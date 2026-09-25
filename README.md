@@ -23,6 +23,21 @@ Forge Design est une application compagnon séparée qui se connecte à un proje
 
 Ces conventions évitent de mélanger le nom humain, le dépôt, l'import Python et la commande CLI.
 
+## Installation et version
+
+Avec Python 3.12 ou supérieur, depuis la racine du dépôt :
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+forge-design --version
+```
+
+La commande affiche `Forge Design` suivi de la version courante du package.
+La CLI se limite actuellement à cette option et à l'aide (`--help`).
+Sans argument, elle affiche l'aide.
+
 ## Vision
 
 ```text
