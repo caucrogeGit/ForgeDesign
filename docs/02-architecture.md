@@ -72,6 +72,28 @@ Une option telle que `--no-browser` pourra être étudiée dans un ticket CLI d�
 Une écoute sur `0.0.0.0`, une connexion distante ou une exposition publique ne font pas partie du comportement par défaut.
 Elles nécessitent une conception de sécurité dédiée.
 
+### Serveur minimal disponible (FD-WEB-001)
+
+`forge_design.web.server.create_server(host="127.0.0.1", port=8765)` ouvre
+l'écoute sans lancer la boucle ; `run_server` utilise les mêmes paramètres et
+sert dans le thread appelant jusqu'à Ctrl+C, puis ferme le socket.
+Seul `127.0.0.1` est accepté : tout autre hôte est refusé, sans exposition réseau
+implicite. Le port par défaut est `8765` ; `0` demande un port éphémère au système.
+Un port hors de `0..65535` est refusé et un port occupé conserve l'exception
+`OSError` du système, sans repli automatique.
+
+La seule route est `GET /`, qui retourne `Forge Design` suivi d'un saut de ligne,
+en texte brut UTF-8. Les autres chemins retournent 404.
+Le serveur utilise `HTTPServer` et un gestionnaire `BaseHTTPRequestHandler` de
+la bibliothèque standard ; il ne sert aucun fichier et ne dépend ni du Bridge
+ni du point de composition. Aucune UI métier n'est disponible.
+La CLI reste inchangée et aucun navigateur n'est ouvert automatiquement.
+
+Pour un cycle de vie piloté, utiliser `create_server` dans un bloc `with`, lancer
+`serve_forever`, puis appeler `shutdown` depuis un autre thread et joindre le
+thread de service avant de quitter le bloc. Le serveur ne crée lui-même aucun
+thread. Un délai d'inactivité de deux secondes est appliqué aux connexions.
+
 Le frontend peut évoluer progressivement :
 
 ```text
