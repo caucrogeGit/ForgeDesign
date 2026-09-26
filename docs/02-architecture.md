@@ -86,7 +86,8 @@ Un choix frontend propre à Circuit, Network ou 3D ne doit pas devenir une dépe
 
 ## 3. Point de composition
 
-Les implémentations concrètes sont assemblées au démarrage de Forge Design.
+Les implémentations concrètes sont assemblées explicitement par
+`forge_design.app.create_tool_registry()`.
 
 Un Tool ne doit pas aller rechercher lui-même un Bridge global, un singleton ou un service caché.
 
@@ -101,7 +102,15 @@ l'application construit
 
 Cela garde les dépendances visibles et facilite les tests.
 
-Le fichier exact servant de point de composition sera choisi lors du ticket correspondant.
+Chaque appel crée un nouveau `ToolRegistry` et une nouvelle instance de
+`ProjectInspectorTool`, enregistrée explicitement sous `project-inspector`.
+C'est l'unique Tool intégré à ce stade. La fonction retourne le registre sans
+exécuter le Tool ni accéder à un projet.
+
+`forge_design/app.py` porte ce choix d'application, au-dessus de la Platform et
+des Tools. Il n'existe pas d'instance globale de registre, de singleton ou de
+découverte automatique. Modifier un registre retourné n'affecte pas les autres.
+Ce point de composition ne démarre aucun serveur et n'est pas encore relié à la CLI.
 
 ## 4. Platform
 
@@ -300,7 +309,7 @@ Le résultat métier spécifique est donc volontairement effacé lors d'une rech
 par identifiant ; aucun `Any`, cast ou résultat universel n'est nécessaire.
 La stabilité de l'identifiant demeure une obligation du Tool après enregistrement.
 Le registre ne copie pas, n'exécute pas et ne découvre pas les Tools.
-Le futur point de composition décidera des instances à enregistrer.
+`forge_design.app.create_tool_registry()` choisit explicitement les instances intégrées à enregistrer (section 3).
 
 ## 13. Outils spécialisés futurs
 
