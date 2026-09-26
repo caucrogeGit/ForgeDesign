@@ -12,7 +12,11 @@ from core.http.router import Router
 
 from forge_design.app import create_tool_registry
 from forge_design.current_project import CurrentProjectContext
-from forge_design.web.inspector import inspect_submission, show_inspector
+from forge_design.web.inspector import (
+    inspect_submission,
+    refresh_project,
+    show_inspector,
+)
 from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
 
@@ -51,6 +55,9 @@ def create_application() -> Application:
     def inspect(request: Request) -> Response:
         return inspect_submission(request, registry, context)
 
+    def refresh(request: Request) -> Response:
+        return refresh_project(request, registry, context)
+
     router = Router()
     router.add("GET", "/", index, public=True, no_store=True)
     router.add("GET", "/shell.css", _style, public=True)
@@ -58,6 +65,9 @@ def create_application() -> Application:
     # Ces actions runtime sans session exigent une origine locale exacte.
     router.add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
     router.add("POST", "/project/close", close, public=True, csrf=False, no_store=True)
+    router.add(
+        "POST", "/project/refresh", refresh, public=True, csrf=False, no_store=True
+    )
     return Application(router, api_routes_module=None)
 
 

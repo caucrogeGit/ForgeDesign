@@ -11,6 +11,7 @@
       <p id="path-help">Chemin local. L’inspection ne modifie aucun fichier.</p>
       <button type="submit">Inspecter</button>
     </form>
+    {% if message %}<p role="status">{{ message }}</p>{% endif %}
     {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
     {% if result %}
     <section aria-labelledby="inspection-title">

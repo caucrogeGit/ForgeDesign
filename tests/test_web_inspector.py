@@ -197,6 +197,12 @@ def test_registry_delegation_and_escaping(monkeypatch: pytest.MonkeyPatch) -> No
             assert "<script>" not in html and "&lt;script&gt;" in html
             assert escape(raw, quote=True).replace("&quot;", "&#34;") in html
             calls.clear()
+            assert request(instance, "ignored", target="/project/refresh")[0] == 200
+            assert calls == [Path(raw)] and ids == [
+                "project-inspector",
+                "project-inspector",
+            ]
+            calls.clear()
             assert request(instance, raw, origin="https://evil.example")[0] == 403
             assert calls == []
         finally:
@@ -285,3 +291,69 @@ def test_application_isolation_and_restart(server: WSGIServer, project: Path) ->
                 other.shutdown()
                 thread.join(timeout=5)
                 assert not thread.is_alive()
+
+
+def test_refresh_empty(server: WSGIServer) -> None:
+    status, html, headers = request(server, target="/project/refresh")
+    assert status == 409 and "Aucun projet à actualiser." in html
+    assert "no-store" in headers.get("Cache-Control", "")
+
+
+def test_refresh_updates_diagnostic(server: WSGIServer, project: Path) -> None:
+    assert request(server, str(project / "mvc/.."))[0] == 200
+    (project / "requirements.txt").write_text("forge-mvc==2.0.0")
+    (project / "mvc/views").mkdir()
+    # Aucune lecture automatique : le GET conserve l'instantané précédent.
+    assert "Forge 1.0.0rc9" in request(server, method="GET", target="/")[1]
+    before = {
+        p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)
+        for p in project.rglob("*")
+    }
+    status, html, headers = request(server, "ignored", target="/project/refresh")
+    assert status == 200 and "Projet actualisé." in html
+    assert "2.0.0" in html and "1.0.0rc9" not in html
+    assert "mvc/views" not in html and "mvc/models" in html
+    assert f"Projet : {project.resolve()}" in html
+    assert "no-store" in headers.get("Cache-Control", "")
+    assert before == {
+        p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)
+        for p in project.rglob("*")
+    }
+    assert request(server, target="/project/close")[0] == 200
+    assert request(server, target="/project/refresh")[0] == 409
+
+
+@pytest.mark.parametrize("change", ["structure", "missing", "file"])
+def test_refresh_invalidates_current(
+    server: WSGIServer, project: Path, change: str
+) -> None:
+    import shutil
+
+    assert request(server, str(project))[0] == 200
+    if change == "structure":
+        (project / "app.py").unlink()
+    else:
+        shutil.rmtree(project)
+        if change == "file":
+            project.touch()
+    status, html, _ = request(server, target="/project/refresh")
+    assert status == (200 if change == "structure" else 400)
+    assert "fermé" in html and "Traceback" not in html
+    assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
+
+
+@pytest.mark.parametrize(
+    "origin,site",
+    [(None, None), ("https://evil.example", None), ("local", "cross-site")],
+)
+def test_refresh_security(
+    server: WSGIServer, project: Path, origin: str | None, site: str | None
+) -> None:
+    assert request(server, str(project))[0] == 200
+    (project / "app.py").unlink()
+    assert (
+        request(server, target="/project/refresh", origin=origin, fetch_site=site)[0]
+        == 403
+    )
+    assert request(server, target="/project/refresh", method="GET")[0] != 200
+    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]

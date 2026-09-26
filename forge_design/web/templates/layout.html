@@ -17,6 +17,9 @@
       {% if current_project %}
       <p>Projet : {{ current_project.root }}</p>
       {% if current_project.forge_version %}<p>Forge {{ current_project.forge_version }}</p>{% endif %}
+      <form action="/project/refresh" method="post">
+        <button type="submit">Actualiser</button>
+      </form>
       <form action="/project/close" method="post">
         <button type="submit">Fermer le projet</button>
       </form>

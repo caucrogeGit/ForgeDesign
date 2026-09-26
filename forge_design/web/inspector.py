@@ -25,6 +25,7 @@ def _render(
     *,
     result: ProjectInspection | None = None,
     error: str | None = None,
+    message: str | None = None,
     status: int = 200,
 ) -> Response:
     return render_page(
@@ -33,6 +34,7 @@ def _render(
             "path": path,
             "result": result,
             "error": error,
+            "message": message,
             "max_path_length": MAX_PATH_LENGTH,
             "active_page": "inspector",
             "current_project": context.inspection,
@@ -86,3 +88,36 @@ def inspect_submission(
     if result.valid:
         context.set_project(result)
     return _render(context, path, result=result)
+
+
+def refresh_project(
+    request: Request, registry: ToolRegistry, context: CurrentProjectContext
+) -> Response:
+    """Réinspecter uniquement la racine courante, sans utiliser de chemin HTTP."""
+    if not is_local_action(request):
+        return _render(
+            context, error="Origine de la requête non autorisée.", status=403
+        )
+    root = context.root
+    if root is None:
+        return _render(context, error="Aucun projet à actualiser.", status=409)
+    try:
+        result = registry.get("project-inspector").run(root)
+    except (
+        ProjectRootNotFoundError,
+        ProjectRootNotDirectoryError,
+        ProjectRootResolutionError,
+    ) as error:
+        context.clear()
+        return _render(context, error=f"Projet fermé : {error}", status=400)
+    if not isinstance(result, ProjectInspection):
+        raise TypeError("project-inspector doit retourner ProjectInspection.")
+    if not result.valid:
+        context.clear()
+        return _render(
+            context,
+            result=result,
+            error="Le projet n’est plus reconnu ; il a été fermé.",
+        )
+    context.set_project(result)
+    return _render(context, result=result, message="Projet actualisé.")

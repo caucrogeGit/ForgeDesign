@@ -140,9 +140,15 @@ Toutes les pages contenant cet état sont servies avec `Cache-Control: no-store`
 Le contexte appartient à l'instance serveur, partagé par ses onglets clients,
 et disparaît avec elle : aucune persistance, aucun cookie ni session ajouté.
 Une nouvelle application démarre vide. Le diagnostic n'est pas rafraîchi en arrière-plan.
+`POST /project/refresh` (FD-PROJECT-002) réinspecte explicitement `context.root`
+via `registry.get("project-inspector").run(root)`, sans chemin fourni par HTTP.
+Un résultat valide remplace le diagnostic et affiche « Projet actualisé. ».
+Un résultat invalide vide le contexte et affiche ses erreurs (200) ; une erreur
+attendue de racine le vide également avec un message (400). Sans projet : 409.
+Cette action applique le même contrôle d'origine et `no-store` que la fermeture.
 
 Activation et fermeture modifient maintenant l'état runtime. La politique a été
-réévaluée : le CSRF Forge rc9 dépend d'une session ; les deux POST utilisent ici
+réévaluée : le CSRF Forge rc9 dépend d'une session ; les POST de mutation utilisent ici
 un contrôle strict d'origine sans session, avec `csrf=False` explicitement déclaré.
 Avant toute mutation, `Origin` doit égaler exactement `http://` suivi du Host
 local `127.0.0.1[:port]`, et `Sec-Fetch-Site`, s'il existe, doit valoir `same-origin`.
