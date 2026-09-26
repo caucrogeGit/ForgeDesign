@@ -9,8 +9,8 @@
 {% for warning in result.warnings %}<p>{{ warning }}</p>{% endfor %}
 {% if result.routes %}
 <table>
-  <thead><tr><th scope="col">Méthode</th><th scope="col">Chemin</th><th scope="col">Nom</th><th scope="col">Public</th></tr></thead>
-  <tbody>{% for route in result.routes %}<tr><td>{{ route.method }}</td><td>{{ route.path }}</td><td>{{ route.name or '—' }}</td><td>{{ 'Oui' if route.public else 'Non' }}</td></tr>{% endfor %}</tbody>
+  <thead><tr><th scope="col">Méthode</th><th scope="col">Chemin</th><th scope="col">Handler</th><th scope="col">Nom</th><th scope="col">Public</th></tr></thead>
+  <tbody>{% for route in result.routes %}<tr><td>{{ route.method }}</td><td>{{ route.path }}</td><td>{{ route.handler.reference if route.handler else '—' }}</td><td>{{ route.name or '—' }}</td><td>{{ 'Oui' if route.public else 'Non' }}</td></tr>{% endfor %}</tbody>
 </table>
 {% else %}<p>Aucune route statique trouvée dans cette source.</p>{% endif %}
 {% endif %}

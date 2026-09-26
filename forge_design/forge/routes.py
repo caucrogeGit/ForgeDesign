@@ -22,11 +22,17 @@ class RoutesSourceUnreadableError(ValueError):
 
 
 @dataclass(frozen=True)
+class HandlerInfo:
+    reference: str
+
+
+@dataclass(frozen=True)
 class RouteInfo:
     method: str
     path: str
     name: str | None
     public: bool
+    handler: HandlerInfo | None = None
 
 
 @dataclass(frozen=True)
@@ -34,6 +40,17 @@ class RoutesResult:
     routes: tuple[RouteInfo, ...]
     warnings: tuple[str, ...]
     source: str = "mvc/routes/__init__.py"
+
+
+def _handler(node: ast.expr) -> HandlerInfo | None:
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return None
+    parts.append(node.id)
+    return HandlerInfo(".".join(reversed(parts)))
 
 
 def _literal(node: ast.expr) -> object:
@@ -137,10 +154,17 @@ def _parse(tree: ast.Module, receiver: str | None = None) -> RoutesResult:
                             or type(public) is not bool
                         ):
                             raise ValueError
+                        handler = _handler(call.args[2])
+                        if handler is None:
+                            warnings.append(
+                                f"Ligne {call.lineno} : handler dynamique non résolu."
+                            )
                         for m in methods:
                             assert isinstance(m, str)
                             routes.append(
-                                RouteInfo(m.upper(), prefix + path, name, public)
+                                RouteInfo(
+                                    m.upper(), prefix + path, name, public, handler
+                                )
                             )
                         continue
                 warnings.append(
@@ -159,9 +183,7 @@ def _read_source(path: Path) -> str:
     try:
         metadata = path.lstat()
     except FileNotFoundError as error:
-        raise RoutesSourceMissingError(
-            f"Source {path.name} absente."
-        ) from error
+        raise RoutesSourceMissingError(f"Source {path.name} absente.") from error
     except OSError as error:
         raise RoutesSourceUnreadableError("Source inaccessible.") from error
     try:

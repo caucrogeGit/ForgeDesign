@@ -473,8 +473,12 @@ Les résultats immuables contiennent méthode, chemin, nom optionnel et public.
 La lecture statique reconnaît `router = Router()`, les appels littéraux `add`
 et les groupes `with router.group(...) as ...` ; elle conserve l'ordre source.
 Les listes de méthodes produisent une ligne par méthode.
-Le troisième argument handler n'est jamais évalué. Les noms de routes sont affichés,
-pas reliés aux contrôleurs.
+Le troisième argument handler n'est jamais évalué. FD-ROUTES-002 ajoute un
+`HandlerInfo(reference)` immuable au résultat : les noms simples et chaînes
+attributaires ancrées sur un nom sont reproduits tels quels, y compris les alias.
+Les imports restent des déclarations syntaxiques, sans ouverture des contrôleurs.
+Une expression dynamique conserve la route avec handler absent et un avertissement
+de ligne ; la colonne Handler affiche alors « — ». Aucun lien ou graphe ajouté.
 
 Forge `routes:list` et `Router.iter_routes` nécessitent le chargement du code cible ;
 ils sont donc inadaptés à ce contrat sans exécution. Un AST Python standard est

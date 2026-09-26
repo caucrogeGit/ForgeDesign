@@ -6,6 +6,7 @@ import pytest
 
 from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.forge.routes import (
+    HandlerInfo,
     RouteInfo,
     RoutesResult,
     RoutesSourceMissingError,
@@ -40,7 +41,7 @@ register_optins(router)
     assert result.routes == (
         RouteInfo("GET", "/api/items", "items", True),
         RouteInfo("POST", "/api/items", "items", True),
-        RouteInfo("DELETE", "/items", None, False),
+        RouteInfo("DELETE", "/items", None, False, HandlerInfo("missing_handler")),
     )
     assert result == read_routes(project)
     assert result.warnings
@@ -135,7 +136,7 @@ def register_contact_routes(router):
         "user_routes.py",
         "contact_routes.py",
     ]
-    assert len(result.warnings) == 2
+    assert len(result.warnings) == 5
     assert before == {
         p: (p.read_bytes(), p.stat().st_mtime_ns) for p in directory.iterdir()
     }
@@ -158,3 +159,61 @@ def test_unresolved_branch(project: Path, kind: str) -> None:
     (directory / "__init__.py").write_text(f"{imports}\nrouter = Router()\n{call}\n")
     result = read_routes(project)
     assert result.routes == () and len(result.warnings) >= 2
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["ContactController.list", "HomeController.index", "health", "Contact.list"],
+)
+@pytest.mark.parametrize("branched", [False, True])
+def test_handler_references(project: Path, reference: str, branched: bool) -> None:
+    directory = project / "mvc/routes"
+    declaration = f'    public.add("GET", "/", {reference}, name="home")\n'
+    content = (
+        "from mvc.controllers.contact import ContactController as Contact\n"
+        'def health(request):\n    raise RuntimeError("never execute")\n'
+    )
+    if branched:
+        (directory / "__init__.py").write_text(
+            "from mvc.routes.contact_routes import register_contact_routes\n"
+            "router = Router()\nregister_contact_routes(router)\n"
+        )
+        content += (
+            'def register_contact_routes(router):\n'
+            '    with router.group("", public=True) as public:\n'
+            + "    "
+            + declaration
+        )
+        target = directory / "contact_routes.py"
+    else:
+        content += (
+            'router = Router()\nwith router.group("", public=True) as public:\n'
+            + declaration
+        )
+        target = directory / "__init__.py"
+    target.write_text(content)
+    result = read_routes(project)
+    assert result.routes == (
+        RouteInfo("GET", "/", "home", True, HandlerInfo(reference)),
+    )
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "get_handler()",
+        "factory().index",
+        'handlers["list"]',
+        "lambda request: None",
+        "partial(ContactController.list, secret)",
+        "getattr(ContactController, action)",
+    ],
+)
+def test_dynamic_handler_keeps_route(project: Path, expression: str) -> None:
+    (project / "mvc/routes/__init__.py").write_text(
+        f'router = Router()\nrouter.add("GET", "/", {expression})\n'
+    )
+    result = read_routes(project)
+    assert result.routes == (RouteInfo("GET", "/", None, False),)
+    assert any("handler dynamique non résolu" in warning for warning in result.warnings)
+    assert all(expression not in warning for warning in result.warnings)
