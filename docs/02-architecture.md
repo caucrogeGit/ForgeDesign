@@ -476,7 +476,14 @@ Les listes de méthodes produisent une ligne par méthode.
 Le troisième argument handler n'est jamais évalué. FD-ROUTES-002 ajoute un
 `HandlerInfo(reference)` immuable au résultat : les noms simples et chaînes
 attributaires ancrées sur un nom sont reproduits tels quels, y compris les alias.
-Les imports restent des déclarations syntaxiques, sans ouverture des contrôleurs.
+FD-ROUTES-003 ajoute `controller_file` optionnel au handler, depuis les imports
+explicites du même fichier de routes : `mvc.controllers.<module_simple>`, avec alias
+acceptés. Le chemin relatif est confirmé par métadonnées uniquement ; aucun
+contenu contrôleur n'est ouvert. Fichiers ou parents liés, fichiers absents et types
+incorrects ne sont pas résolus et produisent un avertissement. Les imports des
+sources différentes ne sont jamais mélangés. Sous-paquets et imports relatifs
+restent hors contrat ; aucune recherche de classe ou méthode n'est effectuée.
+La page ajoute la colonne Contrôleur, sans lien.
 Une expression dynamique conserve la route avec handler absent et un avertissement
 de ligne ; la colonne Handler affiche alors « — ». Aucun lien ou graphe ajouté.
 

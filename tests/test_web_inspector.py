@@ -364,7 +364,11 @@ def test_route_explorer_page(server: WSGIServer, project: Path) -> None:
     assert status == 200 and "Aucun projet ouvert." in html
     assert 'href="/routes" aria-current="page"' in html
     assert "no-store" in headers.get("Cache-Control", "")
-    (project / "mvc/routes/__init__.py").write_text('''router = Router()
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/contact.py").write_text("invalid Python!")
+    (project / "mvc/routes/__init__.py").write_text('''
+from mvc.controllers.contact import ContactController
+router = Router()
 router.add("GET", "/<script>", ContactController.list, name="home", public=True)
 router.add("POST", "/submit", handler)
 ''')
@@ -373,6 +377,7 @@ router.add("POST", "/submit", handler)
     assert status == 200 and "<table>" in html
     assert "GET" in html and "POST" in html and "home" in html
     assert "Handler</th>" in html and "ContactController.list" in html
+    assert "Contrôleur</th>" in html and "mvc/controllers/contact.py" in html
     assert "Oui" in html and "Non" in html and "—" in html
     assert "&lt;script&gt;" in html and "<script>" not in html
     assert "no-store" in headers.get("Cache-Control", "")

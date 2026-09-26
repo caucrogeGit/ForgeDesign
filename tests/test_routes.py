@@ -179,10 +179,8 @@ def test_handler_references(project: Path, reference: str, branched: bool) -> No
             "router = Router()\nregister_contact_routes(router)\n"
         )
         content += (
-            'def register_contact_routes(router):\n'
-            '    with router.group("", public=True) as public:\n'
-            + "    "
-            + declaration
+            "def register_contact_routes(router):\n"
+            '    with router.group("", public=True) as public:\n' + "    " + declaration
         )
         target = directory / "contact_routes.py"
     else:
@@ -217,3 +215,113 @@ def test_dynamic_handler_keeps_route(project: Path, expression: str) -> None:
     assert result.routes == (RouteInfo("GET", "/", None, False),)
     assert any("handler dynamique non résolu" in warning for warning in result.warnings)
     assert all(expression not in warning for warning in result.warnings)
+
+
+@pytest.mark.parametrize("branched", [False, True])
+@pytest.mark.parametrize("alias", ["ContactController", "Contact"])
+def test_controller_per_source(
+    project: Path, branched: bool, alias: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    controllers = project / "mvc/controllers"
+    controllers.mkdir()
+    controller = controllers / "contact_controller.py"
+    controller.write_text("not even valid python !!!")
+    routes = project / "mvc/routes"
+    declaration = f'router.add("GET", "/contact", {alias}.list)\n'
+    source = (
+        f"from mvc.controllers.contact_controller import ContactController as {alias}\n"
+    )
+    if branched:
+        (routes / "__init__.py").write_text(
+            "from mvc.controllers.wrong import ContactController\n"
+            "from mvc.routes.contact_routes import register_contact_routes\n"
+            "router = Router()\nregister_contact_routes(router)\n"
+        )
+        (routes / "contact_routes.py").write_text(
+            source + "def register_contact_routes(router):\n    " + declaration
+        )
+    else:
+        (routes / "__init__.py").write_text(
+            source + "router = Router()\n" + declaration
+        )
+    original = os.open
+
+    def guarded(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        assert isinstance(path, Path) and path.parent == routes
+        return original(path, flags, mode, dir_fd=dir_fd)
+
+    def no_scan(*args: object, **kwargs: object) -> None:
+        pytest.fail("Aucun scan autorisé")
+
+    before = controller.stat().st_mtime_ns, controller.read_bytes()
+    monkeypatch.setattr(os, "open", guarded)
+    monkeypatch.setattr(Path, "iterdir", no_scan)
+    result = read_routes(project)
+    assert result.routes[0].handler == HandlerInfo(
+        f"{alias}.list", "mvc/controllers/contact_controller.py"
+    )
+    assert before == (controller.stat().st_mtime_ns, controller.read_bytes())
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "missing",
+        "symlink",
+        "parent_link",
+        "external",
+        "subpackage",
+        "relative",
+        "simple",
+        "dynamic",
+        "different_source",
+    ],
+)
+def test_controller_unresolved(project: Path, kind: str) -> None:
+    controllers = project / "mvc/controllers"
+    controllers.mkdir()
+    target = controllers / "contact.py"
+    imports = "from mvc.controllers.contact import Contact"
+    reference = "Contact.list"
+    if kind == "symlink":
+        target.symlink_to(project / "app.py")
+    elif kind == "parent_link":
+        controllers.rmdir()
+        controllers.symlink_to(project / "mvc/routes", target_is_directory=True)
+    elif kind == "external":
+        imports = "from services.contact import Contact"
+    elif kind == "subpackage":
+        imports = "from mvc.controllers.admin.contact import Contact"
+    elif kind == "relative":
+        imports = "from ..controllers.contact import Contact"
+    elif kind == "simple":
+        reference = "health"
+    elif kind == "dynamic":
+        reference = "factory()"
+    source = f'{imports}\nrouter = Router()\nrouter.add("GET", "/", {reference})\n'
+    if kind == "different_source":
+        target.touch()
+        source = (
+            imports
+            + "\nfrom mvc.routes.contact_routes import register_contact_routes\n"
+            "router = Router()\nregister_contact_routes(router)\n"
+        )
+        (project / "mvc/routes/contact_routes.py").write_text(
+            'def register_contact_routes(router):\n'
+            '    router.add("GET", "/", Contact.list)\n'
+        )
+    (project / "mvc/routes/__init__.py").write_text(source)
+    result = read_routes(project)
+    assert len(result.routes) == 1
+    handler = result.routes[0].handler
+    assert handler is None or handler.controller_file is None
+    if kind in ("missing", "symlink", "parent_link"):
+        assert any("contrôleur" in warning for warning in result.warnings)
