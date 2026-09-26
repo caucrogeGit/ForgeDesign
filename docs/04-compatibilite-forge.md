@@ -129,6 +129,57 @@ La lecture de version doit :
 
 Si plusieurs sources existent, l'ordre de priorité est documenté et testé.
 
+### Contrat de lecture établi par FD-FORGE-003
+
+Source observée sur Forge `main`, commit
+[`73a956e587e5f169c028415e0e540c149cbaff56`](https://github.com/caucrogeGit/Forge/tree/73a956e587e5f169c028415e0e540c149cbaff56/skeleton/data) :
+le squelette déclare `forge-mvc==1.0.0rc9` dans `requirements.txt`.
+Son `pyproject.toml` configure uniquement les outils, sans table `[project]`.
+`forge new` peut remplacer le pin par une référence Git selon la provenance du CLI
+(`cli/project/install_source.py`).
+Cette référence ne déclare pas à elle seule une version de distribution.
+
+`read_forge_version(root)` reconnaît d'abord le projet avec le détecteur du Bridge,
+puis lit uniquement `requirements.txt` à la racine canonique.
+C'est la seule source retenue : aucun ordre de priorité entre fichiers ni fallback.
+La version de l'application, les commentaires d'`app.py`, les métadonnées de
+l'environnement installé et `forge --version` ne constituent pas cette déclaration.
+
+Le résultat immuable `ForgeVersionInfo` contient `status`, `version`, `source` et
+`details`. `source` vaut `requirements.txt` lorsque ce chemin est présent ou
+inaccessible, et `None` lorsque le fichier est absent.
+
+| Statut | Signification |
+|---|---|
+| `found` | Déclarations `forge-mvc` exactes (`==` sans joker), inconditionnelles et cohérentes ; version normalisée PEP 440 |
+| `absent` | Fichier ou déclaration absent, ou aucune version exacte déterminable (URL Git, plage, joker, condition) |
+| `unreadable` | Erreur d'accès, format Forge invalide, UTF-8 invalide, source non régulière, taille excessive ou directive non prise en charge |
+| `conflict` | Plusieurs pins exacts désignent des versions différentes dans le même fichier |
+
+Seul `found` fournit une version. Les noms de distribution sont normalisés et les
+préversions sont acceptées. Des pins équivalents selon PEP 440 sont cohérents ;
+la première déclaration fournit la représentation normalisée retournée.
+Les spécificateurs d'une même déclaration sont triés pour stabiliser ce choix.
+Une erreur de lecture ou de format prime sur un conflit ; un conflit entre pins
+exacts prime sur une déclaration non résolue. Une déclaration non résolue empêche
+un résultat `found`, même si un autre pin exact est présent.
+
+Le lecteur n'évalue pas les conditions, ne suit ni inclusions `-r`/`-c`, ni
+installations éditables, ni continuations de ligne. Ces directives donnent
+`unreadable`. Les autres dépendances et les commentaires sont ignorés.
+Les diagnostics ne recopient pas les lignes du fichier.
+
+La lecture est limitée à 1 Mio et refuse les liens symboliques et fichiers
+spéciaux. Le type et l'identité sont contrôlés avant lecture sur le descripteur
+ouvert ; `O_NOFOLLOW` et `O_NONBLOCK` sont utilisés lorsqu'ils sont disponibles.
+La racine et ses parents doivent rester stables pendant l'appel.
+Une racine invalide conserve les exceptions de `resolve_project_root` ; un
+projet non reconnu déclenche `NotForgeProjectError`.
+
+Ce contrat décrit la version **déclarée**, pas nécessairement la version installée
+(notamment en mode `FORGE_DEV_SRC`). Il ne compare pas cette version à Forge Design
+et ne statue pas sur son support.
+
 ## 7. Détection de projet
 
 La détection doit utiliser un petit ensemble de signatures stables.

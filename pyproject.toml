@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Cockpit graphique et outils visuels pour l'écosystème Forge"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["packaging>=24.0"]
 
 [project.scripts]
 forge-design = "forge_design.cli:main"
