@@ -175,7 +175,7 @@ construction. Sa méthode `run` délègue directement à `inspect_project` et re
 La conformité est vérifiée statiquement par Pyright, sans héritage obligatoire ni
 test `isinstance` du protocole. Le kebab-case, la stabilité des identifiants et la
 lecture seule sont des obligations du contrat, pas un mécanisme de contrôle à
-l'exécution. Aucun registre ni chargement de plugins n'est implémenté à ce stade.
+l'exécution. Le registre explicite est décrit en section 12 ; aucun chargement de plugins n'est implémenté.
 
 ## 7. Arborescence cible progressive
 
@@ -283,15 +283,24 @@ Voir `04-compatibilite-forge.md`.
 
 ## 12. Registre des Tools
 
-Le registre vient après un premier Tool réel.
+`forge_design.platform.tool_registry.ToolRegistry` conserve des instances
+fournies explicitement via `register(tool)` ; aucun Tool n'est préenregistré.
+`get(tool_id)` retrouve l'instance et `list()` retourne un tuple instantané dans
+l'ordre d'enregistrement. La collection retournée ne permet pas de modifier le
+registre ; les instances restent celles fournies par l'appelant.
 
-Son objectif initial est limité :
+Les identifiants suivent `[a-z][a-z0-9]*(?:-[a-z0-9]+)*` : minuscules ASCII,
+chiffres après la première lettre et segments séparés par un seul tiret.
+Un identifiant invalide lève `ValueError`, un doublon `DuplicateToolError`
+(sous-classe de `ValueError`) et une recherche inconnue `UnknownToolError`
+(sous-classe de `KeyError`). Aucun doublon ne remplace l'instance existante.
 
-- enregistrer les Tools intégrés ;
-- les retrouver par identifiant ;
-- exposer leurs métadonnées minimales.
-
-Pas de téléchargement, marketplace, chargement de code arbitraire ou découverte dynamique externe.
+Le registre utilise `Tool[object]` grâce à la covariance du contrat.
+Le résultat métier spécifique est donc volontairement effacé lors d'une recherche
+par identifiant ; aucun `Any`, cast ou résultat universel n'est nécessaire.
+La stabilité de l'identifiant demeure une obligation du Tool après enregistrement.
+Le registre ne copie pas, n'exécute pas et ne découvre pas les Tools.
+Le futur point de composition décidera des instances à enregistrer.
 
 ## 13. Outils spécialisés futurs
 
