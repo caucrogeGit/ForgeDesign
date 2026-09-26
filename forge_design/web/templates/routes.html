@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block title %}Route Explorer — Forge Design{% endblock %}
+{% block content %}
+<h1>Route Explorer</h1>
+{% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if result %}
+<p>Source : {{ result.source }}</p>
+{% for warning in result.warnings %}<p>{{ warning }}</p>{% endfor %}
+{% if result.routes %}
+<table>
+  <thead><tr><th scope="col">Méthode</th><th scope="col">Chemin</th><th scope="col">Nom</th><th scope="col">Public</th></tr></thead>
+  <tbody>{% for route in result.routes %}<tr><td>{{ route.method }}</td><td>{{ route.path }}</td><td>{{ route.name or '—' }}</td><td>{{ 'Oui' if route.public else 'Non' }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}<p>Aucune route statique trouvée dans cette source.</p>{% endif %}
+{% endif %}
+{% endblock %}

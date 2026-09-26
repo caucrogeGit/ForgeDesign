@@ -18,6 +18,7 @@ from forge_design.web.inspector import (
     show_inspector,
 )
 from forge_design.web.rendering import render_page
+from forge_design.web.routes import show_routes
 from forge_design.web.security import is_local_action
 
 DEFAULT_HOST = "127.0.0.1"
@@ -58,6 +59,9 @@ def create_application() -> Application:
     def refresh(request: Request) -> Response:
         return refresh_project(request, registry, context)
 
+    def routes(request: Request) -> Response:
+        return show_routes(context, registry)
+
     router = Router()
     router.add("GET", "/", index, public=True, no_store=True)
     router.add("GET", "/shell.css", _style, public=True)
@@ -68,6 +72,7 @@ def create_application() -> Application:
     router.add(
         "POST", "/project/refresh", refresh, public=True, csrf=False, no_store=True
     )
+    router.add("GET", "/routes", routes, public=True, no_store=True)
     return Application(router, api_routes_module=None)
 
 

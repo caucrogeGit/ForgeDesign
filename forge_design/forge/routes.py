@@ -1,0 +1,263 @@
+"""Déclarations statiques de la racine de routes Forge, sans import cible."""
+
+import ast
+import os
+import re
+from dataclasses import dataclass
+from os import PathLike
+from pathlib import Path
+from stat import S_ISREG
+
+from forge_design.forge.project_detection import detect_forge_project
+from forge_design.forge.project_root import resolve_project_root
+from forge_design.forge.project_version import NotForgeProjectError
+
+
+class RoutesSourceMissingError(ValueError):
+    """La source conventionnelle des routes est absente."""
+
+
+class RoutesSourceUnreadableError(ValueError):
+    """Source refusée, inaccessible ou syntaxiquement invalide."""
+
+
+@dataclass(frozen=True)
+class RouteInfo:
+    method: str
+    path: str
+    name: str | None
+    public: bool
+
+
+@dataclass(frozen=True)
+class RoutesResult:
+    routes: tuple[RouteInfo, ...]
+    warnings: tuple[str, ...]
+    source: str = "mvc/routes/__init__.py"
+
+
+def _literal(node: ast.expr) -> object:
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return [_literal(item) for item in node.elts]
+    raise ValueError("Expression dynamique")
+
+
+def _tree(source: str) -> ast.Module:
+    try:
+        return ast.parse(source)
+    except (SyntaxError, ValueError, RecursionError) as error:
+        raise RoutesSourceUnreadableError("Syntaxe de routes invalide.") from error
+
+
+def _parse(tree: ast.Module, receiver: str | None = None) -> RoutesResult:
+    routes: list[RouteInfo] = []
+    warnings = [
+        "Lecture statique des routes explicitement branchées ; "
+        "configuration, imports dynamiques "
+        "et opt-ins non exécutés. La liste peut être partielle."
+    ]
+
+    def visit(body: list[ast.stmt], receivers: dict[str, tuple[str, bool]]) -> None:
+        for statement in body:
+            try:
+                if isinstance(statement, (ast.Import, ast.ImportFrom, ast.Pass)):
+                    continue
+                if isinstance(statement, ast.Expr) and isinstance(
+                    statement.value, ast.Constant
+                ):
+                    continue
+                if isinstance(statement, ast.Assign) and len(statement.targets) == 1:
+                    target, value = statement.targets[0], statement.value
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == "router"
+                        and isinstance(value, ast.Call)
+                        and isinstance(value.func, ast.Name)
+                        and value.func.id == "Router"
+                        and not value.args
+                        and not value.keywords
+                    ):
+                        receivers["router"] = ("", False)
+                        continue
+                if isinstance(statement, ast.With) and len(statement.items) == 1:
+                    item = statement.items[0]
+                    call = item.context_expr
+                    if (
+                        isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Attribute)
+                        and isinstance(call.func.value, ast.Name)
+                        and call.func.attr == "group"
+                        and call.func.value.id in receivers
+                        and isinstance(item.optional_vars, ast.Name)
+                    ):
+                        options = {k.arg: _literal(k.value) for k in call.keywords}
+                        prefix = _literal(call.args[0]) if len(call.args) == 1 else None
+                        public = options.get("public", False)
+                        if not isinstance(prefix, str) or type(public) is not bool:
+                            raise ValueError
+                        nested = dict(receivers)
+                        nested[item.optional_vars.id] = (prefix.rstrip("/"), public)
+                        visit(statement.body, nested)
+                        continue
+                if isinstance(statement, ast.Expr) and isinstance(
+                    statement.value, ast.Call
+                ):
+                    call = statement.value
+                    if (
+                        isinstance(call.func, ast.Attribute)
+                        and call.func.attr == "add"
+                        and isinstance(call.func.value, ast.Name)
+                        and call.func.value.id in receivers
+                    ):
+                        if len(call.args) != 3 or any(
+                            k.arg is None for k in call.keywords
+                        ):
+                            raise ValueError
+                        method, path = _literal(call.args[0]), _literal(call.args[1])
+                        options = {k.arg: _literal(k.value) for k in call.keywords}
+                        prefix, default_public = receivers[call.func.value.id]
+                        name, public = (
+                            options.get("name"),
+                            options.get("public", default_public),
+                        )
+                        if public is None:
+                            public = default_public
+                        methods = (
+                            [_literal(item) for item in call.args[0].elts]
+                            if isinstance(call.args[0], (ast.List, ast.Tuple))
+                            else [method]
+                        )
+                        if (
+                            not isinstance(path, str)
+                            or not methods
+                            or not all(isinstance(m, str) for m in methods)
+                            or (name is not None and not isinstance(name, str))
+                            or type(public) is not bool
+                        ):
+                            raise ValueError
+                        for m in methods:
+                            assert isinstance(m, str)
+                            routes.append(
+                                RouteInfo(m.upper(), prefix + path, name, public)
+                            )
+                        continue
+                warnings.append(
+                    f"Ligne {statement.lineno} : déclaration non interprétée."
+                )
+            except (ValueError, RecursionError):
+                warnings.append(
+                    f"Ligne {statement.lineno} : déclaration dynamique non résolue."
+                )
+
+    visit(tree.body, {receiver: ("", False)} if receiver is not None else {})
+    return RoutesResult(tuple(routes), tuple(warnings))
+
+
+def _read_source(path: Path) -> str:
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError as error:
+        raise RoutesSourceMissingError(
+            f"Source {path.name} absente."
+        ) from error
+    except OSError as error:
+        raise RoutesSourceUnreadableError("Source inaccessible.") from error
+    try:
+        if not S_ISREG(metadata.st_mode):
+            raise RoutesSourceUnreadableError(
+                "La source doit être un fichier sans lien."
+            )
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+        )
+        with os.fdopen(descriptor, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if not S_ISREG(opened.st_mode) or not os.path.samestat(metadata, opened):
+                raise RoutesSourceUnreadableError(
+                    "Source remplacée pendant la lecture."
+                )
+            data = stream.read(1024 * 1024 + 1)
+        if len(data) > 1024 * 1024:
+            raise RoutesSourceUnreadableError("Source supérieure à 1 Mio.")
+        return data.decode("utf-8-sig")
+    except (OSError, UnicodeError) as error:
+        raise RoutesSourceUnreadableError("Source de routes illisible.") from error
+
+
+def read_routes(root: str | PathLike[str]) -> RoutesResult:
+    """Racine puis branchements directs seulement, sans import ni récursion."""
+    canonical = resolve_project_root(root)
+    if not detect_forge_project(canonical).valid:
+        raise NotForgeProjectError("La racine n'est pas un projet Forge reconnu.")
+    directory = canonical / "mvc/routes"
+    tree = _tree(_read_source(directory / "__init__.py"))
+    imports: dict[str, str] = {}
+    branches: list[tuple[str, str]] = []
+    direct: list[ast.stmt] = []
+    # Uniquement les instructions inconditionnelles de la racine, dans leur ordre.
+    for statement in tree.body:
+        if isinstance(statement, ast.ImportFrom):
+            module = statement.module or ""
+            if statement.level == 0 and re.fullmatch(
+                r"mvc\.routes\.[A-Za-z_][A-Za-z_0-9]*", module
+            ):
+                for alias in statement.names:
+                    if alias.asname is None and re.fullmatch(
+                        r"register_[A-Za-z_0-9]+_routes", alias.name
+                    ):
+                        imports[alias.name] = module.rsplit(".", 1)[1]
+        if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call):
+            call = statement.value
+            if (
+                isinstance(call.func, ast.Name)
+                and call.func.id in imports
+                and len(call.args) == 1
+                and isinstance(call.args[0], ast.Name)
+                and call.args[0].id == "router"
+                and not call.keywords
+            ):
+                branches.append((imports[call.func.id], call.func.id))
+                continue
+        direct.append(statement)
+    result = _parse(ast.Module(body=direct, type_ignores=[]))
+    routes, warnings = list(result.routes), list(result.warnings)
+    for module, function in branches[:64]:
+        filename = f"{module}.py"
+        try:
+            child = _tree(_read_source(directory / filename))
+            definitions = [
+                node
+                for node in child.body
+                if isinstance(node, ast.FunctionDef) and node.name == function
+            ]
+            if len(definitions) != 1:
+                raise RoutesSourceUnreadableError("Fonction absente ou ambiguë.")
+            definition = definitions[0]
+            args = definition.args
+            if (
+                definition.decorator_list
+                or len(args.args) != 1
+                or args.posonlyargs
+                or args.kwonlyargs
+                or args.defaults
+                or args.vararg
+                or args.kwarg
+            ):
+                raise RoutesSourceUnreadableError(
+                    "Signature ou décorateur non pris en charge."
+                )
+            parsed = _parse(
+                ast.Module(body=definition.body, type_ignores=[]), args.args[0].arg
+            )
+            routes.extend(parsed.routes)
+            warnings.extend(
+                f"{filename} : {warning}" for warning in parsed.warnings[1:]
+            )
+        except (RoutesSourceMissingError, RoutesSourceUnreadableError) as error:
+            warnings.append(f"{filename} : branchement non résolu ({error}).")
+    if len(branches) > 64:
+        warnings.append("Limite de 64 branchements atteinte ; liste partielle.")
+    return RoutesResult(tuple(routes), tuple(warnings))

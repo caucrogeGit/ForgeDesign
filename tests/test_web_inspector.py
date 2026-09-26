@@ -357,3 +357,23 @@ def test_refresh_security(
     )
     assert request(server, target="/project/refresh", method="GET")[0] != 200
     assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+
+
+def test_route_explorer_page(server: WSGIServer, project: Path) -> None:
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and "Aucun projet ouvert." in html
+    assert 'href="/routes" aria-current="page"' in html
+    assert "no-store" in headers.get("Cache-Control", "")
+    (project / "mvc/routes/__init__.py").write_text('''router = Router()
+router.add("GET", "/<script>", handler, name="home", public=True)
+router.add("POST", "/submit", handler)
+''')
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and "<table>" in html
+    assert "GET" in html and "POST" in html and "home" in html
+    assert "Oui" in html and "Non" in html and "—" in html
+    assert "&lt;script&gt;" in html and "<script>" not in html
+    assert "no-store" in headers.get("Cache-Control", "")
+    (project / "mvc/routes/__init__.py").unlink()
+    assert "absente" in request(server, method="GET", target="/routes")[1]

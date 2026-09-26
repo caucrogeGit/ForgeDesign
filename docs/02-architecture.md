@@ -190,7 +190,7 @@ Cela garde les dépendances visibles et facilite les tests.
 
 Chaque appel crée un nouveau `ToolRegistry` et une nouvelle instance de
 `ProjectInspectorTool`, enregistrée explicitement sous `project-inspector`.
-C'est l'unique Tool intégré à ce stade. La fonction retourne le registre sans
+`RouteExplorerTool` est également enregistré sous `route-explorer` ; ce sont les deux Tools intégrés. La fonction retourne le registre sans
 exécuter le Tool ni accéder à un projet.
 
 `forge_design/app.py` porte ce choix d'application, au-dessus de la Platform et
@@ -456,3 +456,36 @@ UI critique
 ```
 
 Les tests privilégient les contrats observables plutôt que les détails internes.
+
+
+## Route Explorer (FD-ROUTES-001)
+
+`GET /routes` utilise le contexte courant et récupère `route-explorer` dans le
+registre. Sans projet, aucun Tool n'est exécuté. Chaque GET avec projet relit les
+routes, sans modifier le contexte et avec `Cache-Control: no-store`.
+La navigation reste fixe et inclut Route Explorer.
+
+Le Bridge `read_routes` vérifie la racine et la reconnaissance structurelle puis
+lit `mvc/routes/__init__.py` puis les fichiers directement sous `mvc/routes/`
+explicitement importés et branchés depuis cette racine, sans liens symboliques.
+Chaque source est bornée à 1 Mio ; au plus 64 branchements sont suivis.
+Les résultats immuables contiennent méthode, chemin, nom optionnel et public.
+La lecture statique reconnaît `router = Router()`, les appels littéraux `add`
+et les groupes `with router.group(...) as ...` ; elle conserve l'ordre source.
+Les listes de méthodes produisent une ligne par méthode.
+Le troisième argument handler n'est jamais évalué. Les noms de routes sont affichés,
+pas reliés aux contrôleurs.
+
+Forge `routes:list` et `Router.iter_routes` nécessitent le chargement du code cible ;
+ils sont donc inadaptés à ce contrat sans exécution. Un AST Python standard est
+utilisé uniquement comme lecture syntaxique, sans compilation ni évaluation.
+La page indique toujours que la liste peut être partielle : configuration,
+opt-ins et branchements dynamiques ne sont pas suivis.
+Les imports `from mvc.routes.module import register_x_routes` suivis d’un appel
+`register_x_routes(router)` activent la lecture du corps de cette seule fonction.
+Aucun import dans un module branché n’est suivi. Les routes directes précèdent
+les fonctions branchées, dans l’ordre de leurs appels ; un import sans appel
+ne déclenche aucune lecture. Une déclaration
+non interprétée ajoute un avertissement de ligne. Aucun inventaire complet des
+routes exécutables n'est promis par cette lecture minimale.
+Une source absente ou illisible et un projet non reconnu restent des erreurs distinctes.
