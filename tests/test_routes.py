@@ -11,6 +11,7 @@ from forge_design.forge.routes import (
     RoutesResult,
     RoutesSourceMissingError,
     RoutesSourceUnreadableError,
+    TemplateDependency,
     read_routes,
 )
 from forge_design.platform.tool import Tool
@@ -371,6 +372,7 @@ def test_verification(project: Path, content: str, status: str) -> None:
     assert handler.verification == status
     assert handler.template.presence == "not-applicable"
     assert handler.template.syntax == "not-applicable"
+    assert handler.template.dependencies == ()
     assert handler.template.status == (
         "none" if status == "found" else "not-applicable"
     )
@@ -528,6 +530,7 @@ def test_template_resolution(
     if status != "found":
         assert handler.template.presence == "not-applicable"
         assert handler.template.syntax == "not-applicable"
+        assert handler.template.dependencies == ()
     assert len(result.warnings) == 1
 
 
@@ -634,6 +637,7 @@ def test_template_presence(
     assert handler.template.presence == expected
     if expected != "present":
         assert handler.template.syntax == "not-applicable"
+        assert handler.template.dependencies == ()
     assert len(result.warnings) == (2 if kind == "file" else 1)
 
 
@@ -715,7 +719,9 @@ def test_jinja_syntax(
 ) -> None:
     import os
 
-    from jinja2 import Environment, Template
+    from jinja2 import Environment, Template, nodes
+
+    from forge_design.forge import routes as bridge
 
     (project / "mvc/controllers").mkdir()
     controller = project / "mvc/controllers/home.py"
@@ -736,6 +742,13 @@ def test_jinja_syntax(
         p: (p.read_bytes(), p.stat().st_mtime_ns) for p in (source, controller, target)
     }
     original_open, original_parse = os.open, Environment.parse
+    original_extract = bridge._template_dependencies  # pyright: ignore[reportPrivateUsage]
+    extractions: list[nodes.Template] = []
+
+    def extracted(tree: nodes.Template) -> tuple[TemplateDependency, ...]:
+        extractions.append(tree)
+        return original_extract(tree)
+
     reads: list[Path] = []
     parses: list[str] = []
 
@@ -755,6 +768,7 @@ def test_jinja_syntax(
     with monkeypatch.context() as guarded:
         guarded.setattr(os, "open", opened)
         guarded.setattr(Environment, "parse", parsed)
+        guarded.setattr(bridge, "_template_dependencies", extracted)
         for name in ("get_template", "compile", "from_string"):
             guarded.setattr(Environment, name, forbidden)
         for name in ("render", "render_async"):
@@ -763,6 +777,7 @@ def test_jinja_syntax(
             guarded.setattr(Path, name, forbidden)
         for attempt in (1, 2):
             result = read_routes(project)
+            assert len(extractions) == (attempt if status == "valid" else 0)
             assert reads.count(target) == attempt
             assert len(parses) == (0 if status == "unreadable" else attempt)
             for route in result.routes:
@@ -773,3 +788,100 @@ def test_jinja_syntax(
                     assert template.syntax_line and template.syntax_message
             assert len(result.warnings) == (1 if status == "valid" else 2)
     assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}
+
+
+@pytest.mark.parametrize(
+    "source,expected",
+    [
+        (
+            '{% extends "base.html" %}',
+            (TemplateDependency("extends", "base.html", False, 1),),
+        ),
+        (
+            '{% include "partial.html" %}',
+            (TemplateDependency("include", "partial.html", False, 1),),
+        ),
+        (
+            '{% import "macros.html" as macros %}',
+            (TemplateDependency("import", "macros.html", False, 1),),
+        ),
+        (
+            '{% from "forms.html" import field %}',
+            (TemplateDependency("from-import", "forms.html", False, 1),),
+        ),
+        ("{% extends base %}", (TemplateDependency("extends", None, True, 1),)),
+        (
+            "{% include template_name %}",
+            (TemplateDependency("include", None, True, 1),),
+        ),
+        (
+            '{% include "partials/" ~ name %}',
+            (TemplateDependency("include", None, True, 1),),
+        ),
+        (
+            "{% include get_template() %}",
+            (TemplateDependency("include", None, True, 1),),
+        ),
+        (
+            '{% include ["z.html", "a.html"] %}',
+            (
+                TemplateDependency("include", "z.html", False, 1),
+                TemplateDependency("include", "a.html", False, 1),
+            ),
+        ),
+        (
+            '{% include ["a.html", variable] %}',
+            (TemplateDependency("include", None, True, 1),),
+        ),
+        (
+            '{% include "../secret.html" %}',
+            (TemplateDependency("include", "../secret.html", False, 1),),
+        ),
+        (
+            '{% if condition %}\n{% include "a.html" %}\n'
+            '{% else %}\n{% include "b.html" %}\n{% endif %}\n'
+            '{% macro helper() %}{% include "a.html" %}{% endmacro %}\n'
+            '{% block content %}{% include "c.html" %}{% endblock %}',
+            (
+                TemplateDependency("include", "a.html", False, 2),
+                TemplateDependency("include", "b.html", False, 4),
+                TemplateDependency("include", "a.html", False, 6),
+                TemplateDependency("include", "c.html", False, 7),
+            ),
+        ),
+    ],
+)
+def test_jinja_dependencies(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    expected: tuple[TemplateDependency, ...],
+) -> None:
+    import os
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/home.py"
+    controller.write_text(
+        'class HomeController:\n'
+        '    def index(self): return BaseController.render("home.html")\n'
+    )
+    routes = project / "mvc/routes/__init__.py"
+    routes.write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/", HomeController.index)\n'
+    )
+    (project / "mvc/views").mkdir()
+    template = project / "mvc/views/home.html"
+    template.write_text(source)
+    original = os.open
+
+    def opened(path: Path, flags: int) -> int:
+        assert path in (controller, routes, template)
+        return original(path, flags)
+
+    monkeypatch.setattr(os, "open", opened)
+    result = read_routes(project)
+    handler = result.routes[0].handler
+    assert handler and handler.template.syntax == "valid"
+    assert handler.template.dependencies == expected
+    assert len(result.warnings) == 1

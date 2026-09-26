@@ -573,3 +573,22 @@ Syntaxe Jinja valide ne signifie ni rendu réussi, ni dépendances présentes,
 ni filtres/globals runtime valides, ni HTML valide. Les configurations et
 extensions personnalisées du projet ne sont pas chargées. Jinja2 est déclaré
 explicitement au même pin que Forge car le Bridge utilise directement son API.
+
+
+### Déclarations de dépendances Jinja directes
+
+L'AST déjà produit par le parsing fournit les déclarations `extends`, `include`,
+`import` et `from-import`. `TemplateResolution.dependencies` est un tuple de
+`TemplateDependency(kind, path, dynamic, line)` immuables, vide lorsque l'analyse
+n'est pas applicable ou qu'aucune déclaration n'existe.
+Les chaînes littérales sont conservées sans validation filesystem ; les variables,
+concaténations et appels restent dynamiques. Une liste d'include entièrement
+littérale fournit une occurrence par élément ; une liste mixte ou vide reste
+non résolue. Les occurrences, doublons et lignes suivent l'ordre source, y compris
+dans les branches, macros et blocs, sans en interpréter le comportement.
+
+Le cache existant conserve ce résultat après une seule lecture, un seul parsing
+et une seule extraction par template et par appel. Le résumé s'affiche sous la
+référence du template avec échappement, sans warning pour les cas dynamiques.
+Une dépendance détectée n'est ni chargée, ni vérifiée présente ou valide : aucun
+accès filesystem supplémentaire et aucun graphe transitif.

@@ -9,7 +9,7 @@ from pathlib import Path
 from stat import S_ISDIR, S_ISREG
 from typing import Literal
 
-from jinja2 import Environment, TemplateSyntaxError
+from jinja2 import Environment, TemplateSyntaxError, nodes
 
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
@@ -47,6 +47,17 @@ TemplatePresenceStatus = Literal[
 TemplateSyntaxStatus = Literal["valid", "invalid", "unreadable", "not-applicable"]
 
 
+TemplateDependencyKind = Literal["extends", "include", "import", "from-import"]
+
+
+@dataclass(frozen=True)
+class TemplateDependency:
+    kind: TemplateDependencyKind
+    path: str | None
+    dynamic: bool
+    line: int
+
+
 @dataclass(frozen=True)
 class TemplateResolution:
     status: TemplateResolutionStatus = "not-applicable"
@@ -55,6 +66,7 @@ class TemplateResolution:
     syntax: TemplateSyntaxStatus = "not-applicable"
     syntax_line: int | None = None
     syntax_message: str | None = None
+    dependencies: tuple[TemplateDependency, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -281,6 +293,48 @@ def _template_presence(root: Path, reference: str) -> TemplatePresenceStatus:
     return "present"
 
 
+def _template_dependencies(tree: nodes.Template) -> tuple[TemplateDependency, ...]:
+    dependencies: list[TemplateDependency] = []
+    pending: list[nodes.Node] = [tree]
+    while pending:
+        node = pending.pop()
+        kind: TemplateDependencyKind | None = None
+        if isinstance(node, nodes.Extends):
+            kind = "extends"
+        elif isinstance(node, nodes.Include):
+            kind = "include"
+        elif isinstance(node, nodes.Import):
+            kind = "import"
+        elif isinstance(node, nodes.FromImport):
+            kind = "from-import"
+        if kind is not None and isinstance(
+            node, (nodes.Extends, nodes.Include, nodes.Import, nodes.FromImport)
+        ):
+            expression = node.template
+            candidates = (
+                expression.items
+                if isinstance(node, nodes.Include)
+                and isinstance(expression, nodes.List)
+                else [expression]
+            )
+            paths: list[str] = []
+            for candidate in candidates:
+                if not isinstance(candidate, nodes.Const) or not isinstance(
+                    candidate.value, str
+                ):
+                    break
+                paths.append(candidate.value)
+            if paths and len(paths) == len(candidates):
+                dependencies.extend(
+                    TemplateDependency(kind, path, False, node.lineno) for path in paths
+                )
+            else:
+                dependencies.append(TemplateDependency(kind, None, True, node.lineno))
+        pending.extend(reversed(list(node.iter_child_nodes())))
+    # Tri stable : ordre lexical, y compris branches et occurrences sur une même ligne.
+    return tuple(sorted(dependencies, key=lambda dependency: dependency.line))
+
+
 def _template_syntax(root: Path, template: TemplateResolution) -> TemplateResolution:
     assert template.path is not None and template.presence == "present"
     try:
@@ -289,7 +343,7 @@ def _template_syntax(root: Path, template: TemplateResolution) -> TemplateResolu
         return replace(template, syntax="unreadable")
     try:
         # Pas de loader, extension, compilation, contexte ou rendu.
-        Environment(loader=None).parse(source)
+        tree = Environment(loader=None).parse(source)
     except TemplateSyntaxError as error:
         return replace(
             template,
@@ -301,7 +355,7 @@ def _template_syntax(root: Path, template: TemplateResolution) -> TemplateResolu
         )
     except RecursionError:
         return replace(template, syntax="unreadable")
-    return replace(template, syntax="valid")
+    return replace(template, syntax="valid", dependencies=_template_dependencies(tree))
 
 
 def _with_template_presence(
