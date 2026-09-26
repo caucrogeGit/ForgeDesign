@@ -9,6 +9,8 @@ from pathlib import Path
 from stat import S_ISDIR, S_ISREG
 from typing import Literal
 
+from jinja2 import Environment, TemplateSyntaxError
+
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
@@ -42,11 +44,17 @@ TemplatePresenceStatus = Literal[
 ]
 
 
+TemplateSyntaxStatus = Literal["valid", "invalid", "unreadable", "not-applicable"]
+
+
 @dataclass(frozen=True)
 class TemplateResolution:
     status: TemplateResolutionStatus = "not-applicable"
     path: str | None = None
     presence: TemplatePresenceStatus = "not-applicable"
+    syntax: TemplateSyntaxStatus = "not-applicable"
+    syntax_line: int | None = None
+    syntax_message: str | None = None
 
 
 @dataclass(frozen=True)
@@ -273,10 +281,33 @@ def _template_presence(root: Path, reference: str) -> TemplatePresenceStatus:
     return "present"
 
 
+def _template_syntax(root: Path, template: TemplateResolution) -> TemplateResolution:
+    assert template.path is not None and template.presence == "present"
+    try:
+        source = _read_source(root / "mvc/views" / template.path)
+    except (RoutesSourceMissingError, RoutesSourceUnreadableError):
+        return replace(template, syntax="unreadable")
+    try:
+        # Pas de loader, extension, compilation, contexte ou rendu.
+        Environment(loader=None).parse(source)
+    except TemplateSyntaxError as error:
+        return replace(
+            template,
+            syntax="invalid",
+            syntax_line=error.lineno,
+            syntax_message=" ".join(
+                (error.message or "Syntaxe Jinja invalide.").split()
+            )[:240],
+        )
+    except RecursionError:
+        return replace(template, syntax="unreadable")
+    return replace(template, syntax="valid")
+
+
 def _with_template_presence(
-    root: Path, routes: list[RouteInfo]
+    root: Path, routes: list[RouteInfo], warnings: list[str]
 ) -> tuple[RouteInfo, ...]:
-    cache: dict[str, TemplatePresenceStatus] = {}
+    cache: dict[str, TemplateResolution] = {}
     enriched: list[RouteInfo] = []
     for route in routes:
         handler = route.handler
@@ -284,13 +315,24 @@ def _with_template_presence(
             template = handler.template
             if template.path is not None:
                 if template.path not in cache:
-                    cache[template.path] = _template_presence(root, template.path)
+                    checked = replace(
+                        template, presence=_template_presence(root, template.path)
+                    )
+                    if checked.presence == "present":
+                        checked = _template_syntax(root, checked)
+                    cache[template.path] = checked
+                    if checked.syntax == "invalid":
+                        warnings.append(
+                            f"mvc/views/{template.path}:{checked.syntax_line} : "
+                            f"syntaxe Jinja invalide : {checked.syntax_message}"
+                        )
+                    elif checked.syntax == "unreadable":
+                        warnings.append(
+                            f"mvc/views/{template.path} : syntaxe Jinja non vérifiable "
+                            "(lecture, encodage, taille ou profondeur)."
+                        )
                 route = replace(
-                    route,
-                    handler=replace(
-                        handler,
-                        template=replace(template, presence=cache[template.path]),
-                    ),
+                    route, handler=replace(handler, template=cache[template.path])
                 )
         enriched.append(route)
     return tuple(enriched)
@@ -547,4 +589,6 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
             warnings.append(f"{filename} : branchement non résolu ({error}).")
     if len(branches) > 64:
         warnings.append("Limite de 64 branchements atteinte ; liste partielle.")
-    return RoutesResult(_with_template_presence(canonical, routes), tuple(warnings))
+    return RoutesResult(
+        _with_template_presence(canonical, routes, warnings), tuple(warnings)
+    )

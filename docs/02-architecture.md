@@ -543,10 +543,33 @@ La référence affichée reste inchangée. Les chemins absolus, segments vides,
 `.` ou `..`, antislashs, deux-points et caractères NUL sont refusés avant accès.
 Chaque parent doit être un dossier ordinaire et la cible un fichier ordinaire ;
 tous les symlinks sont refusés. Un cache local à `read_routes` évite les contrôles
-répétés d’une même référence. Aucun scan, fallback, lecture ou rendu de vue.
+répétés d’une même référence. Aucun scan ni fallback. La lecture des seules vues présentes est décrite ci-dessous.
 
 Cette racine est la convention du squelette : le `VIEWS_DIR` configurable de
 Forge et ses loaders d’opt-ins ne sont pas chargés. « Absent » signifie absent
 dans cet espace conventionnel. Présence ne signifie ni validité Jinja ni rendu
 effectif. Les parents doivent rester stables pendant ces contrôles, comme pour
 les autres vérifications de métadonnées du Bridge.
+
+
+### Syntaxe Jinja du template référencé
+
+Route Explorer prolonge la présence par un parsing Jinja uniquement lorsque
+la référence est statique et le fichier présent. `TemplateResolution.syntax`
+vaut `valid`, `invalid`, `unreadable` ou `not-applicable` ; `syntax_line` et
+`syntax_message` portent un diagnostic syntaxique éventuel, sans ligne source.
+La colonne Jinja et les warnings affichent ces informations échappées.
+
+Le lecteur existant limite la lecture à 1 Mio, accepte UTF-8 avec BOM et vérifie
+le fichier ordinaire, les liens et les métadonnées du descripteur ouvert.
+L'environnement Jinja 3.1.6 utilise `parse` sans loader, extension, compilation,
+contexte ni rendu. Forge n'active pas d'extension syntaxique dans sa baseline ;
+ses globals et son autoescape ne sont pas nécessaires à ce parsing.
+Les dépendances `extends`, `include` et `import` ne sont jamais chargées.
+Un cache local conserve présence et syntaxe, y compris les échecs, pour éviter
+plusieurs lectures et parsings du même template dans un appel.
+
+Syntaxe Jinja valide ne signifie ni rendu réussi, ni dépendances présentes,
+ni filtres/globals runtime valides, ni HTML valide. Les configurations et
+extensions personnalisées du projet ne sont pas chargées. Jinja2 est déclaré
+explicitement au même pin que Forge car le Bridge utilise directement son API.

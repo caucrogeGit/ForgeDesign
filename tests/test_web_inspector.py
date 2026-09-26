@@ -453,3 +453,51 @@ def test_web_template_presence(
     if "<script>" in reference:
         assert "&lt;script&gt;" in html
     assert headers.get("Cache-Control") == "no-store"
+
+
+@pytest.mark.parametrize(
+    "content,label",
+    [
+        ('{% extends "absent.html" %}{{ unknown }}', "Valide"),
+        ("{% <script> %}", "Invalide"),
+        ("{% if title %}", "Invalide"),
+    ],
+)
+def test_web_jinja_syntax(
+    server: WSGIServer,
+    project: Path,
+    content: str,
+    label: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jinja2 import Environment, TemplateSyntaxError
+
+    original_parse = Environment.parse
+
+    def parsed(environment: Environment, source: str, *args: object, **kwargs: object):
+        if source == content and "<script>" in source:
+            raise TemplateSyntaxError("diagnostic <script> non fiable", 1)
+        return original_parse(environment, source)
+
+    monkeypatch.setattr(Environment, "parse", parsed)
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home.py").write_text(
+        "class HomeController:\n    def index(self):\n"
+        '        return BaseController.render("home.html")\n'
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/", HomeController.index)\n'
+    )
+    (project / "mvc/views").mkdir()
+    (project / "mvc/views/home.html").write_text(content)
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and "Jinja</th>" in html
+    assert f"<td>{label}</td>" in html and "<td>Présent</td>" in html
+    assert "<script>" not in html and "Traceback" not in html
+    if "<script>" in content:
+        assert "&lt;" in html
+    if label == "Invalide":
+        assert "home.html:1" in html
+    assert headers.get("Cache-Control") == "no-store"
