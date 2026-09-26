@@ -1,1 +1,1 @@
-"""Cas d'usage métier de Forge Design, sans contrat Tool générique."""
+"""Cas d’usage métier et adaptateurs Tool de Forge Design."""

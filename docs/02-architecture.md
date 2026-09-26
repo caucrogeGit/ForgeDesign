@@ -157,6 +157,26 @@ Le Tool ne dépend pas directement :
 - d'un moteur spécialisé non abstrait lorsque plusieurs implémentations sont possibles ;
 - de l'état interne de l'UI.
 
+### Contrat actuellement implémenté (FD-PLATFORM-001)
+
+`forge_design.platform.tool.Tool[Result_co]` est un `Protocol` structurel minimal.
+Il expose trois propriétés en lecture seule : `id` (stable, kebab-case), `name`
+(nom affiché) et `description` (responsabilité courte), ainsi que
+`run(project_root: Path) -> Result_co`, synchrone et en lecture seule.
+Le résultat reste propre à chaque Tool ; aucune enveloppe universelle n'est imposée.
+La validation de racine appartient à l'implémentation via le Bridge et les erreurs
+métier restent propagées. Le protocole ne réalise aucun accès au projet.
+
+`ProjectInspectorTool` fournit l'identifiant `project-inspector` et le nom
+`Project Inspector`. Ses métadonnées sont gelées et non paramétrables à la
+construction. Sa méthode `run` délègue directement à `inspect_project` et retourne
+`ProjectInspection`, sans changer la logique métier.
+
+La conformité est vérifiée statiquement par Pyright, sans héritage obligatoire ni
+test `isinstance` du protocole. Le kebab-case, la stabilité des identifiants et la
+lecture seule sont des obligations du contrat, pas un mécanisme de contrôle à
+l'exécution. Aucun registre ni chargement de plugins n'est implémenté à ce stade.
+
 ## 7. Arborescence cible progressive
 
 ```text

@@ -17,7 +17,7 @@ forge-design = "forge_design.cli:main"
 dev = ["pytest>=8", "ruff>=0.9", "pyright>=1.1.390"]
 
 [tool.setuptools]
-packages = ["forge_design", "forge_design.forge", "forge_design.tools"]
+packages = ["forge_design", "forge_design.forge", "forge_design.tools", "forge_design.platform"]
 
 [tool.setuptools.dynamic]
 version = {attr = "forge_design.__version__"}

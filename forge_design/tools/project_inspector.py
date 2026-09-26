@@ -1,6 +1,6 @@
 """Diagnostic de projet en lecture seule, composé à partir du Forge Bridge."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import PathLike
 from pathlib import Path
 
@@ -54,3 +54,18 @@ def inspect_project(root: str | PathLike[str]) -> ProjectInspection:
         structure.errors,
         warnings,
     )
+
+
+@dataclass(frozen=True)
+class ProjectInspectorTool:
+    """Adaptateur Tool ; toute la logique métier reste dans inspect_project."""
+
+    id: str = field(default="project-inspector", init=False)
+    name: str = field(default="Project Inspector", init=False)
+    description: str = field(
+        default="Reconnaître un projet Forge et lire sa version déclarée.", init=False
+    )
+
+    def run(self, project_root: Path) -> ProjectInspection:
+        """Déléguer à l'API métier sans modifier son résultat ni ses erreurs."""
+        return inspect_project(project_root)
