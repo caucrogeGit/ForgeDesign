@@ -93,7 +93,7 @@ Le transport standard n'hérite pas du délai d'inactivité de l'ancien gestionn
 `GET /shell.css` sert une unique ressource CSS explicitement nommée : les styles
 ont été extraits du HTML pour respecter `style-src 'self'` de Forge, sans assouplir
 sa CSP. Les ressources sont packagées et chargées via `importlib.resources`.
-Le shell étant statique, le moteur Jinja de Forge n'est pas encore activé.
+Le shell d'accueil reste statique ; le formulaire Inspector utilise le renderer Jinja public de Forge.
 Les erreurs et en-têtes de sécurité relèvent de Forge.
 La sonde `/health` est fournie nativement par son adaptateur WSGI.
 Les paramètres de requête suivent le parsing Forge ; ils ne sélectionnent aucun projet.
@@ -104,8 +104,34 @@ Cette version sert à exécuter Forge Design ; elle ne détermine pas la version
 déclarée d'un projet cible, toujours lue indépendamment par le Bridge.
 Forge Core ne dépend pas de Forge Design et n'est pas modifié.
 Aucun `config.py`, `bootstrap.py` ou module `mvc` du répertoire courant n'est chargé
-par la composition Web. Aucun Tool n'est exécuté et aucune UI métier n'est ajoutée.
+par la composition Web. Seul un POST explicite à `/inspector` exécute le Tool Inspector.
 La CLI reste inchangée ; aucun navigateur n'est ouvert automatiquement.
+
+### Project Inspector Web disponible (FD-UI-002)
+
+`GET /inspector` affiche un formulaire vierge ; `POST /inspector` inspecte le
+chemin soumis et affiche racine canonique, validité, version, source et diagnostics.
+Chaque application construit son registre via `create_tool_registry()` ; le POST
+appelle `registry.get("project-inspector").run(Path(path))`.
+La couche Web ne résout pas le chemin et ne lit pas le projet directement.
+Elle vérifie le résultat `ProjectInspection` après le retour typé `object` du registre.
+
+Le champ est obligatoire, limité à 4096 caractères, sans suppression silencieuse
+d'espaces ni expansion de chemin. Les trois erreurs attendues de racine sont
+rendues en HTML avec statut 400 ; les erreurs inattendues restent confiées à Forge.
+Le template packagé `inspector.html` est rendu avec `Jinja2Renderer` et son
+échappement automatique. Les réponses Inspector portent `Cache-Control: no-store`.
+Aucun chemin ou diagnostic n'est conservé entre requêtes, aucun cookie ni session
+n'est créé ; un GET ultérieur affiche toujours un formulaire vierge.
+
+Le CSRF Forge rc9 dépend d'une session. Pour cette seule route POST publique en
+lecture seule, `csrf=False` est explicite : avant toute inspection, l'en-tête
+`Origin` doit être exactement `http://` suivi du `Host` local `127.0.0.1[:port]`.
+Les origines absentes, nulles ou étrangères sont refusées (403), ainsi qu'un
+`Sec-Fetch-Site` autre que `same-origin` lorsqu'il est présent.
+Seul `application/x-www-form-urlencoded` est accepté (415 sinon).
+Ce contrôle navigateur ne constitue pas une authentification des clients locaux.
+Il ne modifie pas les middlewares ni la politique des autres routes.
 
 Le frontend peut évoluer progressivement :
 

@@ -1,4 +1,4 @@
-"""Application Forge et transport WSGI local unique, sans accès aux projets."""
+"""Application Forge locale et inspection explicite via le Tool."""
 
 from importlib.resources import files
 from wsgiref.simple_server import WSGIServer, make_server
@@ -8,6 +8,9 @@ from core.app.wsgi import create_wsgi_app
 from core.http.request import Request
 from core.http.response import Response
 from core.http.router import Router
+
+from forge_design.app import create_tool_registry
+from forge_design.web.inspector import inspect_submission, show_inspector
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -29,9 +32,17 @@ def create_application() -> Application:
     Aucun chargement de config.py, bootstrap.py ou mvc du répertoire courant.
     Les middlewares Forge par défaut restent en place ; le shell est public.
     """
+    registry = create_tool_registry()
+
+    def inspect(request: Request) -> Response:
+        return inspect_submission(request, registry)
+
     router = Router()
     router.add("GET", "/", _index, public=True)
     router.add("GET", "/shell.css", _style, public=True)
+    router.add("GET", "/inspector", show_inspector, public=True, no_store=True)
+    # CSRF Forge requiert une session ; ce POST stateless contrôle son Origin.
+    router.add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
     return Application(router, api_routes_module=None)
 
 

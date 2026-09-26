@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Inspector — Forge Design</title>
+  <link rel="stylesheet" href="/shell.css">
+</head>
+<body>
+  <header><p class="brand"><a href="/">Forge Design</a></p></header>
+  <main>
+    <h1>Project Inspector</h1>
+    <p class="intro">Consultez la structure et la version déclarée d’un projet Forge.</p>
+    <form action="/inspector" method="post">
+      <label for="project-path">Chemin du projet</label>
+      <input id="project-path" name="path" type="text" value="{{ path }}"
+             maxlength="{{ max_path_length }}" required autocomplete="off"
+             spellcheck="false" aria-describedby="path-help">
+      <p id="path-help">Chemin local. L’inspection ne modifie aucun fichier.</p>
+      <button type="submit">Inspecter</button>
+    </form>
+    {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
+    {% if result %}
+    <section aria-labelledby="inspection-title">
+      <h2 id="inspection-title">{% if result.valid %}Projet Forge reconnu{% else %}Projet Forge non reconnu{% endif %}</h2>
+      <dl>
+        <dt>Racine</dt><dd>{{ result.root }}</dd>
+        <dt>Version Forge</dt><dd>{{ result.forge_version or 'indéterminée' }}</dd>
+        <dt>Source</dt><dd>{{ result.forge_version_source or 'indéterminée' }}</dd>
+      </dl>
+      {% if result.errors %}
+      <h3>Erreurs</h3>
+      <ul class="error">{% for message in result.errors %}<li>{{ message }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if result.warnings %}
+      <h3>Avertissements</h3>
+      <ul>{% for message in result.warnings %}<li>{{ message }}</li>{% endfor %}</ul>
+      {% endif %}
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
