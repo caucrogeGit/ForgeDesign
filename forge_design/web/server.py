@@ -11,15 +11,13 @@ from core.http.response import Response
 from core.http.router import Router
 
 from forge_design.app import create_tool_registry
+from forge_design.current_project import CurrentProjectContext
 from forge_design.web.inspector import inspect_submission, show_inspector
 from forge_design.web.rendering import render_page
+from forge_design.web.security import is_local_action
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-
-
-def _index(request: Request) -> Response:
-    return render_page("index.html", {"active_page": "home"})
 
 
 def _style(request: Request) -> Response:
@@ -34,16 +32,32 @@ def create_application() -> Application:
     Les middlewares Forge par défaut restent en place ; le shell est public.
     """
     registry = create_tool_registry()
+    context = CurrentProjectContext()
+
+    def index(request: Request) -> Response:
+        return render_page(
+            "index.html", {"active_page": "home", "current_project": context.inspection}
+        )
+
+    def show(request: Request) -> Response:
+        return show_inspector(request, context)
+
+    def close(request: Request) -> Response:
+        if not is_local_action(request):
+            return Response.html("Origine de la requête non autorisée.", status=403)
+        context.clear()
+        return index(request)
 
     def inspect(request: Request) -> Response:
-        return inspect_submission(request, registry)
+        return inspect_submission(request, registry, context)
 
     router = Router()
-    router.add("GET", "/", _index, public=True)
+    router.add("GET", "/", index, public=True, no_store=True)
     router.add("GET", "/shell.css", _style, public=True)
-    router.add("GET", "/inspector", show_inspector, public=True, no_store=True)
-    # CSRF Forge requiert une session ; ce POST stateless contrôle son Origin.
+    router.add("GET", "/inspector", show, public=True, no_store=True)
+    # Ces actions runtime sans session exigent une origine locale exacte.
     router.add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
+    router.add("POST", "/project/close", close, public=True, csrf=False, no_store=True)
     return Application(router, api_routes_module=None)
 
 

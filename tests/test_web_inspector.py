@@ -1,4 +1,4 @@
-"""Tranche HTTP réelle : formulaire stateless, registre, Bridge et Jinja Forge."""
+"""HTTP réel : formulaire, contexte runtime, registre et rendu Forge."""
 
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -43,6 +43,8 @@ def request(
     path: str | None = None,
     *,
     method: str = "POST",
+    target: str = "/inspector",
+    fetch_site: str | None = None,
     origin: str | None = "local",
     content_type: str = "application/x-www-form-urlencoded",
 ) -> tuple[int, str, dict[str, str]]:
@@ -51,11 +53,13 @@ def request(
         headers["Origin"] = (
             f"http://127.0.0.1:{server.server_port}" if origin == "local" else origin
         )
+    if fetch_site is not None:
+        headers["Sec-Fetch-Site"] = fetch_site
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
     try:
         connection.request(
             method,
-            "/inspector",
+            target,
             urlencode({"path": path}) if path is not None else "",
             headers,
         )
@@ -83,7 +87,8 @@ def test_valid_project(server: WSGIServer, project: Path) -> None:
     assert "Set-Cookie" not in headers
     assert "no-store" in headers.get("Cache-Control", "")
     _, fresh, _ = request(server, method="GET")
-    assert str(project) not in fresh
+    assert str(project) in fresh
+    assert 'name="path" type="text" value=""' in fresh
 
 
 def test_invalid_structure(server: WSGIServer, tmp_path: Path) -> None:
@@ -198,3 +203,85 @@ def test_registry_delegation_and_escaping(monkeypatch: pytest.MonkeyPatch) -> No
             instance.shutdown()
             thread.join(timeout=5)
             assert not thread.is_alive()
+
+
+def test_current_project_lifecycle(server: WSGIServer, project: Path) -> None:
+    assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
+    assert request(server, str(project / "mvc/.."))[0] == 200
+    home = request(server, method="GET", target="/")[1]
+    assert f"Projet : {project.resolve()}" in home and "Forge 1.0.0rc9" in home
+    assert "Aucun projet ouvert." not in home
+    assert "Fermer le projet" in home
+    source = project / "requirements.txt"
+    source.unlink()
+    assert request(server, str(project))[0] == 200
+    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+    assert "Forge 1.0.0rc9" not in request(server, method="GET", target="/")[1]
+    assert request(server, target="/project/close")[0] == 200
+    assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
+
+
+@pytest.mark.parametrize("bad_path", ["invalid", "missing", "file", "nul"])
+def test_bad_inspection_preserves_current(
+    server: WSGIServer, project: Path, bad_path: str
+) -> None:
+    assert request(server, str(project))[0] == 200
+    invalid = project / "invalid"
+    invalid.mkdir()
+    paths = {
+        "invalid": str(invalid),
+        "missing": str(project / "missing"),
+        "file": str(project / "app.py"),
+        "nul": "bad\x00path",
+    }
+    assert request(server, paths[bad_path])[0] in (200, 400)
+    home = request(server, method="GET", target="/")[1]
+    assert f"Projet : {project}" in home and "Forge 1.0.0rc9" in home
+
+
+@pytest.mark.parametrize("origin", [None, "null", "https://evil.example"])
+@pytest.mark.parametrize("target", ["/inspector", "/project/close"])
+def test_foreign_mutation_preserves_current(
+    server: WSGIServer, project: Path, origin: str | None, target: str
+) -> None:
+    assert request(server, str(project))[0] == 200
+    assert request(server, str(project), origin=origin, target=target)[0] == 403
+    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+
+
+def test_close_security_and_no_writes(server: WSGIServer, project: Path) -> None:
+    assert request(server, str(project))[0] == 200
+    before = {
+        p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)
+        for p in project.rglob("*")
+    }
+    assert request(server, target="/project/close", fetch_site="cross-site")[0] == 403
+    assert request(server, target="/project/close", method="GET")[0] != 200
+    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+    assert request(server, target="/project/close")[0] == 200
+    assert before == {
+        p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)
+        for p in project.rglob("*")
+    }
+
+
+def test_application_isolation_and_restart(server: WSGIServer, project: Path) -> None:
+    assert request(server, str(project))[0] == 200
+    for _ in range(2):
+        with web.create_server(port=0) as other:
+            thread = Thread(target=other.serve_forever, kwargs={"poll_interval": 0.01})
+            thread.start()
+            try:
+                assert (
+                    "Aucun projet ouvert."
+                    in request(other, method="GET", target="/")[1]
+                )
+                assert request(other, target="/project/close")[0] == 200
+                assert (
+                    f"Projet : {project}"
+                    in request(server, method="GET", target="/")[1]
+                )
+            finally:
+                other.shutdown()
+                thread.join(timeout=5)
+                assert not thread.is_alive()

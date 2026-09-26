@@ -124,17 +124,33 @@ d'espaces ni expansion de chemin. Les trois erreurs attendues de racine sont
 rendues en HTML avec statut 400 ; les erreurs inattendues restent confiées à Forge.
 Le template packagé `inspector.html` est rendu avec `Jinja2Renderer` et son
 échappement automatique. Les réponses Inspector portent `Cache-Control: no-store`.
-Aucun chemin ou diagnostic n'est conservé entre requêtes, aucun cookie ni session
-n'est créé ; un GET ultérieur affiche toujours un formulaire vierge.
+### Contexte projet courant (FD-PROJECT-001)
 
-Le CSRF Forge rc9 dépend d'une session. Pour cette seule route POST publique en
-lecture seule, `csrf=False` est explicite : avant toute inspection, l'en-tête
-`Origin` doit être exactement `http://` suivi du `Host` local `127.0.0.1[:port]`.
-Les origines absentes, nulles ou étrangères sont refusées (403), ainsi qu'un
-`Sec-Fetch-Site` autre que `same-origin` lorsqu'il est présent.
-Seul `application/x-www-form-urlencoded` est accepté (415 sinon).
-Ce contrôle navigateur ne constitue pas une authentification des clients locaux.
-Il ne modifie pas les middlewares ni la politique des autres routes.
+Chaque `create_application()` crée son propre `CurrentProjectContext` et le fournit
+explicitement aux routes. Il conserve uniquement le dernier `ProjectInspection`
+valide ; sa propriété `root` dérive de ce diagnostic canonique, sans dupliquer la valeur.
+`set_project` et `clear` encapsulent les mutations. Aucun état global ni stockage
+dans le registre n'est ajouté.
+
+Un POST Inspector valide active ou remplace le projet courant, même sans version
+connue. Une inspection invalide ou une erreur conserve le projet précédent.
+Le shell commun affiche la racine et la version connue sur les deux pages.
+`POST /project/close` vide le contexte et affiche l'accueil ; il ne ferme pas le serveur.
+Toutes les pages contenant cet état sont servies avec `Cache-Control: no-store`.
+Le contexte appartient à l'instance serveur, partagé par ses onglets clients,
+et disparaît avec elle : aucune persistance, aucun cookie ni session ajouté.
+Une nouvelle application démarre vide. Le diagnostic n'est pas rafraîchi en arrière-plan.
+
+Activation et fermeture modifient maintenant l'état runtime. La politique a été
+réévaluée : le CSRF Forge rc9 dépend d'une session ; les deux POST utilisent ici
+un contrôle strict d'origine sans session, avec `csrf=False` explicitement déclaré.
+Avant toute mutation, `Origin` doit égaler exactement `http://` suivi du Host
+local `127.0.0.1[:port]`, et `Sec-Fetch-Site`, s'il existe, doit valoir `same-origin`.
+Les origines absentes, nulles ou étrangères sont refusées avec 403.
+Ce contrôle protège contre les soumissions de pages étrangères dans un navigateur ;
+il n'authentifie pas les programmes locaux capables de fabriquer leurs en-têtes.
+Le GET ne ferme jamais le projet. Le formulaire Inspector conserve son contrôle de
+contenu `application/x-www-form-urlencoded`. Aucun middleware global n'est désactivé.
 
 Le frontend peut évoluer progressivement :
 

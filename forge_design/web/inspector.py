@@ -1,11 +1,11 @@
 """Frontière Web de Project Inspector : formulaire, délégation et rendu Forge."""
 
-import re
 from pathlib import Path
 
 from core.http.request import Request
 from core.http.response import Response
 
+from forge_design.current_project import CurrentProjectContext
 from forge_design.forge.project_root import (
     ProjectRootNotDirectoryError,
     ProjectRootNotFoundError,
@@ -14,11 +14,13 @@ from forge_design.forge.project_root import (
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.project_inspector import ProjectInspection
 from forge_design.web.rendering import render_page
+from forge_design.web.security import is_local_action
 
 MAX_PATH_LENGTH = 4096
 
 
 def _render(
+    context: CurrentProjectContext,
     path: str = "",
     *,
     result: ProjectInspection | None = None,
@@ -33,40 +35,42 @@ def _render(
             "error": error,
             "max_path_length": MAX_PATH_LENGTH,
             "active_page": "inspector",
+            "current_project": context.inspection,
         },
         status=status,
     )
 
 
-def show_inspector(request: Request) -> Response:
-    """Afficher un formulaire vierge, sans inspection ni état mémorisé."""
-    return _render()
+def show_inspector(request: Request, context: CurrentProjectContext) -> Response:
+    """Afficher un formulaire vierge, sans nouvelle inspection."""
+    return _render(context)
 
 
-def inspect_submission(request: Request, registry: ToolRegistry) -> Response:
+def inspect_submission(
+    request: Request, registry: ToolRegistry, context: CurrentProjectContext
+) -> Response:
     """Valider les données HTTP puis déléguer intégralement au Tool enregistré.
 
-    Route POST publique en lecture seule, sans session : l'origine HTTP locale
+    Route POST activant le projet en mémoire, sans session : l'origine HTTP locale
     exacte est obligatoire à la place du CSRF Forge fondé sur une session.
     Aucun chemin n'est résolu ou lu ici ; Path adapte uniquement le type d'entrée.
     """
-    host = request.header("Host", "")
-    if (
-        re.fullmatch(r"127\.0\.0\.1(?::[0-9]{1,5})?", host) is None
-        or request.header("Origin") != f"http://{host}"
-        or request.header("Sec-Fetch-Site") not in (None, "same-origin")
-    ):
-        return _render(error="Origine de la requête non autorisée.", status=403)
+    if not is_local_action(request):
+        return _render(
+            context, error="Origine de la requête non autorisée.", status=403
+        )
     if request.header("Content-Type", "").split(";", 1)[0] != (
         "application/x-www-form-urlencoded"
     ):
-        return _render(error="Format de formulaire non pris en charge.", status=415)
+        return _render(
+            context, error="Format de formulaire non pris en charge.", status=415
+        )
     path = request.form("path")
     if path is None or not path or path.isspace():
-        return _render(error="Saisissez le chemin du projet.", status=400)
+        return _render(context, error="Saisissez le chemin du projet.", status=400)
     if len(path) > MAX_PATH_LENGTH:
         return _render(
-            error="Le chemin dépasse la limite de 4096 caractères.", status=400
+            context, error="Le chemin dépasse la limite de 4096 caractères.", status=400
         )
     try:
         result = registry.get("project-inspector").run(Path(path))
@@ -75,8 +79,10 @@ def inspect_submission(request: Request, registry: ToolRegistry) -> Response:
         ProjectRootNotDirectoryError,
         ProjectRootResolutionError,
     ) as error:
-        return _render(path, error=str(error), status=400)
+        return _render(context, path, error=str(error), status=400)
     # Le registre est hétérogène : on vérifie le résultat au point de consommation.
     if not isinstance(result, ProjectInspection):
         raise TypeError("project-inspector doit retourner ProjectInspection.")
-    return _render(path, result=result)
+    if result.valid:
+        context.set_project(result)
+    return _render(context, path, result=result)

@@ -13,6 +13,15 @@
       <a href="/"{% if active_page == 'home' %} aria-current="page"{% endif %}>Accueil</a>
       <a href="/inspector"{% if active_page == 'inspector' %} aria-current="page"{% endif %}>Project Inspector</a>
     </nav>
+    <div class="current-project">
+      {% if current_project %}
+      <p>Projet : {{ current_project.root }}</p>
+      {% if current_project.forge_version %}<p>Forge {{ current_project.forge_version }}</p>{% endif %}
+      <form action="/project/close" method="post">
+        <button type="submit">Fermer le projet</button>
+      </form>
+      {% else %}<p>Aucun projet ouvert.</p>{% endif %}
+    </div>
   </header>
   <main>
 {% block content %}{% endblock %}
