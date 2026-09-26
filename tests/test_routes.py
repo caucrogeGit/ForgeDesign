@@ -369,6 +369,7 @@ def test_verification(project: Path, content: str, status: str) -> None:
     assert handler.reference == "Alias.list"
     assert handler.controller_file == "mvc/controllers/example.py"
     assert handler.verification == status
+    assert handler.template.presence == "not-applicable"
     assert handler.template.status == (
         "none" if status == "found" else "not-applicable"
     )
@@ -470,7 +471,7 @@ def test_controller_cache_and_encoding(
         ),
         (
             'try:\n    return BaseController.render("x.html")\n'
-            'except Exception:\n    pass',
+            "except Exception:\n    pass",
             "found",
             "x.html",
         ),
@@ -511,7 +512,7 @@ def test_template_resolution(
         "raise RuntimeError('module must never execute')\n"
         "class HomeController:\n    @staticmethod\n    def index(request):\n"
         + indent(body, "        ")
-        + '\n    def unrelated(self):\n'
+        + "\n    def unrelated(self):\n"
         '        return BaseController.render("other.html")\n'
     )
     (project / "mvc/routes/__init__.py").write_text(
@@ -523,6 +524,8 @@ def test_template_resolution(
     assert handler is not None and handler.verification == "found"
     assert handler.template.status == status
     assert handler.template.path == path
+    if status != "found":
+        assert handler.template.presence == "not-applicable"
     assert len(result.warnings) == 1
 
 
@@ -564,4 +567,120 @@ def test_template_cache_and_confined_reads(
     assert all(
         r.handler and r.handler.template.path == "../secret.html" for r in result.routes
     )
+    assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}
+
+
+@pytest.mark.parametrize(
+    "reference,kind,expected",
+    [
+        ("contacts/list.html", "file", "present"),
+        ("contacts/list.html", "missing", "missing"),
+        ("../secret.html", "missing", "invalid-path"),
+        ("/absolute.html", "missing", "invalid-path"),
+        ("contacts/../../../secret", "missing", "invalid-path"),
+        ("C:\\secret.html", "missing", "invalid-path"),
+        ("", "missing", "invalid-path"),
+        ("contacts/./list.html", "missing", "invalid-path"),
+        ("contacts/list.html", "link", "invalid-path"),
+        ("contacts/list.html", "parent-link", "invalid-path"),
+        ("contacts/list.html", "directory", "invalid-path"),
+        ("contacts/list.html", "permission", "unreadable"),
+    ],
+)
+def test_template_presence(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+    kind: str,
+    expected: str,
+) -> None:
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home.py").write_text(
+        "class HomeController:\n    def index(self):\n"
+        f"        return BaseController.render({reference!r})\n"
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/", HomeController.index)\n'
+    )
+    views = project / "mvc/views"
+    views.mkdir()
+    parent = views / "contacts"
+    parent.mkdir()
+    target = parent / "list.html"
+    if kind == "file":
+        target.write_bytes(b"invalid Jinja {{\xff")
+    elif kind == "directory":
+        target.mkdir()
+    elif kind == "link":
+        target.symlink_to(project / "config.py")
+    elif kind == "parent-link":
+        parent.rmdir()
+        parent.symlink_to(project, target_is_directory=True)
+    original = Path.lstat
+
+    def metadata(path: Path):
+        if kind == "permission" and path == target:
+            raise PermissionError("denied")
+        return original(path)
+
+    monkeypatch.setattr(Path, "lstat", metadata)
+    result = read_routes(project)
+    handler = result.routes[0].handler
+    assert handler and handler.template.path == reference
+    assert handler.template.status == "found"
+    assert handler.template.presence == expected
+    assert len(result.warnings) == 1
+
+
+def test_presence_cache_and_no_content(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/home.py"
+    controller.write_text(
+        "class HomeController:\n    def index(self):\n"
+        '        return BaseController.render("home.html")\n'
+    )
+    source = project / "mvc/routes/__init__.py"
+    source.write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/", HomeController.index)\n'
+        'router.add("POST", "/", HomeController.index)\n'
+    )
+    (project / "mvc/views").mkdir()
+    target = project / "mvc/views/home.html"
+    target.write_bytes(b"{{ invalid Jinja\xff")
+    snapshot = {
+        p: (p.read_bytes(), p.stat().st_mtime_ns) for p in (source, controller, target)
+    }
+    original_stat, original_open = Path.lstat, os.open
+    checked: list[Path] = []
+
+    def metadata(path: Path):
+        checked.append(path)
+        return original_stat(path)
+
+    def opened(path: Path, flags: int) -> int:
+        assert path in (source, controller)
+        return original_open(path, flags)
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("template read or scan")
+
+    with monkeypatch.context() as guarded:
+        guarded.setattr(Path, "lstat", metadata)
+        guarded.setattr(os, "open", opened)
+        for name in ("open", "iterdir", "glob", "rglob"):
+            guarded.setattr(Path, name, forbidden)
+        result = read_routes(project)
+        assert checked.count(target) == 1
+        assert all(
+            r.handler and r.handler.template.presence == "present"
+            for r in result.routes
+        )
+        read_routes(project)
+        assert checked.count(target) == 2
     assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}

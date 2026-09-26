@@ -534,5 +534,19 @@ lambdas et classes imbriquées sont exclues. Une méthode non vérifiée conserv
 `not-applicable`. Aucun warning supplémentaire n’est ajouté.
 
 La colonne Template affiche la référence littérale, « Dynamique », « Plusieurs »
-ou « — ». Le template n’est pas encore vérifié sur le filesystem : aucun fichier
-de vue n’est ouvert, aucune existence ou validité Jinja n’est affirmée.
+ou « — ». La colonne Présence vérifie désormais les métadonnées sous `mvc/views`, sans
+ouvrir le fichier. `TemplateResolution.presence` distingue `present`, `missing`,
+`invalid-path`, `unreadable` et `not-applicable`. Seule une résolution `found`
+est vérifiée ; les autres statuts n’entraînent aucun contrôle de vue.
+
+La référence affichée reste inchangée. Les chemins absolus, segments vides,
+`.` ou `..`, antislashs, deux-points et caractères NUL sont refusés avant accès.
+Chaque parent doit être un dossier ordinaire et la cible un fichier ordinaire ;
+tous les symlinks sont refusés. Un cache local à `read_routes` évite les contrôles
+répétés d’une même référence. Aucun scan, fallback, lecture ou rendu de vue.
+
+Cette racine est la convention du squelette : le `VIEWS_DIR` configurable de
+Forge et ses loaders d’opt-ins ne sont pas chargés. « Absent » signifie absent
+dans cet espace conventionnel. Présence ne signifie ni validité Jinja ni rendu
+effectif. Les parents doivent rester stables pendant ces contrôles, comme pour
+les autres vérifications de métadonnées du Bridge.

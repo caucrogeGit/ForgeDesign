@@ -3,7 +3,7 @@
 import ast
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from os import PathLike
 from pathlib import Path
 from stat import S_ISDIR, S_ISREG
@@ -37,10 +37,16 @@ TemplateResolutionStatus = Literal[
 ]
 
 
+TemplatePresenceStatus = Literal[
+    "present", "missing", "invalid-path", "unreadable", "not-applicable"
+]
+
+
 @dataclass(frozen=True)
 class TemplateResolution:
     status: TemplateResolutionStatus = "not-applicable"
     path: str | None = None
+    presence: TemplatePresenceStatus = "not-applicable"
 
 
 @dataclass(frozen=True)
@@ -238,6 +244,56 @@ def _template(method: ast.FunctionDef | ast.AsyncFunctionDef) -> TemplateResolut
     if paths:
         return TemplateResolution("found", next(iter(paths)))
     return TemplateResolution("none")
+
+
+def _template_presence(root: Path, reference: str) -> TemplatePresenceStatus:
+    # Convention portable stricte : ne jamais normaliser un traversal en chemin sûr.
+    parts = reference.split("/")
+    if (
+        not reference
+        or "\\" in reference
+        or ":" in reference
+        or "\x00" in reference
+        or any(part in ("", ".", "..") for part in parts)
+    ):
+        return "invalid-path"
+    candidate = root
+    components = ["mvc", "views", *parts]
+    try:
+        for index, component in enumerate(components):
+            candidate = candidate / component
+            mode = candidate.lstat().st_mode
+            expected = S_ISREG if index == len(components) - 1 else S_ISDIR
+            if not expected(mode):
+                return "invalid-path"
+    except FileNotFoundError:
+        return "missing"
+    except OSError:
+        return "unreadable"
+    return "present"
+
+
+def _with_template_presence(
+    root: Path, routes: list[RouteInfo]
+) -> tuple[RouteInfo, ...]:
+    cache: dict[str, TemplatePresenceStatus] = {}
+    enriched: list[RouteInfo] = []
+    for route in routes:
+        handler = route.handler
+        if handler is not None and handler.template.status == "found":
+            template = handler.template
+            if template.path is not None:
+                if template.path not in cache:
+                    cache[template.path] = _template_presence(root, template.path)
+                route = replace(
+                    route,
+                    handler=replace(
+                        handler,
+                        template=replace(template, presence=cache[template.path]),
+                    ),
+                )
+        enriched.append(route)
+    return tuple(enriched)
 
 
 def _literal(node: ast.expr) -> object:
@@ -491,4 +547,4 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
             warnings.append(f"{filename} : branchement non résolu ({error}).")
     if len(branches) > 64:
         warnings.append("Limite de 64 branchements atteinte ; liste partielle.")
-    return RoutesResult(tuple(routes), tuple(warnings))
+    return RoutesResult(_with_template_presence(canonical, routes), tuple(warnings))

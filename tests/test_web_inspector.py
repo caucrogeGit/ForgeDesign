@@ -417,3 +417,39 @@ def test_route_templates(
     assert status == 200 and "Template</th>" in html and expected in html
     assert "<script>" not in html
     assert headers.get("Cache-Control") == "no-store"
+
+
+@pytest.mark.parametrize(
+    "reference,present,label",
+    [
+        ("contacts/list.html", True, "Présent"),
+        ("contacts/list.html", False, "Absent"),
+        ("../<script>.html", False, "Chemin refusé"),
+    ],
+)
+def test_web_template_presence(
+    server: WSGIServer,
+    project: Path,
+    reference: str,
+    present: bool,
+    label: str,
+) -> None:
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home.py").write_text(
+        "class HomeController:\n    def index(self):\n"
+        f"        return BaseController.render({reference!r})\n"
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/", HomeController.index)\n'
+    )
+    if present:
+        (project / "mvc/views/contacts").mkdir(parents=True)
+        (project / "mvc/views/contacts/list.html").write_text("anything")
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and "Présence</th>" in html and f"<td>{label}</td>" in html
+    assert "<script>" not in html
+    if "<script>" in reference:
+        assert "&lt;script&gt;" in html
+    assert headers.get("Cache-Control") == "no-store"
