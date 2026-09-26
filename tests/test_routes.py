@@ -369,6 +369,9 @@ def test_verification(project: Path, content: str, status: str) -> None:
     assert handler.reference == "Alias.list"
     assert handler.controller_file == "mvc/controllers/example.py"
     assert handler.verification == status
+    assert handler.template.status == (
+        "none" if status == "found" else "not-applicable"
+    )
     assert (len(result.warnings) == 1) == (status == "found")
 
 
@@ -409,3 +412,156 @@ def test_controller_cache_and_encoding(
         route.handler and route.handler.verification == "found"
         for route in result.routes
     )
+
+
+@pytest.mark.parametrize(
+    "body,status,path",
+    [
+        (
+            'return BaseController.render("home/index.html", request=request)',
+            "found",
+            "home/index.html",
+        ),
+        (
+            'return BaseController.render("contacts/form.html", context={})',
+            "found",
+            "contacts/form.html",
+        ),
+        (
+            'return BaseController.render(template="auth/login.html")',
+            "found",
+            "auth/login.html",
+        ),
+        (
+            'return BaseController.render(" ../literal.html ")',
+            "found",
+            " ../literal.html ",
+        ),
+        ('return Response.html("raw HTML")', "none", None),
+        ('return BaseController.redirect("/")', "none", None),
+        ('return other.render("unrelated.html")', "none", None),
+        (
+            'template = "x.html"\nreturn BaseController.render(template)',
+            "dynamic",
+            None,
+        ),
+        ('return BaseController.render(f"contacts/{mode}.html")', "dynamic", None),
+        ("return BaseController.render(BASE_TEMPLATE)", "dynamic", None),
+        ("return BaseController.render(get_template())", "dynamic", None),
+        ("return BaseController.render(**options)", "dynamic", None),
+        ("return BaseController.render(*args)", "dynamic", None),
+        (
+            'if condition:\n    return BaseController.render("x.html")\n'
+            'return BaseController.render("x.html")',
+            "found",
+            "x.html",
+        ),
+        (
+            'if condition:\n    return BaseController.render("a.html")\n'
+            'return BaseController.render("b.html")',
+            "ambiguous",
+            None,
+        ),
+        (
+            "if condition:\n    return BaseController.render(template)\n"
+            'return BaseController.render("x.html")',
+            "dynamic",
+            None,
+        ),
+        (
+            'try:\n    return BaseController.render("x.html")\n'
+            'except Exception:\n    pass',
+            "found",
+            "x.html",
+        ),
+        (
+            'for item in items:\n    BaseController.render("x.html")\n'
+            'while condition:\n    BaseController.render("x.html")\n'
+            'with resource:\n    BaseController.render("x.html")\n'
+            'match value:\n    case 1:\n        BaseController.render("x.html")',
+            "found",
+            "x.html",
+        ),
+        (
+            'def helper():\n    return BaseController.render("hidden.html")',
+            "none",
+            None,
+        ),
+        (
+            'async def helper():\n    return BaseController.render("hidden.html")',
+            "none",
+            None,
+        ),
+        (
+            'class Nested:\n    value = BaseController.render("hidden.html")',
+            "none",
+            None,
+        ),
+        ('helper = lambda: BaseController.render("hidden.html")', "none", None),
+    ],
+)
+def test_template_resolution(
+    project: Path, body: str, status: str, path: str | None
+) -> None:
+    from textwrap import indent
+
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home_controller.py").write_text(
+        "from core.mvc.controller.base_controller import BaseController\n"
+        "raise RuntimeError('module must never execute')\n"
+        "class HomeController:\n    @staticmethod\n    def index(request):\n"
+        + indent(body, "        ")
+        + '\n    def unrelated(self):\n'
+        '        return BaseController.render("other.html")\n'
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home_controller import HomeController\n"
+        'router = Router()\nrouter.add("GET", "/", HomeController.index)\n'
+    )
+    result = read_routes(project)
+    handler = result.routes[0].handler
+    assert handler is not None and handler.verification == "found"
+    assert handler.template.status == status
+    assert handler.template.path == path
+    assert len(result.warnings) == 1
+
+
+def test_template_cache_and_confined_reads(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/home.py"
+    controller.write_text(
+        'raise RuntimeError("never execute")\nclass HomeController:\n'
+        '    def index(self): return BaseController.render("../secret.html")\n'
+    )
+    source = project / "mvc/routes/__init__.py"
+    source.write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add(["GET", "POST"], "/", HomeController.index)\n'
+        'router.add("GET", "/other", HomeController.index)\n'
+    )
+    snapshot = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in (source, controller)}
+    original = os.open
+    reads: list[Path] = []
+
+    def opened(path: Path, flags: int) -> int:
+        assert path in snapshot
+        reads.append(path)
+        return original(path, flags)
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("scan or high-level read forbidden")
+
+    with monkeypatch.context() as guarded:
+        guarded.setattr(os, "open", opened)
+        guarded.setattr(Path, "iterdir", forbidden)
+        guarded.setattr(Path, "open", forbidden)
+        result = read_routes(project)
+    assert reads == [source, controller]
+    assert all(
+        r.handler and r.handler.template.path == "../secret.html" for r in result.routes
+    )
+    assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}

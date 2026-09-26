@@ -366,12 +366,12 @@ def test_route_explorer_page(server: WSGIServer, project: Path) -> None:
     assert "no-store" in headers.get("Cache-Control", "")
     (project / "mvc/controllers").mkdir()
     (project / "mvc/controllers/contact.py").write_text("invalid Python!")
-    (project / "mvc/routes/__init__.py").write_text('''
+    (project / "mvc/routes/__init__.py").write_text("""
 from mvc.controllers.contact import ContactController
 router = Router()
 router.add("GET", "/<script>", ContactController.list, name="home", public=True)
 router.add("POST", "/submit", handler)
-''')
+""")
     assert request(server, str(project))[0] == 200
     status, html, headers = request(server, method="GET", target="/routes")
     assert status == 200 and "<table>" in html
@@ -384,3 +384,36 @@ router.add("POST", "/submit", handler)
     assert "no-store" in headers.get("Cache-Control", "")
     (project / "mvc/routes/__init__.py").unlink()
     assert "absente" in request(server, method="GET", target="/routes")[1]
+
+
+@pytest.mark.parametrize(
+    "body,expected",
+    [
+        (
+            'return BaseController.render("contacts/<script>.html")',
+            "contacts/&lt;script&gt;.html",
+        ),
+        ("return BaseController.render(template)", "Dynamique"),
+        (
+            'if condition: return BaseController.render("one.html")\n'
+            '        return BaseController.render("two.html")',
+            "Plusieurs",
+        ),
+    ],
+)
+def test_route_templates(
+    server: WSGIServer, project: Path, body: str, expected: str
+) -> None:
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/contact.py").write_text(
+        "class ContactController:\n    def list(self):\n        " + body + "\n"
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.contact import ContactController\nrouter = Router()\n"
+        'router.add("GET", "/", ContactController.list)\n'
+    )
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and "Template</th>" in html and expected in html
+    assert "<script>" not in html
+    assert headers.get("Cache-Control") == "no-store"

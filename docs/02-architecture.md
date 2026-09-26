@@ -514,3 +514,25 @@ Décorateurs et corps métier ne sont pas interprétés ; l'héritage n'est pas 
 ou un handler dynamique n'entraîne aucune lecture supplémentaire.
 La colonne Vérification affiche le résultat sans lien. « Trouvée » signifie
 uniquement une définition syntaxique directe, pas une garantie d'exécutabilité.
+
+
+### Référence de template du handler
+
+Route Explorer prolonge le chemin route → handler → contrôleur → méthode par une
+référence éventuelle de template. Dans le corps de la méthode déjà trouvée,
+l’AST en cache collecte les appels explicites `BaseController.render(...)`,
+forme utilisée par le squelette et les générateurs Forge. Le premier argument
+ou le mot-clé `template` fournit une référence seulement s’il est une chaîne
+littérale. Aucun alias de l’API de rendu ni appel indirect n’est résolu.
+
+`HandlerInfo.template` contient un `TemplateResolution` immuable : `status`
+(`found`, `none`, `dynamic`, `ambiguous`, `not-applicable`) et `path` optionnel.
+Les chemins identiques sont dédupliqués ; plusieurs chemins différents donnent
+`ambiguous`. Un argument dynamique prend priorité sur les chemins statiques.
+Les branches sont parcourues syntaxiquement sans les évaluer ; les fonctions,
+lambdas et classes imbriquées sont exclues. Une méthode non vérifiée conserve
+`not-applicable`. Aucun warning supplémentaire n’est ajouté.
+
+La colonne Template affiche la référence littérale, « Dynamique », « Plusieurs »
+ou « — ». Le template n’est pas encore vérifié sur le filesystem : aucun fichier
+de vue n’est ouvert, aucune existence ou validité Jinja n’est affirmée.

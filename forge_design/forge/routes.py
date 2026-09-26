@@ -32,11 +32,23 @@ Verification = Literal[
 ]
 
 
+TemplateResolutionStatus = Literal[
+    "found", "none", "dynamic", "ambiguous", "not-applicable"
+]
+
+
+@dataclass(frozen=True)
+class TemplateResolution:
+    status: TemplateResolutionStatus = "not-applicable"
+    path: str | None = None
+
+
 @dataclass(frozen=True)
 class HandlerInfo:
     reference: str
     controller_file: str | None = None
     verification: Verification = "not-applicable"
+    template: TemplateResolution = TemplateResolution()
 
 
 @dataclass(frozen=True)
@@ -129,8 +141,10 @@ def _controller(
             f"Ligne {line} : contrôleur refusé (accès/lien/type) : {relative}."
         )
         return HandlerInfo(handler.reference, verification="unreadable")
-    status = _verify(root, relative, symbol, handler.reference, cache, warnings)
-    return HandlerInfo(handler.reference, relative, status)
+    status, template = _verify(
+        root, relative, symbol, handler.reference, cache, warnings
+    )
+    return HandlerInfo(handler.reference, relative, status, template)
 
 
 def _verify(
@@ -140,9 +154,9 @@ def _verify(
     reference: str,
     cache: dict[str, ast.Module | None],
     warnings: list[str],
-) -> Verification:
+) -> tuple[Verification, TemplateResolution]:
     if len(reference.split(".")) != 2:
-        return "not-applicable"
+        return "not-applicable", TemplateResolution()
     if relative not in cache:
         try:
             cache[relative] = _tree(_read_source(root / relative))
@@ -153,7 +167,7 @@ def _verify(
             )
     tree = cache[relative]
     if tree is None:
-        return "unreadable"
+        return "unreadable", TemplateResolution()
     classes = [
         node
         for node in tree.body
@@ -161,10 +175,10 @@ def _verify(
     ]
     if not classes:
         warnings.append(f"{relative} : classe {symbol} introuvable.")
-        return "class-missing"
+        return "class-missing", TemplateResolution()
     if len(classes) != 1:
         warnings.append(f"{relative} : classe {symbol} ambiguë.")
-        return "ambiguous"
+        return "ambiguous", TemplateResolution()
     method = reference.split(".")[1]
     methods = [
         node
@@ -176,11 +190,54 @@ def _verify(
         warnings.append(
             f"{relative} : méthode {method} non définie directement dans {symbol}."
         )
-        return "method-missing"
+        return "method-missing", TemplateResolution()
     if len(methods) != 1:
         warnings.append(f"{relative} : méthode {method} ambiguë dans {symbol}.")
-        return "ambiguous"
-    return "found"
+        return "ambiguous", TemplateResolution()
+    return "found", _template(methods[0])
+
+
+def _template(method: ast.FunctionDef | ast.AsyncFunctionDef) -> TemplateResolution:
+    """Collecter BaseController.render sans interpréter les branches ou les noms."""
+    paths: set[str] = set()
+    dynamic = False
+    pending: list[ast.AST] = list(reversed(method.body))
+    while pending:
+        node = pending.pop()
+        if isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+        ):
+            continue
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "BaseController"
+            and node.func.attr == "render"
+        ):
+            arguments = [
+                keyword.value for keyword in node.keywords if keyword.arg == "template"
+            ]
+            if node.args:
+                arguments.insert(0, node.args[0])
+            if (
+                len(arguments) == 1
+                and not any(keyword.arg is None for keyword in node.keywords)
+                and not any(isinstance(arg, ast.Starred) for arg in node.args)
+                and isinstance(arguments[0], ast.Constant)
+                and isinstance(arguments[0].value, str)
+            ):
+                paths.add(arguments[0].value)
+            else:
+                dynamic = True
+        pending.extend(reversed(list(ast.iter_child_nodes(node))))
+    if dynamic:
+        return TemplateResolution("dynamic")
+    if len(paths) > 1:
+        return TemplateResolution("ambiguous")
+    if paths:
+        return TemplateResolution("found", next(iter(paths)))
+    return TemplateResolution("none")
 
 
 def _literal(node: ast.expr) -> object:
