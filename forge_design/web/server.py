@@ -1,5 +1,6 @@
 """Application Forge locale et inspection explicite via le Tool."""
 
+from collections.abc import Callable
 from importlib.resources import files
 from wsgiref.simple_server import WSGIServer, make_server
 
@@ -61,10 +62,17 @@ def create_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> WSGISer
     return make_server(host, port, create_wsgi_app(application))
 
 
-def run_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+def run_server(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    *,
+    on_ready: Callable[[], None] | None = None,
+) -> None:
     """Servir Forge dans le thread appelant jusqu'à Ctrl+C, puis fermer l'écoute."""
     with create_server(host, port) as server:
         try:
+            if on_ready is not None:
+                on_ready()
             server.serve_forever()
         except KeyboardInterrupt:
             pass

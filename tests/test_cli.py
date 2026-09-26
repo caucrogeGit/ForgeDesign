@@ -3,6 +3,7 @@
 import errno
 import subprocess
 import sysconfig
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -33,13 +34,14 @@ def test_main_without_arguments(
 
     calls: list[tuple[str, int]] = []
 
-    def run(host: str, port: int) -> None:
+    def run(host: str, port: int, *, on_ready: Callable[[], None]) -> None:
         calls.append((host, port))
+        on_ready()
 
     monkeypatch.setattr(server, "run_server", run)
-    assert main([]) == 0
+    assert main(["--no-browser"]) == 0
     output = capsys.readouterr()
-    assert output.out == f"Forge Design {__version__}\nhttp://127.0.0.1:8765\n"
+    assert output.out == f"Forge Design {__version__}\nhttp://127.0.0.1:8765/\n"
     assert calls == [("127.0.0.1", 8765)]
     assert output.err == ""
 
@@ -64,11 +66,11 @@ def test_server_exit(
 ) -> None:
     from forge_design.web import server
 
-    def fail(host: str, port: int) -> None:
+    def fail(host: str, port: int, *, on_ready: Callable[[], None]) -> None:
         raise error
 
     monkeypatch.setattr(server, "run_server", fail)
-    assert main([]) == (0 if isinstance(error, KeyboardInterrupt) else 1)
+    assert main(["--no-browser"]) == (0 if isinstance(error, KeyboardInterrupt) else 1)
     output = capsys.readouterr()
     assert "Traceback" not in output.err
     if isinstance(error, OSError):
@@ -78,12 +80,12 @@ def test_server_exit(
 def test_unexpected_error_propagates(monkeypatch: pytest.MonkeyPatch) -> None:
     from forge_design.web import server
 
-    def fail(host: str, port: int) -> None:
+    def fail(host: str, port: int, *, on_ready: Callable[[], None]) -> None:
         raise RuntimeError("unexpected")
 
     monkeypatch.setattr(server, "run_server", fail)
     with pytest.raises(RuntimeError, match="unexpected"):
-        main([])
+        main(["--no-browser"])
 
 
 def test_startup_has_no_business_or_browser_effects(
@@ -123,5 +125,71 @@ def test_startup_has_no_business_or_browser_effects(
         return instance
 
     monkeypatch.setattr(server, "create_server", create)
-    assert main([]) == 0
+    assert main(["--no-browser"]) == 0
     assert instance.closed
+
+
+@pytest.mark.parametrize("outcome", [True, False, OSError("browser unavailable")])
+def test_browser_after_socket_ready(
+    outcome: bool | OSError,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import webbrowser
+
+    from forge_design.web import server
+
+    events: list[str] = []
+
+    class FakeServer:
+        def __enter__(self) -> "FakeServer":
+            events.append("ready")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            events.append("closed")
+
+        def serve_forever(self) -> None:
+            events.append("serve")
+            raise KeyboardInterrupt
+
+    def create(host: str, port: int) -> FakeServer:
+        assert (host, port) == ("127.0.0.1", 8765)
+        return FakeServer()
+
+    def open_browser(url: str) -> bool:
+        assert events == ["ready"]
+        assert url == "http://127.0.0.1:8765/"
+        events.append("browser")
+        if isinstance(outcome, OSError):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(server, "create_server", create)
+    monkeypatch.setattr(webbrowser, "open", open_browser)
+    assert main([]) == 0
+    assert events == ["ready", "browser", "serve", "closed"]
+    output = capsys.readouterr()
+    assert "http://127.0.0.1:8765/" in output.out
+    assert bool(output.err) == (outcome is not True)
+
+
+def test_version_and_busy_port_never_open_browser(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import webbrowser
+
+    from forge_design.web import server
+
+    def forbidden(url: str) -> bool:
+        pytest.fail("Aucun navigateur attendu")
+
+    def busy(host: str, port: int) -> None:
+        raise OSError(errno.EADDRINUSE, "busy")
+
+    monkeypatch.setattr(webbrowser, "open", forbidden)
+    with pytest.raises(SystemExit) as result:
+        main(["--version"])
+    assert result.value.code == 0
+    monkeypatch.setattr(server, "create_server", busy)
+    assert main([]) == 1

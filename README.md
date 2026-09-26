@@ -41,9 +41,17 @@ Pour démarrer l'application Web locale :
 forge-design
 ```
 
-Ouvrez ensuite `http://127.0.0.1:8765` dans votre navigateur.
+Le navigateur par défaut ouvre `http://127.0.0.1:8765/` après ouverture du socket.
+Forge Design écoute uniquement sur cette adresse locale.
 La commande reste active jusqu'à `Ctrl+C`, qui ferme le serveur proprement.
-Le navigateur n'est pas ouvert automatiquement. Si le port est occupé, la commande
+Pour démarrer sans ouvrir le navigateur :
+
+```bash
+forge-design --no-browser
+```
+
+Si le navigateur est indisponible, le serveur reste actif et l'URL affichée permet
+une ouverture manuelle. Si le port est occupé, la commande
 signale l'erreur et retourne un code non nul, sans changer de port.
 `--version` et `--help` restent disponibles.
 
