@@ -35,8 +35,17 @@ forge-design --version
 ```
 
 La commande affiche `Forge Design` suivi de la version courante du package.
-La CLI se limite actuellement à cette option et à l'aide (`--help`).
-Sans argument, elle affiche l'aide.
+Pour démarrer l'application Web locale :
+
+```bash
+forge-design
+```
+
+Ouvrez ensuite `http://127.0.0.1:8765` dans votre navigateur.
+La commande reste active jusqu'à `Ctrl+C`, qui ferme le serveur proprement.
+Le navigateur n'est pas ouvert automatiquement. Si le port est occupé, la commande
+signale l'erreur et retourne un code non nul, sans changer de port.
+`--version` et `--help` restent disponibles.
 
 ## Vision
 
