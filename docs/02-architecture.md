@@ -72,7 +72,7 @@ Une option telle que `--no-browser` pourra être étudiée dans un ticket CLI d�
 Une écoute sur `0.0.0.0`, une connexion distante ou une exposition publique ne font pas partie du comportement par défaut.
 Elles nécessitent une conception de sécurité dédiée.
 
-### Serveur minimal disponible (FD-WEB-001)
+### Serveur local et shell HTML disponibles (FD-WEB-001 / FD-UI-001)
 
 `forge_design.web.server.create_server(host="127.0.0.1", port=8765)` ouvre
 l'écoute sans lancer la boucle ; `run_server` utilise les mêmes paramètres et
@@ -82,11 +82,19 @@ implicite. Le port par défaut est `8765` ; `0` demande un port éphémère au s
 Un port hors de `0..65535` est refusé et un port occupé conserve l'exception
 `OSError` du système, sans repli automatique.
 
-La seule route est `GET /`, qui retourne `Forge Design` suivi d'un saut de ligne,
-en texte brut UTF-8. Les autres chemins retournent 404.
-Le serveur utilise `HTTPServer` et un gestionnaire `BaseHTTPRequestHandler` de
-la bibliothèque standard ; il ne sert aucun fichier et ne dépend ni du Bridge
-ni du point de composition. Aucune UI métier n'est disponible.
+La seule route est `GET /`, qui retourne un document HTML UTF-8 avec le nom
+Forge Design, une courte description et l'état « Aucun projet ouvert. ».
+La ressource statique `forge_design/web/templates/index.html` contient un CSS
+intégré minimal, sans JavaScript ni chaîne de build frontend.
+Elle est déclarée comme donnée du paquet et chargée via `importlib.resources`,
+indépendamment du répertoire courant, y compris depuis la wheel.
+Aucun moteur de templates n'est nécessaire pour cette page fixe.
+
+Les autres chemins retournent 404 ; aucune URL n'est transformée en chemin
+filesystem. Seule la ressource HTML explicitement nommée est lue.
+Le serveur utilise `HTTPServer` et `BaseHTTPRequestHandler` de la bibliothèque
+standard et ne dépend ni du Bridge ni du point de composition.
+Le shell n'offre aucune UI métier, sélection de projet ou navigation entre Tools.
 La CLI reste inchangée et aucun navigateur n'est ouvert automatiquement.
 
 Pour un cycle de vie piloté, utiliser `create_server` dans un bloc `with`, lancer

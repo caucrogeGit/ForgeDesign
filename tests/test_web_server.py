@@ -5,6 +5,7 @@ import inspect
 from collections.abc import Iterator
 from http.client import HTTPConnection
 from http.server import HTTPServer
+from importlib.resources import files
 from pathlib import Path
 from threading import Thread
 
@@ -44,14 +45,31 @@ def test_local_binding_and_response(running_server: HTTPServer) -> None:
         connection.request("GET", "/")
         response = connection.getresponse()
         assert response.status == 200
-        assert response.getheader("Content-Type") == "text/plain; charset=utf-8"
-        assert response.read() == b"Forge Design\n"
+        assert response.getheader("Content-Type") == "text/html; charset=utf-8"
+        body = response.read()
+        assert response.getheader("Content-Length") == str(len(body))
+        html = body.decode("utf-8")
+        assert html.startswith("<!doctype html>")
+        assert '<html lang="fr">' in html
+        assert "<title>Forge Design</title>" in html
+        assert "<h1>Forge Design</h1>" in html
+        assert "Aucun projet ouvert." in html
     finally:
         connection.close()
 
 
 @pytest.mark.parametrize(
-    "path", ["/health", "/.env", "/../../etc/passwd", "/?project=x"]
+    "path",
+    [
+        "/health",
+        "/.env",
+        "/../../etc/passwd",
+        "/?project=x",
+        "/%2e%2e/%2e%2e/etc/passwd",
+        "/..%2f..%2fetc/passwd",
+        "/%252e%252e/etc/passwd",
+        "/templates/index.html",
+    ],
 )
 def test_no_other_route(running_server: HTTPServer, path: str) -> None:
     connection = HTTPConnection("127.0.0.1", running_server.server_port, timeout=3)
@@ -75,7 +93,21 @@ def test_no_project_access(
     monkeypatch.setattr(project_root, "resolve_project_root", forbidden)
     monkeypatch.setattr(project_detection, "detect_forge_project", forbidden)
     monkeypatch.setattr(project_version, "read_forge_version", forbidden)
-    monkeypatch.setattr(Path, "open", forbidden)
+    resource = Path(str(files("forge_design.web").joinpath("templates/index.html")))
+    original_open = Path.open
+
+    def guarded_open(
+        self: Path,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ):
+        assert self == resource and mode == "rb"
+        return original_open(self, mode, buffering, encoding, errors, newline)
+
+    monkeypatch.setattr(Path, "open", guarded_open)
     test_local_binding_and_response(running_server)
 
 
@@ -132,3 +164,26 @@ def test_run_server_closes_on_exit(
         with pytest.raises(RuntimeError):
             web.run_server(port=0)
     assert server.socket.fileno() == -1
+
+
+def test_html_independent_of_cwd(
+    running_server: HTTPServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "index.html").write_text("must not be served")
+    monkeypatch.chdir(tmp_path)
+    test_local_binding_and_response(running_server)
+
+
+def test_arbitrary_file_not_served(
+    running_server: HTTPServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "private.txt").write_text("private content sentinel")
+    monkeypatch.chdir(tmp_path)
+    connection = HTTPConnection("127.0.0.1", running_server.server_port, timeout=3)
+    try:
+        connection.request("GET", "/private.txt")
+        response = connection.getresponse()
+        assert response.status == 404
+        assert b"private content sentinel" not in response.read()
+    finally:
+        connection.close()

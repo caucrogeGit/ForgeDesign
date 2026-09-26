@@ -1,6 +1,7 @@
-"""HTTP local à réponse fixe, sans accès au Bridge ni au système de fichiers."""
+"""HTTP local servant une ressource HTML du paquet, sans accès aux projets."""
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from importlib.resources import files
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -14,9 +15,9 @@ class _Handler(BaseHTTPRequestHandler):
         if self.path != "/":
             self.send_error(404)
             return
-        body = b"Forge Design\n"
+        body = files("forge_design.web").joinpath("templates/index.html").read_bytes()
         self.send_response(200)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
