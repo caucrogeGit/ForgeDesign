@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from stat import S_ISDIR, S_ISREG
+from typing import Literal
 
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
@@ -21,10 +22,21 @@ class RoutesSourceUnreadableError(ValueError):
     """Source refusée, inaccessible ou syntaxiquement invalide."""
 
 
+Verification = Literal[
+    "found",
+    "class-missing",
+    "method-missing",
+    "unreadable",
+    "not-applicable",
+    "ambiguous",
+]
+
+
 @dataclass(frozen=True)
 class HandlerInfo:
     reference: str
     controller_file: str | None = None
+    verification: Verification = "not-applicable"
 
 
 @dataclass(frozen=True)
@@ -54,8 +66,8 @@ def _handler(node: ast.expr) -> HandlerInfo | None:
     return HandlerInfo(".".join(reversed(parts)))
 
 
-def _controller_imports(tree: ast.Module) -> dict[str, str]:
-    candidates: dict[str, str] = {}
+def _controller_imports(tree: ast.Module) -> dict[str, tuple[str, str]]:
+    candidates: dict[str, tuple[str, str]] = {}
     ambiguous: set[str] = set()
     for node in tree.body:
         if not isinstance(node, ast.ImportFrom):
@@ -71,7 +83,10 @@ def _controller_imports(tree: ast.Module) -> dict[str, str]:
                 )
                 and alias.name != "*"
             ):
-                candidates[symbol] = (node.module or "").replace(".", "/") + ".py"
+                candidates[symbol] = (
+                    (node.module or "").replace(".", "/") + ".py",
+                    alias.name,
+                )
     # Une réaffectation explicite rend l'association ambiguë, sans interpréter Python.
     for node in tree.body:
         if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
@@ -87,16 +102,18 @@ def _controller_imports(tree: ast.Module) -> dict[str, str]:
 
 def _controller(
     handler: HandlerInfo,
-    imports: dict[str, str],
+    imports: dict[str, tuple[str, str]],
     root: Path,
     warnings: list[str],
     line: int,
+    cache: dict[str, ast.Module | None],
 ) -> HandlerInfo:
     if "." not in handler.reference:
         return handler
-    relative = imports.get(handler.reference.split(".", 1)[0])
-    if relative is None:
+    binding = imports.get(handler.reference.split(".", 1)[0])
+    if binding is None:
         return handler
+    relative, symbol = binding
     try:
         # lstat ne suit ni le fichier ni ses parents liés ; aucun contenu ouvert.
         for parent in (root / "mvc", root / "mvc/controllers"):
@@ -106,13 +123,64 @@ def _controller(
             raise ValueError("fichier non ordinaire ou lien symbolique")
     except FileNotFoundError:
         warnings.append(f"Ligne {line} : contrôleur importé introuvable : {relative}.")
-        return handler
+        return HandlerInfo(handler.reference, verification="unreadable")
     except (OSError, ValueError):
         warnings.append(
             f"Ligne {line} : contrôleur refusé (accès/lien/type) : {relative}."
         )
-        return handler
-    return HandlerInfo(handler.reference, relative)
+        return HandlerInfo(handler.reference, verification="unreadable")
+    status = _verify(root, relative, symbol, handler.reference, cache, warnings)
+    return HandlerInfo(handler.reference, relative, status)
+
+
+def _verify(
+    root: Path,
+    relative: str,
+    symbol: str,
+    reference: str,
+    cache: dict[str, ast.Module | None],
+    warnings: list[str],
+) -> Verification:
+    if len(reference.split(".")) != 2:
+        return "not-applicable"
+    if relative not in cache:
+        try:
+            cache[relative] = _tree(_read_source(root / relative))
+        except (RoutesSourceMissingError, RoutesSourceUnreadableError):
+            cache[relative] = None
+            warnings.append(
+                f"{relative} : lecture ou syntaxe Python invalide, non vérifiable."
+            )
+    tree = cache[relative]
+    if tree is None:
+        return "unreadable"
+    classes = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == symbol
+    ]
+    if not classes:
+        warnings.append(f"{relative} : classe {symbol} introuvable.")
+        return "class-missing"
+    if len(classes) != 1:
+        warnings.append(f"{relative} : classe {symbol} ambiguë.")
+        return "ambiguous"
+    method = reference.split(".")[1]
+    methods = [
+        node
+        for node in classes[0].body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == method
+    ]
+    if not methods:
+        warnings.append(
+            f"{relative} : méthode {method} non définie directement dans {symbol}."
+        )
+        return "method-missing"
+    if len(methods) != 1:
+        warnings.append(f"{relative} : méthode {method} ambiguë dans {symbol}.")
+        return "ambiguous"
+    return "found"
 
 
 def _literal(node: ast.expr) -> object:
@@ -134,8 +202,10 @@ def _parse(
     tree: ast.Module,
     root: Path,
     receiver: str | None = None,
-    imports: dict[str, str] | None = None,
+    imports: dict[str, tuple[str, str]] | None = None,
+    cache: dict[str, ast.Module | None] | None = None,
 ) -> RoutesResult:
+    cache = {} if cache is None else cache
     controller_imports = _controller_imports(tree) if imports is None else imports
     routes: list[RouteInfo] = []
     warnings = [
@@ -229,7 +299,12 @@ def _parse(
                             )
                         else:
                             handler = _controller(
-                                handler, controller_imports, root, warnings, call.lineno
+                                handler,
+                                controller_imports,
+                                root,
+                                warnings,
+                                call.lineno,
+                                cache,
                             )
                         for m in methods:
                             assert isinstance(m, str)
@@ -316,7 +391,8 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
                 branches.append((imports[call.func.id], call.func.id))
                 continue
         direct.append(statement)
-    result = _parse(ast.Module(body=direct, type_ignores=[]), canonical)
+    cache: dict[str, ast.Module | None] = {}
+    result = _parse(ast.Module(body=direct, type_ignores=[]), canonical, cache=cache)
     routes, warnings = list(result.routes), list(result.warnings)
     for module, function in branches[:64]:
         filename = f"{module}.py"
@@ -348,6 +424,7 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
                 canonical,
                 args.args[0].arg,
                 _controller_imports(child),
+                cache,
             )
             routes.extend(parsed.routes)
             warnings.extend(

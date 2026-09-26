@@ -192,7 +192,18 @@ def test_handler_references(project: Path, reference: str, branched: bool) -> No
     target.write_text(content)
     result = read_routes(project)
     assert result.routes == (
-        RouteInfo("GET", "/", "home", True, HandlerInfo(reference)),
+        RouteInfo(
+            "GET",
+            "/",
+            "home",
+            True,
+            HandlerInfo(
+                reference,
+                verification="unreadable"
+                if reference == "Contact.list"
+                else "not-applicable",
+            ),
+        ),
     )
 
 
@@ -255,7 +266,7 @@ def test_controller_per_source(
         *,
         dir_fd: int | None = None,
     ) -> int:
-        assert isinstance(path, Path) and path.parent == routes
+        assert isinstance(path, Path) and (path.parent == routes or path == controller)
         return original(path, flags, mode, dir_fd=dir_fd)
 
     def no_scan(*args: object, **kwargs: object) -> None:
@@ -266,7 +277,7 @@ def test_controller_per_source(
     monkeypatch.setattr(Path, "iterdir", no_scan)
     result = read_routes(project)
     assert result.routes[0].handler == HandlerInfo(
-        f"{alias}.list", "mvc/controllers/contact_controller.py"
+        f"{alias}.list", "mvc/controllers/contact_controller.py", "unreadable"
     )
     assert before == (controller.stat().st_mtime_ns, controller.read_bytes())
 
@@ -315,7 +326,7 @@ def test_controller_unresolved(project: Path, kind: str) -> None:
             "router = Router()\nregister_contact_routes(router)\n"
         )
         (project / "mvc/routes/contact_routes.py").write_text(
-            'def register_contact_routes(router):\n'
+            "def register_contact_routes(router):\n"
             '    router.add("GET", "/", Contact.list)\n'
         )
     (project / "mvc/routes/__init__.py").write_text(source)
@@ -325,3 +336,76 @@ def test_controller_unresolved(project: Path, kind: str) -> None:
     assert handler is None or handler.controller_file is None
     if kind in ("missing", "symlink", "parent_link"):
         assert any("contrôleur" in warning for warning in result.warnings)
+
+
+@pytest.mark.parametrize(
+    "content,status",
+    [
+        ("class Original:\n    def list(self): raise RuntimeError('never')", "found"),
+        ("class Original:\n    async def list(self): pass", "found"),
+        ("class Original:\n    @staticmethod\n    def list(): pass", "found"),
+        ("class Original:\n    @classmethod\n    def list(cls): pass", "found"),
+        ("class Other: pass", "class-missing"),
+        ("class Original: pass", "method-missing"),
+        ("invalid !!!", "unreadable"),
+        ("x" * (1024 * 1024 + 1), "unreadable"),
+        ("class Original: pass\nclass Original: pass", "ambiguous"),
+        (
+            "class Base:\n    def list(self): pass\nclass Original(Base): pass",
+            "method-missing",
+        ),
+    ],
+)
+def test_verification(project: Path, content: str, status: str) -> None:
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/example.py").write_text(content)
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.example import Original as Alias\n"
+        'router = Router()\nrouter.add("GET", "/", Alias.list)\n'
+    )
+    result = read_routes(project)
+    handler = result.routes[0].handler
+    assert handler is not None
+    assert handler.reference == "Alias.list"
+    assert handler.controller_file == "mvc/controllers/example.py"
+    assert handler.verification == status
+    assert (len(result.warnings) == 1) == (status == "found")
+
+
+def test_controller_cache_and_encoding(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forge_design.forge import routes as bridge
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/example.py"
+    controller.write_bytes(b"\xff")
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.example import Original\nrouter = Router()\n"
+        'router.add("GET", "/", Original.list)\n'
+        'router.add("POST", "/", Original.create)\n'
+    )
+    original = bridge._read_source  # pyright: ignore[reportPrivateUsage]
+    reads: list[Path] = []
+
+    def read(path: Path) -> str:
+        reads.append(path)
+        return original(path)
+
+    monkeypatch.setattr(bridge, "_read_source", read)
+    result = read_routes(project)
+    assert reads.count(controller) == 1
+    assert all(
+        route.handler and route.handler.verification == "unreadable"
+        for route in result.routes
+    )
+    assert len(result.warnings) == 2
+    controller.write_text(
+        "class Original:\n    def list(self): pass\n    def create(self): pass"
+    )
+    result = read_routes(project)
+    assert reads.count(controller) == 2
+    assert all(
+        route.handler and route.handler.verification == "found"
+        for route in result.routes
+    )

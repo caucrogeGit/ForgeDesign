@@ -478,11 +478,10 @@ Le troisième argument handler n'est jamais évalué. FD-ROUTES-002 ajoute un
 attributaires ancrées sur un nom sont reproduits tels quels, y compris les alias.
 FD-ROUTES-003 ajoute `controller_file` optionnel au handler, depuis les imports
 explicites du même fichier de routes : `mvc.controllers.<module_simple>`, avec alias
-acceptés. Le chemin relatif est confirmé par métadonnées uniquement ; aucun
-contenu contrôleur n'est ouvert. Fichiers ou parents liés, fichiers absents et types
+acceptés. Le chemin relatif est confirmé par métadonnées avant toute lecture. Fichiers ou parents liés, fichiers absents et types
 incorrects ne sont pas résolus et produisent un avertissement. Les imports des
 sources différentes ne sont jamais mélangés. Sous-paquets et imports relatifs
-restent hors contrat ; aucune recherche de classe ou méthode n'est effectuée.
+restent hors contrat. La vérification directe de classe et méthode est décrite ci-dessous.
 La page ajoute la colonne Contrôleur, sans lien.
 Une expression dynamique conserve la route avec handler absent et un avertissement
 de ligne ; la colonne Handler affiche alors « — ». Aucun lien ou graphe ajouté.
@@ -500,3 +499,18 @@ ne déclenche aucune lecture. Une déclaration
 non interprétée ajoute un avertissement de ligne. Aucun inventaire complet des
 routes exécutables n'est promis par cette lecture minimale.
 Une source absente ou illisible et un projet non reconnu restent des erreurs distinctes.
+
+
+### Vérification de méthode (FD-ROUTES-004)
+
+Le contrôleur résolu est désormais lu avec la primitive sécurisée des sources,
+limite 1 Mio, UTF-8/BOM, fichier ordinaire sans lien et contrôle du descripteur.
+Un cache AST local à `read_routes` évite plusieurs lectures du même fichier.
+Le symbole original de l'import, même avec alias, identifie la classe de niveau
+module ; seuls ses `FunctionDef` et `AsyncFunctionDef` directs sont recherchés.
+Décorateurs et corps métier ne sont pas interprétés ; l'héritage n'est pas suivi.
+`HandlerInfo.verification` distingue `found`, `class-missing`, `method-missing`,
+`unreadable`, `ambiguous` et `not-applicable`. Une référence simple sans contrôleur
+ou un handler dynamique n'entraîne aucune lecture supplémentaire.
+La colonne Vérification affiche le résultat sans lien. « Trouvée » signifie
+uniquement une définition syntaxique directe, pas une garantie d'exécutabilité.

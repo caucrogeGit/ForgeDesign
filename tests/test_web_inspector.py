@@ -378,6 +378,7 @@ router.add("POST", "/submit", handler)
     assert "GET" in html and "POST" in html and "home" in html
     assert "Handler</th>" in html and "ContactController.list" in html
     assert "Contrôleur</th>" in html and "mvc/controllers/contact.py" in html
+    assert "Vérification</th>" in html and "Non vérifiable" in html
     assert "Oui" in html and "Non" in html and "—" in html
     assert "&lt;script&gt;" in html and "<script>" not in html
     assert "no-store" in headers.get("Cache-Control", "")
