@@ -72,35 +72,40 @@ Une option telle que `--no-browser` pourra être étudiée dans un ticket CLI d�
 Une écoute sur `0.0.0.0`, une connexion distante ou une exposition publique ne font pas partie du comportement par défaut.
 Elles nécessitent une conception de sécurité dédiée.
 
-### Serveur local et shell HTML disponibles (FD-WEB-001 / FD-UI-001)
+### Backend Forge disponible (FD-WEB-002)
 
-`forge_design.web.server.create_server(host="127.0.0.1", port=8765)` ouvre
-l'écoute sans lancer la boucle ; `run_server` utilise les mêmes paramètres et
-sert dans le thread appelant jusqu'à Ctrl+C, puis ferme le socket.
-Seul `127.0.0.1` est accepté : tout autre hôte est refusé, sans exposition réseau
-implicite. Le port par défaut est `8765` ; `0` demande un port éphémère au système.
-Un port hors de `0..65535` est refusé et un port occupé conserve l'exception
-`OSError` du système, sans repli automatique.
+Forge Design est lui-même une application Web construite avec Forge.
+`forge_design.web.server.create_application()` assemble les API publiques
+`Application`, `Router` et `Response` de `forge-mvc`.
+L'adaptateur officiel `create_wsgi_app` reçoit cette application ;
+`wsgiref.simple_server` fournit uniquement le transport local WSGI.
+C'est l'unique voie HTTP : l'ancien gestionnaire HTTP spécifique est supprimé.
 
-La seule route est `GET /`, qui retourne un document HTML UTF-8 avec le nom
-Forge Design, une courte description et l'état « Aucun projet ouvert. ».
-La ressource statique `forge_design/web/templates/index.html` contient un CSS
-intégré minimal, sans JavaScript ni chaîne de build frontend.
-Elle est déclarée comme donnée du paquet et chargée via `importlib.resources`,
-indépendamment du répertoire courant, y compris depuis la wheel.
-Aucun moteur de templates n'est nécessaire pour cette page fixe.
+`create_server(host="127.0.0.1", port=8765)` ouvre l'écoute sans lancer la boucle ;
+`run_server` sert jusqu'à Ctrl+C puis ferme le socket.
+Seul `127.0.0.1` est accepté ; le port `0` demande un port éphémère.
+Les erreurs de port occupé restent des `OSError`, sans repli automatique.
+Le cycle piloté reste `serve_forever` dans un thread, `shutdown` depuis un autre
+thread, puis `join` et fermeture du serveur.
+Le transport standard n'hérite pas du délai d'inactivité de l'ancien gestionnaire.
 
-Les autres chemins retournent 404 ; aucune URL n'est transformée en chemin
-filesystem. Seule la ressource HTML explicitement nommée est lue.
-Le serveur utilise `HTTPServer` et `BaseHTTPRequestHandler` de la bibliothèque
-standard et ne dépend ni du Bridge ni du point de composition.
-Le shell n'offre aucune UI métier, sélection de projet ou navigation entre Tools.
-La CLI reste inchangée et aucun navigateur n'est ouvert automatiquement.
+`GET /` conserve le shell HTML « Aucun projet ouvert. ».
+`GET /shell.css` sert une unique ressource CSS explicitement nommée : les styles
+ont été extraits du HTML pour respecter `style-src 'self'` de Forge, sans assouplir
+sa CSP. Les ressources sont packagées et chargées via `importlib.resources`.
+Le shell étant statique, le moteur Jinja de Forge n'est pas encore activé.
+Les erreurs et en-têtes de sécurité relèvent de Forge.
+La sonde `/health` est fournie nativement par son adaptateur WSGI.
+Les paramètres de requête suivent le parsing Forge ; ils ne sélectionnent aucun projet.
 
-Pour un cycle de vie piloté, utiliser `create_server` dans un bloc `with`, lancer
-`serve_forever`, puis appeler `shutdown` depuis un autre thread et joindre le
-thread de service avant de quitter le bloc. Le serveur ne crée lui-même aucun
-thread. Un délai d'inactivité de deux secondes est appliqué aux connexions.
+La dépendance runtime est épinglée à `forge-mvc==1.0.0rc9`, préversion publiée
+vérifiée pour cette migration. Sa mise à jour devra être validée explicitement.
+Cette version sert à exécuter Forge Design ; elle ne détermine pas la version
+déclarée d'un projet cible, toujours lue indépendamment par le Bridge.
+Forge Core ne dépend pas de Forge Design et n'est pas modifié.
+Aucun `config.py`, `bootstrap.py` ou module `mvc` du répertoire courant n'est chargé
+par la composition Web. Aucun Tool n'est exécuté et aucune UI métier n'est ajoutée.
+La CLI reste inchangée ; aucun navigateur n'est ouvert automatiquement.
 
 Le frontend peut évoluer progressivement :
 

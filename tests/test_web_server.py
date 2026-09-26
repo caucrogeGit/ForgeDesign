@@ -2,14 +2,16 @@
 
 import errno
 import inspect
+import sys
 from collections.abc import Iterator
 from http.client import HTTPConnection
-from http.server import HTTPServer
 from importlib.resources import files
 from pathlib import Path
 from threading import Thread
+from wsgiref.simple_server import WSGIServer
 
 import pytest
+from core.app.application import Application
 
 from forge_design.forge import project_detection, project_root, project_version
 from forge_design.tools import project_inspector
@@ -17,7 +19,7 @@ from forge_design.web import server as web
 
 
 @pytest.fixture
-def running_server() -> Iterator[HTTPServer]:
+def running_server() -> Iterator[WSGIServer]:
     with web.create_server(port=0) as server:
         thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         thread.start()
@@ -36,7 +38,7 @@ def test_defaults() -> None:
         assert parameters["port"].default == 8765
 
 
-def test_local_binding_and_response(running_server: HTTPServer) -> None:
+def test_local_binding_and_response(running_server: WSGIServer) -> None:
     assert running_server.server_address[0] == "127.0.0.1"
     assert running_server.socket.getsockname()[0] == "127.0.0.1"
     assert running_server.server_port > 0
@@ -61,17 +63,15 @@ def test_local_binding_and_response(running_server: HTTPServer) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "/health",
         "/.env",
         "/../../etc/passwd",
-        "/?project=x",
         "/%2e%2e/%2e%2e/etc/passwd",
         "/..%2f..%2fetc/passwd",
         "/%252e%252e/etc/passwd",
         "/templates/index.html",
     ],
 )
-def test_no_other_route(running_server: HTTPServer, path: str) -> None:
+def test_no_other_route(running_server: WSGIServer, path: str) -> None:
     connection = HTTPConnection("127.0.0.1", running_server.server_port, timeout=3)
     try:
         connection.request("GET", path)
@@ -83,7 +83,7 @@ def test_no_other_route(running_server: HTTPServer, path: str) -> None:
 
 
 def test_no_project_access(
-    running_server: HTTPServer, monkeypatch: pytest.MonkeyPatch
+    running_server: WSGIServer, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def forbidden(*args: object, **kwargs: object) -> None:
         raise AssertionError("Web must not access a project")
@@ -104,7 +104,7 @@ def test_no_project_access(
         errors: str | None = None,
         newline: str | None = None,
     ):
-        assert self == resource and mode == "rb"
+        assert self == resource and mode == "r"
         return original_open(self, mode, buffering, encoding, errors, newline)
 
     monkeypatch.setattr(Path, "open", guarded_open)
@@ -149,7 +149,7 @@ def test_run_server_closes_on_exit(
 ) -> None:
     server = web.create_server(port=0)
 
-    def create(host: str, port: int) -> HTTPServer:
+    def create(host: str, port: int) -> WSGIServer:
         assert host == "127.0.0.1" and port == 0
         return server
 
@@ -167,7 +167,7 @@ def test_run_server_closes_on_exit(
 
 
 def test_html_independent_of_cwd(
-    running_server: HTTPServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    running_server: WSGIServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "index.html").write_text("must not be served")
     monkeypatch.chdir(tmp_path)
@@ -175,7 +175,7 @@ def test_html_independent_of_cwd(
 
 
 def test_arbitrary_file_not_served(
-    running_server: HTTPServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    running_server: WSGIServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "private.txt").write_text("private content sentinel")
     monkeypatch.chdir(tmp_path)
@@ -187,3 +187,62 @@ def test_arbitrary_file_not_served(
         assert b"private content sentinel" not in response.read()
     finally:
         connection.close()
+
+
+def test_forge_application() -> None:
+    assert isinstance(web.create_application(), Application)
+
+
+def test_forge_headers_and_css(running_server: WSGIServer) -> None:
+    connection = HTTPConnection("127.0.0.1", running_server.server_port, timeout=3)
+    try:
+        connection.request("GET", "/")
+        response = connection.getresponse()
+        assert response.status == 200
+        assert response.getheader("X-Content-Type-Options") == "nosniff"
+        policy = response.getheader("Content-Security-Policy") or ""
+        assert "style-src 'self'" in policy
+        assert "unsafe-inline" not in policy
+        html = response.read().decode("utf-8")
+        assert '<link rel="stylesheet" href="/shell.css">' in html
+        assert "<style>" not in html
+        connection.request("GET", "/shell.css")
+        response = connection.getresponse()
+        assert response.status == 200
+        assert response.getheader("Content-Type") == "text/css; charset=utf-8"
+        assert b"font-family" in response.read()
+    finally:
+        connection.close()
+
+
+def test_forge_native_health(running_server: WSGIServer) -> None:
+    connection = HTTPConnection("127.0.0.1", running_server.server_port, timeout=3)
+    try:
+        connection.request("GET", "/health")
+        response = connection.getresponse()
+        assert response.status == 200
+        assert b'"ok"' in response.read()
+    finally:
+        connection.close()
+
+
+def test_cwd_code_not_imported(
+    running_server: WSGIServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("config.py", "bootstrap.py", "app.py"):
+        (tmp_path / name).write_text("raise AssertionError('must not import')")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+    assert isinstance(web.create_application(), Application)
+    test_local_binding_and_response(running_server)
+
+
+def test_target_version_independent_of_runtime(tmp_path: Path) -> None:
+    from importlib.metadata import version
+
+    for name in ("app.py", "bootstrap.py", "config.py"):
+        (tmp_path / name).touch()
+    (tmp_path / "mvc/routes").mkdir(parents=True)
+    (tmp_path / "requirements.txt").write_text("forge-mvc==99.0.0")
+    assert version("forge-mvc") == "1.0.0rc9"
+    assert project_version.read_forge_version(tmp_path).version == "99.0.0"

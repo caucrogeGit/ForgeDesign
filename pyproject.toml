@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Cockpit graphique et outils visuels pour l'écosystème Forge"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["packaging>=24.0"]
+dependencies = ["packaging>=24.0", "forge-mvc==1.0.0rc9"]
 
 [project.scripts]
 forge-design = "forge_design.cli:main"
@@ -20,7 +20,7 @@ dev = ["pytest>=8", "ruff>=0.9", "pyright>=1.1.390"]
 packages = ["forge_design", "forge_design.forge", "forge_design.tools", "forge_design.platform", "forge_design.web"]
 
 [tool.setuptools.package-data]
-"forge_design.web" = ["templates/index.html"]
+"forge_design.web" = ["templates/index.html", "static/shell.css"]
 
 [tool.setuptools.dynamic]
 version = {attr = "forge_design.__version__"}
