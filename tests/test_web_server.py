@@ -246,3 +246,39 @@ def test_target_version_independent_of_runtime(tmp_path: Path) -> None:
     (tmp_path / "requirements.txt").write_text("forge-mvc==99.0.0")
     assert version("forge-mvc") == "1.0.0rc9"
     assert project_version.read_forge_version(tmp_path).version == "99.0.0"
+
+
+@pytest.mark.parametrize("path", ["/", "/inspector"])
+def test_shared_navigation(
+    running_server: WSGIServer, path: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forge_design.platform.tool_registry import ToolRegistry
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("La navigation ne doit pas consulter le registre")
+
+    monkeypatch.setattr(ToolRegistry, "get", forbidden)
+    monkeypatch.setattr(ToolRegistry, "list", forbidden)
+    connection = HTTPConnection("127.0.0.1", running_server.server_port, timeout=3)
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        html = response.read().decode()
+        assert response.status == 200
+        assert '<nav aria-label="Navigation principale">' in html
+        assert f'href="{path}" aria-current="page"' in html
+        assert html.count('aria-current="page"') == 1
+        assert '>Accueil</a>' in html and '>Project Inspector</a>' in html
+        assert 'href="/"' in html and 'href="/inspector"' in html
+        assert html.count('<main>') == html.count('<head>') == 1
+        assert 'href="/shell.css"' in html
+    finally:
+        connection.close()
+
+
+def test_pages_extend_same_layout() -> None:
+    templates = files("forge_design.web").joinpath("templates")
+    for name in ("index.html", "inspector.html"):
+        source = templates.joinpath(name).read_text()
+        assert '{% extends "layout.html" %}' in source
+        assert '<head>' not in source and '<nav' not in source

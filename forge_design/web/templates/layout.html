@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Forge Design{% endblock %}</title>
+  <link rel="stylesheet" href="/shell.css">
+</head>
+<body>
+  <header>
+    <p class="brand">Forge Design</p>
+    <nav aria-label="Navigation principale">
+      <a href="/"{% if active_page == 'home' %} aria-current="page"{% endif %}>Accueil</a>
+      <a href="/inspector"{% if active_page == 'inspector' %} aria-current="page"{% endif %}>Project Inspector</a>
+    </nav>
+  </header>
+  <main>
+{% block content %}{% endblock %}
+  </main>
+</body>
+</html>

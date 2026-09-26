@@ -1,14 +1,6 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Project Inspector — Forge Design</title>
-  <link rel="stylesheet" href="/shell.css">
-</head>
-<body>
-  <header><p class="brand"><a href="/">Forge Design</a></p></header>
-  <main>
+{% extends "layout.html" %}
+{% block title %}Project Inspector — Forge Design{% endblock %}
+{% block content %}
     <h1>Project Inspector</h1>
     <p class="intro">Consultez la structure et la version déclarée d’un projet Forge.</p>
     <form action="/inspector" method="post">
@@ -38,6 +30,4 @@
       {% endif %}
     </section>
     {% endif %}
-  </main>
-</body>
-</html>
+{% endblock %}

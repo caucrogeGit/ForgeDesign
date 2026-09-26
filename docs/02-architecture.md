@@ -93,7 +93,10 @@ Le transport standard n'hérite pas du délai d'inactivité de l'ancien gestionn
 `GET /shell.css` sert une unique ressource CSS explicitement nommée : les styles
 ont été extraits du HTML pour respecter `style-src 'self'` de Forge, sans assouplir
 sa CSP. Les ressources sont packagées et chargées via `importlib.resources`.
-Le shell d'accueil reste statique ; le formulaire Inspector utilise le renderer Jinja public de Forge.
+Les deux pages utilisent le renderer Jinja public de Forge et héritent de `layout.html`.
+Ce layout partage le head, la navigation sémantique et le conteneur principal.
+Les liens fixes Accueil et Project Inspector utilisent un état actif explicite
+(`aria-current` et soulignement), sans consulter le registre pour la navigation.
 Les erreurs et en-têtes de sécurité relèvent de Forge.
 La sonde `/health` est fournie nativement par son adaptateur WSGI.
 Les paramètres de requête suivent le parsing Forge ; ils ne sélectionnent aucun projet.

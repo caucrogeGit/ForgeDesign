@@ -1,16 +1,10 @@
 """Frontière Web de Project Inspector : formulaire, délégation et rendu Forge."""
 
 import re
-from importlib.resources import as_file, files
 from pathlib import Path
 
 from core.http.request import Request
 from core.http.response import Response
-
-# Forge rc9 ne fournit pas de marqueur py.typed pour ce paquet public.
-from integrations.jinja2.renderer import (  # pyright: ignore[reportMissingTypeStubs]
-    Jinja2Renderer,
-)
 
 from forge_design.forge.project_root import (
     ProjectRootNotDirectoryError,
@@ -19,6 +13,7 @@ from forge_design.forge.project_root import (
 )
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.project_inspector import ProjectInspection
+from forge_design.web.rendering import render_page
 
 MAX_PATH_LENGTH = 4096
 
@@ -30,19 +25,17 @@ def _render(
     error: str | None = None,
     status: int = 200,
 ) -> Response:
-    # Seules les ressources du paquet sont ouvertes par cette couche.
-    with as_file(files("forge_design.web").joinpath("templates")) as templates:
-        renderer = Jinja2Renderer(str(templates))
-        html = renderer.render(
-            "inspector.html",
-            {
-                "path": path,
-                "result": result,
-                "error": error,
-                "max_path_length": MAX_PATH_LENGTH,
-            },
-        )
-    return Response.html(html, status=status)
+    return render_page(
+        "inspector.html",
+        {
+            "path": path,
+            "result": result,
+            "error": error,
+            "max_path_length": MAX_PATH_LENGTH,
+            "active_page": "inspector",
+        },
+        status=status,
+    )
 
 
 def show_inspector(request: Request) -> Response:

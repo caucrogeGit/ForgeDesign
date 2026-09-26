@@ -11,14 +11,14 @@ from core.http.router import Router
 
 from forge_design.app import create_tool_registry
 from forge_design.web.inspector import inspect_submission, show_inspector
+from forge_design.web.rendering import render_page
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 
 
 def _index(request: Request) -> Response:
-    html = files("forge_design.web").joinpath("templates/index.html")
-    return Response.html(html.read_text(encoding="utf-8"))
+    return render_page("index.html", {"active_page": "home"})
 
 
 def _style(request: Request) -> Response:

@@ -1,14 +1,6 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Forge Design</title>
-  <link rel="stylesheet" href="/shell.css">
-</head>
-<body>
-  <header><p class="brand">Forge Design</p></header>
-  <main>
+{% extends "layout.html" %}
+{% block title %}Forge Design{% endblock %}
+{% block content %}
     <p class="eyebrow">Espace de travail</p>
     <h1>Forge Design</h1>
     <p class="intro">Cockpit graphique et plateforme d’outils visuels pour Forge.</p>
@@ -17,6 +9,4 @@
       <p>Aucun projet ouvert.</p>
     </section>
     <p><a href="/inspector">Ouvrir Project Inspector</a></p>
-  </main>
-</body>
-</html>
+{% endblock %}
