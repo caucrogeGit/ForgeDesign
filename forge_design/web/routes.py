@@ -14,6 +14,7 @@ from forge_design.forge.routes import (
     RoutesSourceMissingError,
     RoutesSourceUnreadableError,
 )
+from forge_design.forge.template_cycles import TemplateCycle
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.route_graph import build_route_graph
 from forge_design.web.rendering import render_page
@@ -37,6 +38,15 @@ def show_routes(context: CurrentProjectContext, registry: ToolRegistry) -> Respo
             error = str(exc)
         if result is not None and not isinstance(result, RoutesResult):
             raise TypeError("route-explorer doit retourner RoutesResult.")
+    cycles: dict[tuple[tuple[str, str, str], ...], TemplateCycle] = {}
+    partial = False
+    if result is not None:
+        for route in result.routes:
+            closure = route.handler.template.dependency_graph if route.handler else None
+            if closure is not None:
+                partial = partial or closure.truncated
+                for cycle in closure.cycles:
+                    cycles.setdefault(cycle.key, cycle)
     graph = build_route_graph(result) if result is not None else None
     return render_page(
         "routes.html",
@@ -45,6 +55,8 @@ def show_routes(context: CurrentProjectContext, registry: ToolRegistry) -> Respo
             "current_project": context.inspection,
             "result": result,
             "error": error,
+            "template_cycles": tuple(cycles.values()),
+            "cycles_partial": partial,
             "graph": graph,
             "graph_layout": layout_route_graph(graph) if graph else None,
             "graph_nodes": {node.id: node for node in graph.nodes} if graph else {},

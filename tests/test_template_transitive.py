@@ -6,6 +6,7 @@ import pytest
 
 from forge_design.forge import routes as bridge
 from forge_design.forge.routes import read_routes
+from forge_design.forge.template_cycles import TemplateCycle
 
 
 @pytest.fixture
@@ -117,7 +118,8 @@ def test_diamond_cycle_and_cache(
             ]
             assert graph.templates[-1].dependencies[0].path == "a.html"
             assert not graph.truncated
-            assert not any("cycle" in w for w in result.warnings)
+            assert len(graph.cycles) == 1
+            assert sum("Cycle de templates" in w for w in result.warnings) == 1
             assert len(reads) == len(parses) == len(extractions) == 4 * attempt
             assert all(reads.count(p) == attempt for p in snapshot)
     assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}
@@ -167,3 +169,22 @@ def test_global_limit(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert [d.path for d in graph.templates[0].dependencies] == ["b", "c", "d", "e"]
     assert graph.truncated
     assert sum("Limite globale" in w for w in result.warnings) == 1
+
+
+def test_cycle_warning_shared_between_roots(project: Path) -> None:
+    views = project / "mvc/views"
+    (views / "a.html").write_text('{% include "b.html" %}')
+    (views / "b.html").write_text('{% extends "a.html" %}')
+    (project / "mvc/controllers/home.py").write_text(
+        'class Home:\n    def index(self): return BaseController.render("a.html")\n'
+        '    def other(self): return BaseController.render("b.html")\n'
+    )
+    source = project / "mvc/routes/__init__.py"
+    source.write_text(source.read_text() + 'router.add("POST", "/", Home.other)\n')
+    result = read_routes(project)
+    cycles: list[tuple[TemplateCycle, ...]] = []
+    for route in result.routes:
+        assert route.handler and route.handler.template.dependency_graph
+        cycles.append(route.handler.template.dependency_graph.cycles)
+    assert cycles[0] == cycles[1]
+    assert sum("Cycle de templates Jinja :" in w for w in result.warnings) == 1

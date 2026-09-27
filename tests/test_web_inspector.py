@@ -598,3 +598,47 @@ def test_web_dependency_syntax(
     if label == "Invalide":
         assert "part.html:1" in html
     assert headers.get("Cache-Control") == "no-store"
+
+
+@pytest.mark.parametrize(
+    "cyclic,partial", [(False, False), (True, False), (False, True), (True, True)]
+)
+def test_web_template_cycles(
+    server: WSGIServer,
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cyclic: bool,
+    partial: bool,
+) -> None:
+    from forge_design.forge import routes as bridge
+
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home.py").write_text(
+        'class Home:\n    def index(self): return BaseController.render("a.html")\n'
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import Home\nrouter = Router()\n"
+        'router.add("GET", "/", Home.index)\n'
+        'router.add("POST", "/", Home.index)\n'
+    )
+    views = project / "mvc/views"
+    views.mkdir()
+    (views / "a.html").write_text('{% include "<script>.html" %}{% include "extra" %}')
+    (views / "<script>.html").write_text('{% include "a.html" %}' if cyclic else "ok")
+    if partial:
+        monkeypatch.setattr(bridge, "MAX_VISITED_TEMPLATES", 2)
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and headers.get("Cache-Control") == "no-store"
+    section = html.split('<section aria-labelledby="cycles-title">')[1].split(
+        "</section>"
+    )[0]
+    assert "Cycles de templates" in section
+    assert ("Analyse partielle." in section) == partial
+    assert "<script>" not in html
+    if cyclic:
+        assert "&lt;script&gt;.html → a.html → &lt;script&gt;.html" in section
+        assert section.count(" — include → ") == 2
+        assert html.count("Cycle de templates Jinja :") == 1
+    else:
+        assert "Aucun cycle détecté dans l’analyse disponible." in section

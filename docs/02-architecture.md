@@ -674,3 +674,30 @@ racine parcourt ses propres relations connues. Aucune lecture hors de la politiq
 L’analyse transitive ne constitue ni un rendu, ni une résolution dynamique, ni un
 diagnostic de cycles. Le RouteGraph et le SVG restent fondés sur les seules données
 directes ; leur intégration transitive n’est pas réalisée ici.
+
+### Diagnostics de cycles Jinja
+
+`TemplateDependencyGraph → detect_template_cycles → TemplateCycle` est une
+analyse pure du graphe connu, dans `forge/template_cycles.py`. Elle ne relit et
+ne parse aucun template et ne modifie pas le parcours borné de découverte.
+Les cycles sont stockés dans le champ `cycles` de la fermeture finale.
+
+La DFS itérative suit les états absent/en cours/terminé et produit un cycle témoin
+par arête de retour vers la pile active. Elle ne cherche pas à énumérer tous les
+cycles simples d’un graphe dense. Les auto-cycles et cycles indépendants ou
+partageant une racine sont détectés. Les cibles hors de la table et les déclarations
+dynamiques sont exclues. Les quatre types de dépendances statiques sont considérés.
+
+Chaque cycle contient des arêtes gelées (source, cible, kind, line) et expose un
+chemin explicitement fermé. Il est tourné vers sa plus petite source lexicographique,
+sans inversion. Les déclarations de même source/cible/type sont mutualisées en
+conservant la première ligne. L’identité de diagnostic ignore les lignes : mêmes
+relations orientées, même cycle. L’ordre des témoins suit la découverte DFS.
+Le parcours coûte O(V + E), auquel s’ajoute la taille des diagnostics produits.
+
+Les warnings sont dédupliqués entre racines d’un même `read_routes`. La page affiche
+une liste textuelle « Cycles de templates » issue de ces diagnostics déjà calculés,
+avec lignes et types échappés. Le RouteGraph et le SVG restent directs.
+En cas de troncature, « Analyse partielle. » reste visible, même si un cycle connu
+est retourné. « Aucun cycle détecté dans l’analyse disponible. » n’est pas une
+preuve d’absence dans le projet lorsque la fermeture est tronquée.

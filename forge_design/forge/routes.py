@@ -15,6 +15,7 @@ from jinja2 import Environment, TemplateSyntaxError, nodes
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
+from forge_design.forge.template_cycles import TemplateCycle, detect_template_cycles
 
 
 class RoutesSourceMissingError(ValueError):
@@ -80,6 +81,7 @@ class TemplateDependencyGraph:
     root: str
     templates: tuple[TemplateNodeInfo, ...]
     truncated: bool = False
+    cycles: tuple[TemplateCycle, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -458,6 +460,7 @@ def _with_template_presence(
                 dependencies=tuple(dependency_syntax(d) for d in extracted(reference)),
             )
 
+    reported_cycles: set[tuple[tuple[str, str, str], ...]] = set()
     for reference, checked in tuple(cache.items()):
         queue = deque([(reference, 0)])
         discovered = {reference}
@@ -501,13 +504,14 @@ def _with_template_presence(
                     tuple(dependencies),
                 )
             )
+        graph = TemplateDependencyGraph(reference, tuple(templates), truncated)
+        cycles = detect_template_cycles(graph)
+        for cycle in cycles:
+            if cycle.key not in reported_cycles:
+                reported_cycles.add(cycle.key)
+                warnings.append("Cycle de templates Jinja : " + " → ".join(cycle.paths))
         cache[reference] = replace(
-            checked,
-            dependency_graph=TemplateDependencyGraph(
-                reference,
-                tuple(templates),
-                truncated,
-            ),
+            checked, dependency_graph=replace(graph, cycles=cycles)
         )
 
     enriched: list[RouteInfo] = []

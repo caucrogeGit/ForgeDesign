@@ -14,6 +14,19 @@
 </table>
 {% else %}<p>Aucune route statique trouvée dans cette source.</p>{% endif %}
 {% endif %}
+{% if result %}
+<section aria-labelledby="cycles-title">
+  <h2 id="cycles-title">Cycles de templates</h2>
+  {% if cycles_partial %}<p>Analyse partielle.</p>{% endif %}
+  {% if template_cycles %}
+  <ul>{% for cycle in template_cycles %}
+    <li>{{ cycle.paths | join(' → ') }}
+      <ul>{% for edge in cycle.edges %}<li>{{ edge.source }}:{{ edge.line }} — {{ edge.kind }} → {{ edge.target }}</li>{% endfor %}</ul>
+    </li>
+  {% endfor %}</ul>
+  {% else %}<p>Aucun cycle détecté dans l’analyse disponible.</p>{% endif %}
+</section>
+{% endif %}
 {% if graph %}
 <section class="route-graph" aria-labelledby="relations-title">
   <h2 id="relations-title">Vue des relations</h2>
