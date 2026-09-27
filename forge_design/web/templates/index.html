@@ -5,4 +5,26 @@
     <h1>Forge Design</h1>
     <p class="intro">Cockpit graphique et plateforme d’outils visuels pour Forge.</p>
     <p><a href="/inspector">Ouvrir Project Inspector</a></p>
+    <section aria-labelledby="recent-projects-title">
+      <h2 id="recent-projects-title">Projets récents</h2>
+      {% if recent_warning %}<p class="message error" role="alert">{{ recent_warning }}</p>{% endif %}
+      {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
+      {% if recent_projects %}
+      <ul>
+        {% for project in recent_projects %}
+        <li>
+          <p>{{ project.path }}{% if current_project and current_project.root|string == project.path %} — Ouvert{% endif %}</p>
+          <form action="/project/open-recent" method="post">
+            <input type="hidden" name="recent" value="{{ project.path }}">
+            <button type="submit">Ouvrir</button>
+          </form>
+          <form action="/project/recent/remove" method="post">
+            <input type="hidden" name="recent" value="{{ project.path }}">
+            <button type="submit">Retirer</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p>Aucun projet récent.</p>{% endif %}
+    </section>
 {% endblock %}

@@ -107,7 +107,8 @@ Cette version sert à exécuter Forge Design ; elle ne détermine pas la version
 déclarée d'un projet cible, toujours lue indépendamment par le Bridge.
 Forge Core ne dépend pas de Forge Design et n'est pas modifié.
 Aucun `config.py`, `bootstrap.py` ou module `mvc` du répertoire courant n'est chargé
-par la composition Web. Seul un POST explicite à `/inspector` exécute le Tool Inspector.
+par la composition Web. Les POST explicites Inspector, ouverture d’un récent et
+actualisation exécutent le Tool Inspector.
 La CLI reste inchangée ; aucun navigateur n'est ouvert automatiquement.
 
 ### Project Inspector Web disponible (FD-UI-002)
@@ -138,7 +139,7 @@ Le shell commun affiche la racine et la version connue sur les deux pages.
 `POST /project/close` vide le contexte et affiche l'accueil ; il ne ferme pas le serveur.
 Toutes les pages contenant cet état sont servies avec `Cache-Control: no-store`.
 Le contexte appartient à l'instance serveur, partagé par ses onglets clients,
-et disparaît avec elle : aucune persistance, aucun cookie ni session ajouté.
+et disparaît avec elle : aucune persistance du projet courant, aucun cookie ni session ajouté.
 Une nouvelle application démarre vide. Le diagnostic n'est pas rafraîchi en arrière-plan.
 `POST /project/refresh` (FD-PROJECT-002) réinspecte explicitement `context.root`
 via `registry.get("project-inspector").run(root)`, sans chemin fourni par HTTP.
@@ -157,6 +158,43 @@ Ce contrôle protège contre les soumissions de pages étrangères dans un navig
 il n'authentifie pas les programmes locaux capables de fabriquer leurs en-têtes.
 Le GET ne ferme jamais le projet. Le formulaire Inspector conserve son contrôle de
 contenu `application/x-www-form-urlencoded`. Aucun middleware global n'est désactivé.
+
+### Projets récents persistants (FD-PROJECT-003)
+
+`CurrentProjectContext` reste runtime ; `RecentProjects` conserve exclusivement
+les chemins canoniques des projets précédemment ouverts, dans un JSON utilisateur.
+Ce service indépendant du Web est construit dans `create_application`, avec
+injection optionnelle du store ; `create_server` transmet cette injection.
+Aucun singleton, diagnostic persisté, scan ou réouverture automatique.
+
+`recent_projects_file()` utilise `$XDG_CONFIG_HOME/forge-design/recent-projects.json`
+si la base est absolue, sinon `~/.config/forge-design/recent-projects.json`.
+La lecture au démarrage et lors des consultations ne valide pas les projets.
+Le format version 1 contient seulement `version` et `projects`, au plus dix chemins
+absolus distincts. Une ouverture valide enregistre `ProjectInspection.root` en tête.
+L'actualisation et la fermeture ne modifient pas l'historique.
+
+Le stockage est borné à 64 Kio. JSON invalide, version inconnue, lien ou erreur
+filesystem donnent un avertissement contrôlé et interdisent l'écrasement automatique.
+Les écritures relisent le format, créent un temporaire exclusif dans le même dossier,
+flush/fsync le contenu puis effectuent `os.replace`. Les temporaires propres à
+l'opération sont nettoyés sur échec. Dossiers créés en 0700, fichier en 0600,
+sans changer les permissions des dossiers existants.
+Le parcours des parents utilise des descripteurs et refuse les liens avec O_NOFOLLOW.
+La plateforme doit fournir ces primitives ; aucun repli suivant les liens.
+Le stockage est refusé sous la racine ajoutée ou celles déjà enregistrées.
+Il n'y a pas de verrou multi-processus : des mises à jour concurrentes peuvent se
+remplacer ; atomicité du fichier ne signifie pas fusion de l'historique.
+
+L'accueil affiche les récents et l'indication Ouvert pour la racine courante.
+`POST /project/open-recent` exige l'appartenance du chemin à la liste relue côté
+serveur, puis délègue à Inspector. Un échec conserve l'ancien projet et l'entrée.
+`POST /project/recent/remove` retire seulement cette entrée, même si le projet est
+ouvert. Les GET ne modifient rien. Les deux POST réutilisent `is_local_action`
+et le format de formulaire ; contrôle d'origine navigateur, pas authentification
+contre un programme local. Pages no-store et chemins échappés par Jinja.
+Un échec d'enregistrement affiche un avertissement sans annuler l'ouverture valide.
+Tous les tests utilisent une configuration XDG temporaire ou un store injecté.
 
 Le frontend peut évoluer progressivement :
 

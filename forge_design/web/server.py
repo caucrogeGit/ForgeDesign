@@ -12,12 +12,13 @@ from core.http.router import Router
 
 from forge_design.app import create_tool_registry
 from forge_design.current_project import CurrentProjectContext
+from forge_design.recent_projects import RecentProjects
 from forge_design.web.inspector import (
     inspect_submission,
     refresh_project,
     show_inspector,
 )
-from forge_design.web.rendering import render_page
+from forge_design.web.recent_projects import recent_action, show_home
 from forge_design.web.routes import show_routes
 from forge_design.web.security import is_local_action
 from forge_design.web.source import show_source
@@ -38,7 +39,7 @@ def _graph_script(request: Request) -> Response:
     )
 
 
-def create_application() -> Application:
+def create_application(*, recent_projects: RecentProjects | None = None) -> Application:
     """Créer l'application Forge avec ses seules routes publiques explicites.
 
     Aucun chargement de config.py, bootstrap.py ou mvc du répertoire courant.
@@ -46,11 +47,10 @@ def create_application() -> Application:
     """
     registry = create_tool_registry()
     context = CurrentProjectContext()
+    store = recent_projects if recent_projects is not None else RecentProjects()
 
     def index(request: Request) -> Response:
-        return render_page(
-            "index.html", {"active_page": "home", "current_project": context.inspection}
-        )
+        return show_home(request, context, store)
 
     def show(request: Request) -> Response:
         return show_inspector(request, context)
@@ -62,7 +62,7 @@ def create_application() -> Application:
         return index(request)
 
     def inspect(request: Request) -> Response:
-        return inspect_submission(request, registry, context)
+        return inspect_submission(request, registry, context, store)
 
     def refresh(request: Request) -> Response:
         return refresh_project(request, registry, context)
@@ -72,6 +72,12 @@ def create_application() -> Application:
 
     def source(request: Request) -> Response:
         return show_source(request, context)
+
+    def open_recent(request: Request) -> Response:
+        return recent_action(request, context, registry, store)
+
+    def remove_recent(request: Request) -> Response:
+        return recent_action(request, context, registry, store, remove=True)
 
     router = Router()
     router.add("GET", "/", index, public=True, no_store=True)
@@ -84,12 +90,33 @@ def create_application() -> Application:
     router.add(
         "POST", "/project/refresh", refresh, public=True, csrf=False, no_store=True
     )
+    router.add(
+        "POST",
+        "/project/open-recent",
+        open_recent,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
+    router.add(
+        "POST",
+        "/project/recent/remove",
+        remove_recent,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
     router.add("GET", "/routes", routes, public=True, no_store=True)
     router.add("GET", "/source", source, public=True, no_store=True)
     return Application(router, api_routes_module=None)
 
 
-def create_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> WSGIServer:
+def create_server(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    *,
+    recent_projects: RecentProjects | None = None,
+) -> WSGIServer:
     """Ouvrir l'écoute locale servant exclusivement l'adaptateur WSGI Forge.
 
     Seul 127.0.0.1 est accepté ; 0 demande un port éphémère. Les erreurs de bind
@@ -100,7 +127,11 @@ def create_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> WSGISer
         raise ValueError("Seul l'hôte local 127.0.0.1 est autorisé.")
     if isinstance(port, bool) or not 0 <= port <= 65535:
         raise ValueError("Le port doit être compris entre 0 et 65535.")
-    application = create_application()
+    application = (
+        create_application()
+        if recent_projects is None
+        else create_application(recent_projects=recent_projects)
+    )
     return make_server(host, port, create_wsgi_app(application))
 
 
