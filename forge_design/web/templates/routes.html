@@ -17,11 +17,25 @@
 {% if graph %}
 <section class="route-graph" aria-labelledby="relations-title">
   <h2 id="relations-title">Vue des relations</h2>
-  <ul class="graph-nodes">
-  {% for node in graph.nodes %}
-    <li><strong>{{ {'route': 'Route', 'handler': 'Handler', 'controller': 'Contrôleur', 'template': 'Template'}[node.kind] }}</strong> : {{ node.label }}{% if node.presence != 'not-applicable' %} — {{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable'}[node.presence] }}{% endif %}</li>
-  {% else %}<li>Aucune relation disponible.</li>{% endfor %}
-  </ul>
+  <p id="relations-description">Vue graphique statique des relations connues, de gauche à droite : routes, handlers, contrôleurs, templates principaux et dépendances. Le tableau et la liste des relations donnent les libellés complets.</p>
+  <div class="graph-scroll" tabindex="0" role="region" aria-label="Graphe des routes, défilement horizontal">
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="relations-title relations-description" viewBox="0 0 {{ graph_layout.width }} {{ graph_layout.height }}" width="{{ graph_layout.width }}" height="{{ graph_layout.height }}">
+    <defs><marker id="route-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
+    {% for item in graph_layout.edges %}
+    <path class="graph-edge" d="{{ item.path }}" marker-end="url(#route-arrow)" />
+    <text class="edge-label" x="{{ item.label_x }}" y="{{ item.label_y }}">{{ item.edge.kind }}</text>
+    {% endfor %}
+    {% for item in graph_layout.nodes %}
+    <g class="graph-node">
+      <title>{{ item.node.label }}</title>
+      <rect x="{{ item.x }}" y="{{ item.y }}" width="{{ item.width }}" height="{{ item.height }}" rx="6" />
+      <text x="{{ item.x + 12 }}" y="{{ item.y + 24 }}">{{ {'route': 'Route', 'handler': 'Handler', 'controller': 'Contrôleur', 'template': 'Template'}[item.node.kind] }}</text>
+      <text x="{{ item.x + 12 }}" y="{{ item.y + 50 }}">{{ item.label }}</text>
+      <text x="{{ item.x + 12 }}" y="{{ item.y + 78 }}">{{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[item.node.presence] }}</text>
+    </g>
+    {% endfor %}
+  </svg>
+  </div>
   <ul class="graph-edges">
   {% for edge in graph.edges %}
     <li>{{ graph_nodes[edge.source].label }} → <strong>{{ edge.kind }}</strong> → {{ graph_nodes[edge.target].label }}</li>

@@ -512,6 +512,7 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     (project / "mvc/routes/__init__.py").write_text(
         "from mvc.controllers.home import HomeController\nrouter = Router()\n"
         'router.add("GET", "/", HomeController.index)\n'
+        'router.add("POST", "/", HomeController.index)\n'
     )
     (project / "mvc/views").mkdir()
     (project / "mvc/views/home.html").write_text(
@@ -535,7 +536,12 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     assert "mvc/controllers/home.py" in graph_html and "home.html" in graph_html
     assert "extends</strong> → base.html" in graph_html
     assert "includes</strong> → contacts/&lt;script&gt;.html" in graph_html
-    assert "contacts/&lt;script&gt;.html — Absent" in graph_html
+    assert "contacts/&lt;script&gt;.html" in graph_html
+    assert ">Absent</text>" in graph_html
+    assert graph_html.count("<title>HomeController.index</title>") == 1
+    assert graph_html.count(">handles</text>") == 2
+    assert "<svg " in graph_html and graph_html.count("<marker ") == 1
+    assert 'role="img"' in graph_html and "viewBox=" in graph_html
     assert "dynamic_name" not in graph_html and "dynamique" not in graph_html
     assert "<script>" not in graph_html and "<table>" in html
     assert "<td>Présent</td><td>Valide</td>" in html

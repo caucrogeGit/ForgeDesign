@@ -631,3 +631,15 @@ Aucune identité runtime des handlers ni analyse transitive n’est déduite.
 La page `/routes` conserve le tableau diagnostique et ajoute « Vue des relations » :
 blocs de nœuds et liste de relations en HTML/CSS, avec libellés échappés et présence
 textuelle. Le Web ne construit pas les relations et conserve `no-store`.
+
+### Layout graphique statique
+
+`RouteGraph → layout_route_graph → RouteGraphLayout → SVG statique` prolonge
+la représentation. Le module `web/route_graph_layout.py` est pur et ne découvre
+aucune information. Les coordonnées restent séparées du graphe métier.
+Cinq colonnes fixes accueillent routes, handlers, contrôleurs, templates principaux
+(cibles de renders) et autres templates. Un template à double rôle reste principal.
+L’ordre des nœuds et des arêtes est conservé ; aucun parcours transitif n’intervient.
+Des couloirs au-dessus des nœuds portent les flèches et leurs types. Le tableau
+et la liste textuelle restent accessibles, les labels longs sont tronqués dans
+le SVG avec titre complet. Aucune interaction graphique n’est disponible.
