@@ -61,7 +61,7 @@ def create_application() -> Application:
         return refresh_project(request, registry, context)
 
     def routes(request: Request) -> Response:
-        return show_routes(context, registry)
+        return show_routes(request, context, registry)
 
     def source(request: Request) -> Response:
         return show_source(request, context)

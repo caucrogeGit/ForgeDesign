@@ -1,6 +1,6 @@
 """Consolidation pure des faits statiques, sans découverte ni verdict runtime."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from forge_design.forge.routes import (
@@ -21,6 +21,7 @@ class Diagnostic:
     source: SourceLocation | None = None
     subject: str | None = None
     source_available: bool = False
+    route_indices: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -43,9 +44,11 @@ class RouteDiagnostics:
 def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
     """Première occurrence conservée ; aucun texte de warning n'est interprété."""
     items: list[Diagnostic] = []
-    seen: set[tuple[str, str | None, SourceLocation | None]] = set()
+    seen: dict[tuple[str, str | None, SourceLocation | None], int] = {}
+    owners: list[dict[int, None]] = []
+    closure_items: dict[int, None] | None = None
     cycles: set[tuple[tuple[str, str, str], ...]] = set()
-    closures: set[str] = set()
+    closures: dict[str, tuple[int, ...]] = {}
 
     def add(
         code: str,
@@ -56,11 +59,20 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
         available: bool = True,
         *,
         shared: bool = False,
+        global_diagnostic: bool = False,
     ) -> None:
         key = code, subject, None if shared else source
-        if key in seen:
+        index = seen.get(key)
+        if index is None:
+            index = len(items)
+            seen[key] = index
+            owners.append({})
+        if not global_diagnostic:
+            owners[index][route_index] = None
+            if closure_items is not None:
+                closure_items[index] = None
+        if index < len(items):
             return
-        seen.add(key)
         navigable = available and source is not None
         if source is not None:
             try:
@@ -117,7 +129,7 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
             if not value.dynamic and value.path is not None:
                 template_fact(value, value.source, value.source is not None)
 
-    for route in result.routes:
+    for route_index, route in enumerate(result.routes):
         handler = route.handler
         if handler is None:
             if route.handler_dynamic:
@@ -177,11 +189,17 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
             template_fact(template, source, source is not None)
         dependencies(template.dependencies)
         closure = template.dependency_graph
-        if closure is None or closure.root in closures:
+        if closure is None:
             continue
-        closures.add(closure.root)
+        if closure.root in closures:
+            for index in closures[closure.root]:
+                owners[index][route_index] = None
+            continue
+        closure_items = {}
         for node in closure.templates:
             dependencies(node.dependencies)
+        closures[closure.root] = tuple(closure_items)
+        closure_items = None
         sources = {node.path: node.source for node in closure.templates}
         for cycle in closure.cycles:
             if cycle.key in cycles:
@@ -200,6 +218,7 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
                 "Cycle Jinja détecté : " + " → ".join(cycle.paths) + ".",
                 source,
                 repr(cycle.key),
+                global_diagnostic=True,
             )
         if closure.truncated:
             add(
@@ -210,6 +229,7 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
                 closure.root,
                 template.presence == "present",
                 shared=True,
+                global_diagnostic=True,
             )
     if result.warnings:
         # Les limites historiques n'ont pas toutes un équivalent typé. Un résumé
@@ -221,5 +241,11 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
             "avertissements détaillés conservés sur cette page.",
             None,
             result.source,
+            global_diagnostic=True,
         )
-    return RouteDiagnostics(tuple(items))
+    return RouteDiagnostics(
+        tuple(
+            replace(item, route_indices=tuple(owners[index]))
+            for index, item in enumerate(items)
+        )
+    )

@@ -807,3 +807,220 @@ def test_web_diagnostics_missing_dependency_and_source(
         server, method="GET", target="/source?path=mvc%2Fviews%2Fa.html&line=1"
     )
     assert status == 200 and 'class="source-target"' in source
+
+
+@pytest.fixture
+def filter_project(project: Path) -> Path:
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/contact.py").write_text(
+        "class Contact:\n"
+        '    def list(self): return BaseController.render("contact.html")\n'
+        '    def create(self): return BaseController.render("missing.html")\n'
+    )
+    (project / "mvc/controllers/users.py").write_text(
+        "class Users:\n"
+        "    def list(self): return BaseController.render(template_name)\n"
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.contact import Contact\n"
+        "from mvc.controllers.users import Users\nrouter = Router()\n"
+        'router.add("GET", "/contact/list", Contact.list, public=True)\n'
+        'router.add("POST", "/contact/create", Contact.create)\n'
+        'router.add("GET", "/users", Users.list, public=True)\n'
+    )
+    views = project / "mvc/views"
+    views.mkdir()
+    (views / "contact.html").write_text('{% extends "base.html" %}')
+    (views / "base.html").write_text('{% extends "layout.html" %}')
+    (views / "layout.html").write_text('{% extends "base.html" %}')
+    return project
+
+
+@pytest.mark.parametrize(
+    "query,paths,codes",
+    [
+        (
+            "",
+            ("/contact/list", "/contact/create", "/users"),
+            ("template.missing", "template.dynamic", "template.cycle", "route.partial"),
+        ),
+        (
+            "q=CONTACT",
+            ("/contact/list", "/contact/create"),
+            ("template.missing", "template.cycle", "route.partial"),
+        ),
+        (
+            "q=%2Fcontact",
+            ("/contact/list", "/contact/create"),
+            ("template.missing", "template.cycle", "route.partial"),
+        ),
+        (
+            "method=post",
+            ("/contact/create",),
+            ("template.missing", "template.cycle", "route.partial"),
+        ),
+        (
+            "visibility=protected",
+            ("/contact/create",),
+            ("template.missing", "template.cycle", "route.partial"),
+        ),
+        (
+            "severity=error",
+            ("/contact/list", "/contact/create", "/users"),
+            ("template.missing", "template.cycle"),
+        ),
+        (
+            "severity=warning",
+            ("/contact/list", "/contact/create", "/users"),
+            ("template.dynamic", "route.partial"),
+        ),
+        (
+            "diagnostics=only",
+            ("/contact/create", "/users"),
+            ("template.missing", "template.dynamic", "template.cycle", "route.partial"),
+        ),
+        (
+            "severity=error&diagnostics=only&q=create&method=POST&visibility=protected",
+            ("/contact/create",),
+            ("template.missing", "template.cycle"),
+        ),
+        (
+            "severity=warning&diagnostics=only",
+            ("/users",),
+            ("template.dynamic", "route.partial"),
+        ),
+        ("severity=info&diagnostics=only", (), ()),
+        ("q=introuvable", (), ("template.cycle", "route.partial")),
+    ],
+)
+def test_web_route_filters(
+    server: WSGIServer,
+    filter_project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    query: str,
+    paths: tuple[str, ...],
+    codes: tuple[str, ...],
+) -> None:
+    from forge_design.forge.routes import RoutesResult
+    from forge_design.tools.route_explorer import RouteExplorerTool
+
+    calls: list[Path] = []
+    original = RouteExplorerTool.run
+
+    def counted(self: RouteExplorerTool, project_root: Path) -> RoutesResult:
+        calls.append(project_root)
+        return original(self, project_root)
+
+    monkeypatch.setattr(RouteExplorerTool, "run", counted)
+    assert request(server, str(filter_project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes?" + query)
+    assert status == 200 and headers["Cache-Control"] == "no-store"
+    assert calls == [
+        filter_project
+    ]  # Une analyse pour le GET, aucun appel par critère.
+    assert f"{len(paths)} routes affichées sur 3" in html
+    assert '<form method="get" action="/routes"' in html
+    assert 'href="/routes">Réinitialiser</a>' in html
+    assert 'maxlength="256"' in html and "<script" not in html
+    assert "Lecture statique" in html and "Cycles de templates" in html
+    section = html.split('<section aria-labelledby="diagnostics-title">')[1].split(
+        "</section>"
+    )[0]
+    assert section.count("data-diagnostic-code=") == len(codes)
+    for code in codes:
+        assert f'data-diagnostic-code="{code}"' in section
+    errors = sum(code in {"template.missing", "template.cycle"} for code in codes)
+    assert f"{errors} erreur(s), {len(codes) - errors} avertissement(s)" in section
+    cycles = html.split('<section aria-labelledby="cycles-title">')[1].split(
+        "</section>"
+    )[0]
+    assert ("base.html → layout.html → base.html" in cycles) == (
+        "/contact/list" in paths
+    )
+    if paths:
+        table = html.split("<tbody>")[1].split("</tbody>")[0]
+        for path in ("/contact/list", "/contact/create", "/users"):
+            assert (f"<td>{path}</td>" in table) == (path in paths)
+            method = "POST" if path.endswith("create") else "GET"
+            assert (f"<title>{method} {path}</title>" in html) == (path in paths)
+        assert "/source?path=" in table
+    else:
+        assert "Aucune route ne correspond aux filtres." in html
+        assert "Aucun projet ouvert" not in html
+        assert "<svg " not in html and "<table>" not in html
+    if query == "q=CONTACT":
+        assert 'value="CONTACT"' in html
+    if "method=post" in query or "method=POST" in query:
+        assert '<option value="POST" selected>' in html
+    if "severity=error" in query:
+        assert '<option value="error" selected>' in html
+    if "visibility=protected" in query:
+        assert '<option value="protected" selected>' in html
+    if "diagnostics=only" in query:
+        assert 'name="diagnostics" value="only" checked' in html
+    # Reset sans paramètres, sans état persistant dans le contexte.
+    assert (
+        "3 routes affichées sur 3" in request(server, method="GET", target="/routes")[1]
+    )
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "q=" + "x" * 257,
+        "visibility=private",
+        "severity=fatal",
+        "diagnostics=yes",
+    ],
+)
+def test_web_route_filters_invalid_before_analysis(
+    server: WSGIServer,
+    filter_project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    query: str,
+) -> None:
+    from forge_design.tools.route_explorer import RouteExplorerTool
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("Paramètres refusés avant analyse")
+
+    monkeypatch.setattr(RouteExplorerTool, "run", forbidden)
+    assert request(server, str(filter_project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes?" + query)
+    assert status == 400 and headers["Cache-Control"] == "no-store"
+    assert "Traceback" not in html and "<script" not in html
+
+
+@pytest.mark.parametrize("method", ["GTE", "DELETE"])
+def test_web_route_filters_unavailable_method(
+    server: WSGIServer,
+    filter_project: Path,
+    method: str,
+) -> None:
+    assert request(server, str(filter_project))[0] == 200
+    status, html, headers = request(
+        server, method="GET", target="/routes?method=" + method
+    )
+    assert status == 400 and "Méthode absente" in html
+    assert headers["Cache-Control"] == "no-store"
+
+
+def test_web_route_filters_escape_and_source(
+    server: WSGIServer, filter_project: Path
+) -> None:
+    assert request(server, str(filter_project))[0] == 200
+    query = '<script>"&'
+    status, html, _ = request(
+        server, method="GET", target="/routes?" + urlencode({"q": query})
+    )
+    assert status == 200 and 'value="&lt;script&gt;&#34;&amp;"' in html
+    assert "<script>" not in html
+    html = request(server, method="GET", target="/routes?method=POST")[1]
+    assert 'href="/source?path=mvc%2Fcontrollers%2Fcontact.py&amp;line=3"' in html
+    status, source, _ = request(
+        server,
+        method="GET",
+        target="/source?path=mvc%2Fcontrollers%2Fcontact.py&line=3",
+    )
+    assert status == 200 and 'id="line-3" class="source-target"' in source

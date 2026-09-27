@@ -47,3 +47,11 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .source-code { overflow: auto; }
 .source-code span { display: block; }
 .source-target { background: #fff0bd; font-weight: bold; }
+
+.route-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 1rem; }
+.route-filters select { width: 100%; padding: .8rem; border: 1px solid #77847e; border-radius: .3rem; font: inherit; background: white; }
+.route-filters select:focus-visible { outline: 3px solid #b64c29; outline-offset: 3px; }
+.route-filters .filter-checkbox { display: flex; align-items: center; gap: .5rem; font-weight: 400; }
+.filter-checkbox input { width: auto; }
+.filter-actions { display: flex; align-items: center; gap: 1rem; }
+.filter-count { margin-block: 1.5rem; font-weight: 600; }

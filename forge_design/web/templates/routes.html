@@ -7,7 +7,16 @@
 <h1>Route Explorer</h1>
 {% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<form method="get" action="/routes" class="route-filters" aria-label="Filtres des routes">
+  <div><label for="filter-query">Recherche</label><input type="search" id="filter-query" name="q" maxlength="256" value="{{ filters.query or '' }}"></div>
+  <div><label for="filter-method">Méthode</label><select id="filter-method" name="method"><option value="">Toutes</option>{% for method in methods %}<option value="{{ method }}"{% if filters.method == method %} selected{% endif %}>{{ method }}</option>{% endfor %}</select></div>
+  <div><label for="filter-visibility">Visibilité</label><select id="filter-visibility" name="visibility">{% for value, label in [('all', 'Toutes'), ('public', 'Publiques'), ('protected', 'Protégées')] %}<option value="{{ value }}"{% if filters.visibility == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div><label for="filter-severity">Sévérité des diagnostics</label><select id="filter-severity" name="severity">{% for value, label in [('all', 'Toutes'), ('error', 'Erreurs'), ('warning', 'Avertissements'), ('info', 'Informations')] %}<option value="{{ value }}"{% if filters.severity == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <label class="filter-checkbox" for="filter-diagnostics"><input type="checkbox" id="filter-diagnostics" name="diagnostics" value="only"{% if filters.diagnostics_only %} checked{% endif %}> Uniquement avec diagnostics</label>
+  <div class="filter-actions"><button type="submit">Filtrer</button> <a href="/routes">Réinitialiser</a></div>
+</form>
 {% if result %}
+<p class="filter-count" role="status">{{ result.routes | length }} routes affichées sur {{ total_routes }}</p>
 <p>Source : {{ result.source }}</p>
 {% for warning in result.warnings %}<p>{{ warning }}</p>{% endfor %}
 <section aria-labelledby="diagnostics-title">
@@ -37,7 +46,7 @@
 {% endif %}
 </ul></details></td></tr>{% endfor %}</tbody>
 </table>
-{% else %}<p>Aucune route statique trouvée dans cette source.</p>{% endif %}
+{% else %}<p>Aucune route ne correspond aux filtres.</p>{% endif %}
 {% endif %}
 {% if result %}
 <section aria-labelledby="cycles-title">

@@ -808,4 +808,52 @@ connues utilisent le même lien `/source`, après la politique lexicale existant
 sans revérification filesystem. Les fichiers absents/refusés sont décrits depuis
 leur déclaration ; une erreur syntaxique de dépendance conserve le lien vers sa
 déclaration et précise la ligne de l'erreur dans sa cible. Échappement Jinja et
-no-store restent actifs. Aucun filtre interactif, JavaScript ou correction.
+no-store restent actifs. Les filtres GET sont décrits ci-dessous ; aucun JavaScript
+ou mécanisme de correction.
+
+### Recherche et filtres stateless
+
+`RoutesResult + RouteDiagnostics → RouteFilter → FilteredRouteExplorer → RouteGraph → SVG`.
+Le filtre pur intervient après l'analyse et la consolidation ; aucun filtre ne
+déclenche une nouvelle analyse, lecture ou détection de cycle. Un nouveau GET
+conserve l'analyse habituelle unique du projet, puis applique tous ses critères
+au résultat en mémoire. Aucun cache persistant ni préférence dans le contexte.
+
+`RouteFilter` gelé normalise q (espaces périphériques, recherche avec casefold),
+limité à 256 caractères avant normalisation. Recherche par sous-chaîne sur méthode,
+chemin, nom, handler, fichier contrôleur connu/absent et template principal seulement.
+Aucune regex, contenu source ou recherche dans les dépendances.
+Méthode normalisée en majuscules et validée contre l'inventaire complet ; visibilité
+all/public/protected ; severity all/error/warning/info ; diagnostics=all/only.
+Les critères route se combinent par ET. Une sévérité seule filtre les diagnostics ;
+avec diagnostics=only, elle détermine aussi les routes admissibles.
+
+La consolidation conserve `Diagnostic.route_indices`, tuple d'indices dans le
+RoutesResult original. La déduplication cumule tous les propriétaires connus,
+y compris les dépendances transitives d'une fermeture partagée. Aucun rapprochement
+par texte de message ou nom de handler ambigu. Les indices n'ont pas de sens hors
+de cette paire résultat/diagnostics ; ils ne sont ni persistés ni utilisés en URL.
+Un diagnostic sans association reste global. Cycles, troncature et route.partial
+sont volontairement globaux : visibles selon la sévérité, même sans route retenue,
+mais ne font pas correspondre une route au mode diagnostics=only.
+Le filtre est linéaire dans routes, diagnostics, associations et chaînes comparées,
+sans boucle routes × diagnostics. Résultats et modèles source restent immuables.
+
+Le Web parse les valeurs depuis Request.query, séparément du moteur de sélection.
+Valeur reconnue invalide ou q trop long : 400 sans analyse ; la méthode doit attendre
+l'inventaire, puis son absence donne 400. Sans inventaire, aucune méthode spécifique
+n'est disponible. Paramètres inconnus ignorés ; valeur vide traitée comme absente
+et première valeur non vide retenue pour une clé répétée, selon l'API Forge utilisée.
+Aucune correction d'une faute de méthode ni interpolation des paramètres dans
+un chemin fichier, nom de template ou commande.
+
+Le formulaire GET natif conserve ses critères dans l'URL et affiche les valeurs
+normalisées. Réinitialiser pointe vers /routes. Labels, focus visible, checkbox
+native et compteur X routes affichées sur Y ; compteurs diagnostiques filtrés.
+Le tableau, les liens source, le graphe et la section Cycles consomment seulement
+les routes retenues et leurs fermetures déjà connues. Les dépendances partagées
+restent présentes. Les warnings historiques restent ceux du résultat complet.
+Une sélection vide conserve le projet ouvert et les diagnostics globaux applicables,
+sans tableau ni SVG vide. Aucun JavaScript, tri ou pagination ; no-store reste actif,
+y compris sur les réponses 400. Une URL reproduit la sélection sur les données
+courantes, sans garantie d'instantané si le projet change entre deux GET.
