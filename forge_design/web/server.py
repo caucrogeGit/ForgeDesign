@@ -50,7 +50,7 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     store = recent_projects if recent_projects is not None else RecentProjects()
 
     def index(request: Request) -> Response:
-        return show_home(request, context, store)
+        return show_home(request, context, store, registry)
 
     def show(request: Request) -> Response:
         return show_inspector(request, context)

@@ -11,13 +11,20 @@
       {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
       {% if recent_projects %}
       <ul>
-        {% for project in recent_projects %}
-        <li>
-          <p>{{ project.path }}{% if current_project and current_project.root|string == project.path %} — Ouvert{% endif %}</p>
+        {% for state in recent_projects %}
+        {% set project = state.project %}
+        <li data-recent-status="{{ state.status }}">
+          <p>{{ project.path }}{% if state.is_current %} — Ouvert{% endif %}</p>
+          <p>{{ {"available": "Disponible", "missing": "Projet introuvable", "invalid": "Projet non reconnu", "unavailable": "Non disponible"}[state.status] }}</p>
+          {% if state.status == "available" and state.inspection %}
+          <p>{% if state.inspection.forge_version %}Forge {{ state.inspection.forge_version }}{% else %}Version Forge indéterminée{% endif %}</p>
+          {% endif %}
+          {% if state.status == "available" and not state.is_current %}
           <form action="/project/open-recent" method="post">
             <input type="hidden" name="recent" value="{{ project.path }}">
             <button type="submit">Ouvrir</button>
           </form>
+          {% endif %}
           <form action="/project/recent/remove" method="post">
             <input type="hidden" name="recent" value="{{ project.path }}">
             <button type="submit">Retirer</button>

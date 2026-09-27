@@ -7,6 +7,7 @@ from core.http.response import Response
 
 from forge_design.current_project import CurrentProjectContext
 from forge_design.platform.tool_registry import ToolRegistry
+from forge_design.recent_project_states import inspect_recent_projects
 from forge_design.recent_projects import RecentProjects, RecentProjectsError
 from forge_design.web.inspector import inspect_path
 from forge_design.web.rendering import render_page
@@ -17,6 +18,7 @@ def show_home(
     request: Request,
     context: CurrentProjectContext,
     store: RecentProjects,
+    registry: ToolRegistry,
     *,
     error: str | None = None,
     status: int = 200,
@@ -27,7 +29,7 @@ def show_home(
         {
             "active_page": "home",
             "current_project": context.inspection,
-            "recent_projects": recent,
+            "recent_projects": inspect_recent_projects(recent, registry, context.root),
             "recent_warning": store.warning,
             "error": error,
         },
@@ -48,6 +50,7 @@ def recent_action(
             request,
             context,
             store,
+            registry,
             error="Origine de la requête non autorisée.",
             status=403,
         )
@@ -58,6 +61,7 @@ def recent_action(
             request,
             context,
             store,
+            registry,
             error="Format de formulaire non pris en charge.",
             status=415,
         )
@@ -67,6 +71,7 @@ def recent_action(
             request,
             context,
             store,
+            registry,
             error="Ce projet n’appartient pas aux projets récents.",
             status=400,
         )
@@ -75,5 +80,5 @@ def recent_action(
     try:
         store.remove(Path(value))
     except RecentProjectsError as error:
-        return show_home(request, context, store, error=str(error))
-    return show_home(request, context, store)
+        return show_home(request, context, store, registry, error=str(error))
+    return show_home(request, context, store, registry)

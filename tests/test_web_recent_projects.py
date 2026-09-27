@@ -113,6 +113,8 @@ def test_reopen_failure_keeps_current_and_history(tmp_path: Path, failure: str) 
     with running(store) as app:
         call(app, "/inspector", method="POST", value=str(old))
         call(app, "/inspector", method="POST", value=str(current))
+        html = call(app)[1]
+        assert html.count('data-recent-status="available"') == 2
         if failure == "missing":
             shutil.rmtree(old)
         else:

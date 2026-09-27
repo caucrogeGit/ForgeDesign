@@ -169,7 +169,7 @@ Aucun singleton, diagnostic persisté, scan ou réouverture automatique.
 
 `recent_projects_file()` utilise `$XDG_CONFIG_HOME/forge-design/recent-projects.json`
 si la base est absolue, sinon `~/.config/forge-design/recent-projects.json`.
-La lecture au démarrage et lors des consultations ne valide pas les projets.
+Le store ne valide pas les projets lors de ses lectures, y compris au démarrage.
 Le format version 1 contient seulement `version` et `projects`, au plus dix chemins
 absolus distincts. Une ouverture valide enregistre `ProjectInspection.root` en tête.
 L'actualisation et la fermeture ne modifient pas l'historique.
@@ -186,7 +186,20 @@ Le stockage est refusé sous la racine ajoutée ou celles déjà enregistrées.
 Il n'y a pas de verrou multi-processus : des mises à jour concurrentes peuvent se
 remplacer ; atomicité du fichier ne signifie pas fusion de l'historique.
 
-L'accueil affiche les récents et l'indication Ouvert pour la racine courante.
+L'accueil calcule les états via `inspect_recent_projects` (FD-PROJECT-004) :
+`RecentProjects.list() → registry.get("project-inspector") → RecentProjectState`.
+Le tuple conserve l'ordre du store (au plus dix inspections séquentielles par page).
+La construction de l'application ne lance pas ces inspections ; elles ont lieu au
+rendu de l'accueil, sans cache persistant. Les états gelés distinguent disponible,
+introuvable, non reconnu et non disponible ; une version inconnue reste disponible.
+Seules les erreurs contrôlées de résolution sont converties en états, les erreurs
+inattendues sont propagées. Aucun détail de fichier ou diagnostic complet n'est rendu.
+Le service reçoit seulement les entrées, le registre et la racine courante, sans
+référence au contexte mutable ni au store. Les GET n'actualisent ni contexte,
+diagnostic courant, ordre ou JSON. Une liste vide ne consulte pas le registre.
+L'indication Ouvert compare le chemin mémorisé à la racine courante, même si son
+état disque a changé. Ouvrir est proposé aux seuls disponibles non courants ;
+Retirer reste accessible pour tous les états.
 `POST /project/open-recent` exige l'appartenance du chemin à la liste relue côté
 serveur, puis délègue à Inspector. Un échec conserve l'ancien projet et l'entrée.
 `POST /project/recent/remove` retire seulement cette entrée, même si le projet est
