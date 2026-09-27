@@ -983,9 +983,18 @@ exposées sont des tuples, les valeurs default des chaînes JSON immuables.
 Les entités sont ordonnées par dossier, les champs par déclaration. Erreurs
 localisées par SourceLocation et codes, sans traceback ni extrait de contenu.
 Le modèle applique les défauts booléens Forge, sans validation exhaustive du schéma
-ni des types métier, sans génération de champs système et sans analyse de relations.
+ni des types métier, sans génération de champs système.
 Le Web utilise le registre et le courant, ne sélectionne rien, relit à chaque GET
 et rend un tableau avec détails natifs et anomalies. Navigation fixe, échappement
 Jinja et no-store. Source textuelle uniquement ; aucun changement de Route Explorer,
 CurrentProjectContext, /source ou des POST.
 Voir [Entity Explorer](tools/entity-explorer.md) pour les limites du contrat.
+
+FD-ENTITIES-002 enrichit le même EntitiesResult avec un tuple de RelationInfo.
+Le fichier fixe mvc/entities/relations.json utilise la primitive sécurisée _read
+des entités, dans le même dossier ancré ; son absence n’est pas une erreur.
+Les modèles many_to_one/many_to_many et leurs champs pivot sont immuables. Ordre
+du document et source_index conservés, diagnostics locaux réutilisant EntityIssue.
+Les références sont comparées aux noms déjà lus, sans nouvelle recherche. Aucune
+orchestration dans le Tool, modification du registre ou du contexte. La page
+existante présente les relations sous les entités, sans nouvelle route ou script.

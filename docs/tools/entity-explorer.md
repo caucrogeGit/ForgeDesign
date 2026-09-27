@@ -4,7 +4,8 @@ Ouvrir un projet Forge, puis choisir **Entity Explorer** dans la navigation.
 La page `/entities` liste les entités et propose leurs champs dans des blocs
 natifs dépliables. Sans projet courant, aucun Tool n’est exécuté.
 
-La source exclusive est `mvc/entities/<snake>/<snake>.json`. Les dossiers directs
+Les sources sont `mvc/entities/<snake>/<snake>.json` et le fichier fixe
+`mvc/entities/relations.json`. Les dossiers directs
 sont visités dans l’ordre lexical ; les champs gardent l’ordre JSON. Un dossier
 canonique sans son JSON attendu produit une anomalie. Aucun autre JSON n’est cherché.
 Les noms de dossiers acceptés sont des identifiants minuscules avec chiffres et
@@ -36,6 +37,36 @@ sont requises. Le contenu peut changer pendant la lecture : aucun instantané
 atomique garanti. Le nombre d’entités n’est pas plafonné dans cette version.
 
 Aucun import du projet, lecture Python/SQL, commande Forge, connexion à une base,
-édition ou écriture. `relations.json` et les dépendances entre entités ne sont pas
-lus. Aucun champ système implicite n’est inventé. Le chemin source est affiché en
+édition ou écriture. Les relations sont lues uniquement dans `relations.json`, sans recherche
+de fichiers supplémentaires. Aucun champ système implicite n’est inventé. Le chemin source est affiché en
 texte ; la politique `/source` reste inchangée.
+
+## Relations déclarées
+
+La section Relations présente many_to_one (la source porte la FK) et many_to_many
+(pivot avec ses clés source/cible et champs supplémentaires), dans l’ordre du
+document. Inverse_name est affiché seulement s’il existe. Source et index
+relations[n] identifient la déclaration, sans lien /source ou graphe.
+
+Le document exige schema_version "1.0" et une liste relations. Fichier absent ou
+liste vide : aucune relation déclarée. Legacy et versions inconnues sont refusés.
+Une erreur globale laisse les entités disponibles ; une relation mal formée
+n’empêche pas les autres d’être affichées.
+
+Pour many_to_one, foreign_key et on_delete sont obligatoires selon le validateur
+Forge ; nullable et index valent vrai par défaut. Les valeurs déclaratives
+restrict, cascade, set_null et no_action ne sont pas traduites en SQL.
+Pour many_to_many, pivot.table/from_key/to_key sont requis, id et unique_pair
+doivent être true. On_delete vaut cascade et fields est vide par défaut.
+Les champs pivot réutilisent le modèle immuable des champs d’entité et ses défauts.
+
+Les entités source/cible sont vérifiées contre les noms des entités interprétées.
+Une référence indisponible produit relation.entity_missing, mais la déclaration
+lisible reste présentée ; une entité illisible ne compte pas comme disponible.
+Les auto-relations sont conservées. Aucun diagnostic d’absence de champ FK ni
+comparaison FK/references n’est ajouté. Aucun on_update interne n’est inventé.
+
+Cette lecture ne remplace pas la validation métier officielle Forge : pas de
+validation exhaustive des identifiants, unicités, couples de clés, types pivot ou
+compatibilité des politiques. Aucun SQL, DB, graphe, comparaison modèle/base,
+génération ou édition. La lecture est fondée uniquement sur les contrats JSON.

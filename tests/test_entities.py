@@ -212,7 +212,7 @@ def test_only_canonical_json_opened_and_no_mutation(
         path: str | Path, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
     ) -> int:
         if not flags & os.O_DIRECTORY:
-            assert path == "contact.json"
+            assert path in {"contact.json", "relations.json"}
             opened.append(str(path))
         return original_open(path, flags, mode, dir_fd=dir_fd)
 
@@ -228,7 +228,7 @@ def test_only_canonical_json_opened_and_no_mutation(
         result = read_entities(root)
         assert len(result.entities) == 1
         assert read_entities(root) == result
-    assert opened == ["contact.json", "contact.json"]
+    assert opened == ["contact.json", "relations.json"] * 2
     assert before == {
         p: (p.read_bytes(), p.stat().st_mtime_ns)
         for p in root.rglob("*")

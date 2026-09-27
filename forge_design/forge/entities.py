@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from os import PathLike
 from stat import S_ISDIR, S_ISREG
-from typing import cast
+from typing import Literal, cast
 
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
@@ -42,10 +42,43 @@ class EntityInfo:
 
 
 @dataclass(frozen=True)
+class ManyToOneInfo:
+    foreign_key: str
+    nullable: bool
+    index: bool
+    on_delete: str
+
+
+@dataclass(frozen=True)
+class ManyToManyInfo:
+    pivot_table: str
+    from_key: str
+    to_key: str
+    id: bool
+    unique_pair: bool
+    on_delete: str
+    pivot_fields: tuple[EntityFieldInfo, ...] = ()
+
+
+@dataclass(frozen=True)
+class RelationInfo:
+    type: Literal["many_to_one", "many_to_many"]
+    from_entity: str
+    to_entity: str
+    name: str
+    inverse_name: str | None
+    source: SourceLocation
+    source_index: int
+    many_to_one: ManyToOneInfo | None = None
+    many_to_many: ManyToManyInfo | None = None
+
+
+@dataclass(frozen=True)
 class EntityIssue:
     code: str
     message: str
     source: SourceLocation | None = None
+    source_index: int | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +86,7 @@ class EntitiesResult:
     entities: tuple[EntityInfo, ...] = ()
     errors: tuple[EntityIssue, ...] = ()
     warnings: tuple[EntityIssue, ...] = ()
+    relations: tuple[RelationInfo, ...] = ()
 
 
 def _object(value: object) -> dict[str, object]:
@@ -196,6 +230,119 @@ def _load(parent: int, folder: str, errors: list[EntityIssue]) -> EntityInfo | N
         return None
 
 
+_RELATIONS_SOURCE = SourceLocation("mvc/entities/relations.json")
+
+
+def _on_delete(value: object) -> str:
+    text = _text(value)
+    if text not in {"restrict", "cascade", "set_null", "no_action"}:
+        raise ValueError("Politique on_delete inconnue.")
+    return text
+
+
+def _relation(data: dict[str, object], index: int) -> RelationInfo:
+    kind = data["type"]
+    one = None
+    many = None
+    if kind == "many_to_one":
+        one = ManyToOneInfo(
+            _text(data.get("foreign_key")),
+            _boolean(data, "nullable", True),
+            _boolean(data, "index", True),
+            _on_delete(data.get("on_delete")),
+        )
+    else:
+        pivot = _object(data.get("pivot"))
+        if pivot.get("id") is not True or pivot.get("unique_pair") is not True:
+            raise ValueError("id et unique_pair doivent valoir true.")
+        fields = pivot.get("fields", [])
+        if not isinstance(fields, list):
+            raise ValueError("Liste de champs pivot attendue.")
+        many = ManyToManyInfo(
+            _text(pivot.get("table")),
+            _text(pivot.get("from_key")),
+            _text(pivot.get("to_key")),
+            True,
+            True,
+            _on_delete(pivot.get("on_delete", "cascade")),
+            tuple(_field(item) for item in cast(list[object], fields)),
+        )
+    return RelationInfo(
+        cast(Literal["many_to_one", "many_to_many"], kind),
+        _text(data.get("from")),
+        _text(data.get("to")),
+        _text(data.get("name")),
+        _text(data["inverse_name"]) if "inverse_name" in data else None,
+        _RELATIONS_SOURCE,
+        index,
+        one,
+        many,
+    )
+
+
+def _read_relations(
+    directory: int, entities: list[EntityInfo], errors: list[EntityIssue]
+) -> tuple[RelationInfo, ...]:
+    def issue(code: str, message: str, index: int | None = None) -> None:
+        errors.append(
+            EntityIssue("relation." + code, message, _RELATIONS_SOURCE, index)
+        )
+
+    try:
+        content = _read(directory, "relations.json")
+    except FileNotFoundError:
+        return ()
+    except (OSError, UnicodeError):
+        issue("unreadable", "Source de relations illisible ou refusée.")
+        return ()
+    try:
+        raw: object = json.loads(content, parse_constant=_constant)
+    except (ValueError, RecursionError):
+        issue("json_invalid", "JSON des relations invalide.")
+        return ()
+    try:
+        data = _object(raw)
+        if "format_version" in data or data.get("schema_version") != "1.0":
+            issue(
+                "schema_version_unsupported",
+                'schema_version "1.0" attendu, sans format legacy.',
+            )
+            return ()
+        items = data.get("relations")
+        if not isinstance(items, list):
+            raise ValueError("Liste attendue.")
+    except ValueError:
+        issue("structure_invalid", "Document de relations invalide.")
+        return ()
+    names = {entity.name for entity in entities}
+    result: list[RelationInfo] = []
+    for index, item in enumerate(cast(list[object], items)):
+        try:
+            relation_data = _object(item)
+            if relation_data.get("type") not in ("many_to_one", "many_to_many"):
+                issue("type_unsupported", "Type de relation non pris en charge.", index)
+                continue
+            relation = _relation(relation_data, index)
+        except (ValueError, RecursionError):
+            issue(
+                "structure_invalid", "Structure minimale de relation invalide.", index
+            )
+            continue
+        missing = tuple(
+            dict.fromkeys(
+                name
+                for name in (relation.from_entity, relation.to_entity)
+                if name not in names
+            )
+        )
+        if missing:
+            issue(
+                "entity_missing", "Entité non disponible : " + ", ".join(missing), index
+            )
+        result.append(relation)
+    return tuple(result)
+
+
 def read_entities(root: str | PathLike[str]) -> EntitiesResult:
     """Inspecter les dossiers directs, en ordre lexical, via descripteurs ancrés."""
     canonical = resolve_project_root(root)
@@ -203,6 +350,7 @@ def read_entities(root: str | PathLike[str]) -> EntitiesResult:
         raise NotForgeProjectError("La racine n'est pas un projet Forge reconnu.")
     errors: list[EntityIssue] = []
     entities: list[EntityInfo] = []
+    relations: tuple[RelationInfo, ...] = ()
     location = SourceLocation("mvc/entities")
     if not all(
         hasattr(os, flag) for flag in ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")
@@ -252,6 +400,7 @@ def read_entities(root: str | PathLike[str]) -> EntitiesResult:
                         continue
                     if entity := _load(directory, name, errors):
                         entities.append(entity)
+                relations = _read_relations(directory, entities, errors)
     except FileNotFoundError:
         return EntitiesResult(
             tuple(entities),
@@ -268,4 +417,4 @@ def read_entities(root: str | PathLike[str]) -> EntitiesResult:
         errors.append(
             EntityIssue("entity.unreadable", "Dossier inaccessible ou lié.", location)
         )
-    return EntitiesResult(tuple(entities), tuple(errors))
+    return EntitiesResult(tuple(entities), tuple(errors), relations=relations)

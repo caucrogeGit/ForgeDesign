@@ -3,13 +3,14 @@
 {% macro boolean(value) %}{{ 'Oui' if value else 'Non' }}{% endmacro %}
 {% block content %}
 <h1>Entity Explorer</h1>
-<p>Contrats JSON déclarés, en lecture seule. Les relations et la base de données ne sont pas analysées.</p>
+<p>Contrats JSON déclarés, en lecture seule. Les relations sont déclaratives ; la base de données n’est pas analysée.</p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if result %}
+<p>{{ result.entities|length }} entités — {{ result.relations|length }} relations interprétées</p>
 {% if result.errors or result.warnings %}
 <section aria-labelledby="entity-issues"><h2 id="entity-issues">Anomalies</h2><ul>
 {% for issue in result.errors + result.warnings %}
-<li data-code="{{ issue.code }}">{% if issue.source %}{{ issue.source.path }} : {% endif %}{{ issue.message }}</li>
+<li data-code="{{ issue.code }}">{% if issue.source %}{{ issue.source.path }}{% if issue.source_index is not none %} — relations[{{ issue.source_index }}]{% endif %} : {% endif %}{{ issue.message }}</li>
 {% endfor %}
 </ul></section>
 {% endif %}
@@ -35,5 +36,38 @@
 </details>
 {% endfor %}
 {% else %}<p>Aucune entité interprétable.</p>{% endif %}
+<section aria-labelledby="relations-title">
+<h2 id="relations-title">Relations</h2>
+{% if result.relations %}
+<table><thead><tr><th>Type</th><th>Source</th><th>Relation</th><th>Cible</th><th>Détails</th></tr></thead><tbody>
+{% for relation in result.relations %}
+<tr><td>{{ relation.type }}</td><td>{{ relation.from_entity }}</td><td>{{ relation.name }}</td><td>{{ relation.to_entity }}</td><td>
+<p>{{ relation.source.path }} — relations[{{ relation.source_index }}]</p>
+{% if relation.inverse_name is not none %}<p>Nom inverse : {{ relation.inverse_name }}</p>{% endif %}
+{% if relation.many_to_one %}{% set one = relation.many_to_one %}
+<p>Clé étrangère : {{ one.foreign_key }} — portée par {{ relation.from_entity }}</p>
+<p>Nullable : {{ boolean(one.nullable) }} — Index : {{ boolean(one.index) }} — ON DELETE : {{ one.on_delete }}</p>
+{% endif %}
+{% if relation.many_to_many %}{% set many = relation.many_to_many %}
+<p>Pivot : {{ many.pivot_table }}</p>
+<p>{{ many.from_key }} → {{ relation.from_entity }} ; {{ many.to_key }} → {{ relation.to_entity }}</p>
+<p>ON DELETE : {{ many.on_delete }} — id : {{ boolean(many.id) }} — unique_pair : {{ boolean(many.unique_pair) }}</p>
+{% if many.pivot_fields %}
+<details><summary>Champs pivot</summary><table><thead><tr><th>Champ</th><th>Type</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead><tbody>
+{% for field in many.pivot_fields %}<tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
+{% if field.max_length is not none %}max_length={{ field.max_length }} {% endif %}
+{% if field.precision is not none %}precision={{ field.precision }} {% endif %}
+{% if field.scale is not none %}scale={{ field.scale }} {% endif %}
+{% if field.default_json is not none %}default={{ field.default_json }} {% endif %}
+{% if field.references is not none %}references={{ field.references }}{% endif %}
+</td></tr>{% endfor %}</tbody></table></details>
+{% endif %}{% endif %}
+</td></tr>{% endfor %}</tbody></table>
+{% else %}
+{% set state = namespace(invalid=false) %}
+{% for issue in result.errors %}{% if issue.code.startswith('relation.') %}{% set state.invalid = true %}{% endif %}{% endfor %}
+<p>{{ 'Aucune relation interprétable.' if state.invalid else 'Aucune relation déclarée.' }}</p>
+{% endif %}
+</section>
 {% endif %}
 {% endblock %}
