@@ -108,6 +108,7 @@ class HandlerInfo:
     template: TemplateResolution = TemplateResolution()
     class_source: SourceLocation | None = None
     method_source: SourceLocation | None = None
+    missing_controller: str | None = None
 
 
 @dataclass(frozen=True)
@@ -118,6 +119,7 @@ class RouteInfo:
     public: bool
     handler: HandlerInfo | None = None
     source: SourceLocation | None = None
+    handler_dynamic: bool = False
 
 
 @dataclass(frozen=True)
@@ -195,7 +197,9 @@ def _controller(
             raise ValueError("fichier non ordinaire ou lien symbolique")
     except FileNotFoundError:
         warnings.append(f"Ligne {line} : contrôleur importé introuvable : {relative}.")
-        return HandlerInfo(handler.reference, verification="unreadable")
+        return HandlerInfo(
+            handler.reference, verification="unreadable", missing_controller=relative
+        )
     except (OSError, ValueError):
         warnings.append(
             f"Ligne {line} : contrôleur refusé (accès/lien/type) : {relative}."
@@ -692,6 +696,7 @@ def _parse(
                                     public,
                                     handler,
                                     SourceLocation(source_path, call.lineno),
+                                    handler_dynamic=handler is None,
                                 )
                             )
                         continue

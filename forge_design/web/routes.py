@@ -16,6 +16,7 @@ from forge_design.forge.routes import (
 )
 from forge_design.forge.template_cycles import TemplateCycle
 from forge_design.platform.tool_registry import ToolRegistry
+from forge_design.tools.route_diagnostics import build_route_diagnostics
 from forge_design.tools.route_graph import build_route_graph
 from forge_design.web.rendering import render_page
 from forge_design.web.route_graph_layout import layout_route_graph
@@ -55,6 +56,7 @@ def show_routes(context: CurrentProjectContext, registry: ToolRegistry) -> Respo
             "active_page": "routes",
             "current_project": context.inspection,
             "result": result,
+            "diagnostics": build_route_diagnostics(result) if result else None,
             "error": error,
             "source_url": source_url,
             "template_cycles": tuple(cycles.values()),

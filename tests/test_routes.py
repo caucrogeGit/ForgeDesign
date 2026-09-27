@@ -47,6 +47,7 @@ register_optins(router)
             "items",
             True,
             source=SourceLocation("mvc/routes/__init__.py", 4),
+            handler_dynamic=True,
         ),
         RouteInfo(
             "POST",
@@ -54,6 +55,7 @@ register_optins(router)
             "items",
             True,
             source=SourceLocation("mvc/routes/__init__.py", 4),
+            handler_dynamic=True,
         ),
         RouteInfo(
             "DELETE",
@@ -223,6 +225,9 @@ def test_handler_references(project: Path, reference: str, branched: bool) -> No
                 verification="unreadable"
                 if reference == "Contact.list"
                 else "not-applicable",
+                missing_controller="mvc/controllers/contact.py"
+                if reference == "Contact.list"
+                else None,
             ),
             SourceLocation(str(target.relative_to(project)), 6),
         ),
@@ -247,7 +252,12 @@ def test_dynamic_handler_keeps_route(project: Path, expression: str) -> None:
     result = read_routes(project)
     assert result.routes == (
         RouteInfo(
-            "GET", "/", None, False, source=SourceLocation("mvc/routes/__init__.py", 2)
+            "GET",
+            "/",
+            None,
+            False,
+            source=SourceLocation("mvc/routes/__init__.py", 2),
+            handler_dynamic=True,
         ),
     )
     assert any("handler dynamique non résolu" in warning for warning in result.warnings)

@@ -634,6 +634,22 @@ def test_web_template_cycles(
         "</section>"
     )[0]
     assert "Cycles de templates" in section
+    diagnostics = html.split('<section aria-labelledby="diagnostics-title">')[1].split(
+        "</section>"
+    )[0]
+    assert "Diagnostics" in diagnostics and "Avertissement" in diagnostics
+    assert 'data-diagnostic-code="route.partial"' in diagnostics
+    assert ('data-diagnostic-code="template.cycle"' in diagnostics) == cyclic
+    assert (
+        'data-diagnostic-code="template.analysis_truncated"' in diagnostics
+    ) == partial
+    assert "&lt;script&gt;" in html and "<script>" not in diagnostics
+    assert "<table>" in html and "<svg " in html
+    assert "Lecture statique" in html
+    assert "avertissement(s)" in diagnostics and "information(s)" in diagnostics
+    if cyclic:
+        assert diagnostics.count('data-diagnostic-code="template.cycle"') == 1
+        assert "Erreur" in diagnostics and "/source?path=" in diagnostics
     assert ("Analyse partielle." in section) == partial
     assert "<script>" not in html
     if cyclic:
@@ -761,3 +777,33 @@ def test_web_source_bad_request(server: WSGIServer, project: Path, query: str) -
     status, html, headers = request(server, method="GET", target="/source?" + query)
     assert status == 400 and "Traceback" not in html
     assert headers.get("Cache-Control") == "no-store"
+
+
+def test_web_diagnostics_missing_dependency_and_source(
+    server: WSGIServer,
+    project: Path,
+) -> None:
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home.py").write_text(
+        'class Home:\n    def index(self): return BaseController.render("a.html")\n'
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import Home\nrouter = Router()\n"
+        'router.add("GET", "/", Home.index)\n'
+    )
+    (project / "mvc/views").mkdir()
+    (project / "mvc/views/a.html").write_text('{% include "<script>.html" %}')
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    section = html.split('<section aria-labelledby="diagnostics-title">')[1].split(
+        "</section>"
+    )[0]
+    assert status == 200 and headers["Cache-Control"] == "no-store"
+    assert 'data-diagnostic-code="template.dependency_missing"' in section
+    assert "1 erreur(s), 1 avertissement(s), 0 information(s)" in section
+    assert "&lt;script&gt;.html" in section and "<script>" not in section
+    assert 'href="/source?path=mvc%2Fviews%2Fa.html&amp;line=1"' in section
+    status, source, _ = request(
+        server, method="GET", target="/source?path=mvc%2Fviews%2Fa.html&line=1"
+    )
+    assert status == 200 and 'class="source-target"' in source

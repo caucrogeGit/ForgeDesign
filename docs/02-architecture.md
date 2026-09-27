@@ -769,3 +769,43 @@ tout le fichier borné est affiché, avec diagnostic dans ce dernier cas. Les fi
 ligne CRLF/CR sont adaptées pour la numérotation. Projet absent : 409 sans lecture ;
 source disparue : 404 ; refus/encodage/taille/ligne mal formée : 400. No-store pour
 la route entière, aucun POST source, éditeur externe, JavaScript ou écriture.
+
+### Diagnostics consolidés
+
+`RoutesResult → RouteDiagnostics → Web` complète le flux parallèle
+`RoutesResult → RouteGraph → SVG`. Le constructeur `build_route_diagnostics`
+consomme exclusivement les modèles déjà calculés. Aucun filesystem, parsing,
+registre, découverte ou nouvelle détection de cycle ; aucune mutation de l'entrée.
+
+`Diagnostic` et `RouteDiagnostics` sont gelés. Code stable, sévérité
+info/warning/error, message, source optionnelle et sujet structurent les faits.
+Les compteurs sont calculés depuis le tuple de diagnostics, sans verdict global.
+Une erreur décrit une relation statique cassée ou refusée ; un avertissement décrit
+une incertitude, une lecture impossible ou une limite. Aucun diagnostic systématique
+pour les dépendances dynamiques, aucune information de succès ajoutée.
+Diagnostic = faits statiques observés ; diagnostic ≠ score qualité et ≠ garantie runtime.
+
+Deux faits déjà détectés mais auparavant perdus sont conservés dans les modèles :
+`RouteInfo.handler_dynamic` et `HandlerInfo.missing_controller` (chemin attendu).
+Ils sont renseignés dans les branches existantes, sans nouveau contrôle ni parsing.
+Les champs précédents et les constructions Python antérieures sont préservés.
+
+Les diagnostics suivent l'ordre des routes, des dépendances connues et des cycles.
+Une fermeture partagée n'est parcourue qu'une fois par racine. Déduplication par
+code/sujet/source ; les erreurs de fichier partagé sont mutualisées par code/sujet,
+et les cycles par leur clé canonique existante. Pour une dépendance manquante,
+chaque déclaration source distincte reste utile. Les compteurs ne comptent que
+les diagnostics retenus. Les cas principal/dépendance gardent leurs codes distincts.
+
+Les warnings historiques restent affichés intégralement. Un seul `route.partial`
+résume leur présence et renvoie à ces détails : aucun message n'est parsé ou
+reclassé pour inférer un statut. Les faits disposant de statuts typés produisent
+leurs codes propres. Les limites historiques sans structure dédiée ne sont donc
+pas encore localisées individuellement dans le modèle consolidé.
+
+La section Diagnostics conserve tableau, warnings, cycles et SVG. Les sources
+connues utilisent le même lien `/source`, après la politique lexicale existante,
+sans revérification filesystem. Les fichiers absents/refusés sont décrits depuis
+leur déclaration ; une erreur syntaxique de dépendance conserve le lien vers sa
+déclaration et précise la ligne de l'erreur dans sa cible. Échappement Jinja et
+no-store restent actifs. Aucun filtre interactif, JavaScript ou correction.

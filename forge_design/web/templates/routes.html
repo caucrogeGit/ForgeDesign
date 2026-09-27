@@ -10,6 +10,13 @@
 {% if result %}
 <p>Source : {{ result.source }}</p>
 {% for warning in result.warnings %}<p>{{ warning }}</p>{% endfor %}
+<section aria-labelledby="diagnostics-title">
+<h2 id="diagnostics-title">Diagnostics</h2>
+<p>{{ diagnostics.error_count }} erreur(s), {{ diagnostics.warning_count }} avertissement(s), {{ diagnostics.info_count }} information(s).</p>
+{% if diagnostics.items %}<ul>{% for item in diagnostics.items %}
+<li data-diagnostic-code="{{ item.code }}"><strong>{{ {'error': 'Erreur', 'warning': 'Avertissement', 'info': 'Information'}[item.severity] }}</strong> — {{ item.message }}{% if item.source %} — {{ location(item.source, item.source_available) }}{% endif %}</li>
+{% endfor %}</ul>{% else %}<p>Aucun diagnostic dans les informations disponibles.</p>{% endif %}
+</section>
 {% if result.routes %}
 <table>
   <thead><tr><th scope="col">Méthode</th><th scope="col">Chemin</th><th scope="col">Handler</th><th scope="col">Contrôleur</th><th scope="col">Vérification</th><th scope="col">Template</th><th scope="col">Présence</th><th scope="col">Jinja</th><th scope="col">Nom</th><th scope="col">Public</th><th scope="col">Sources</th></tr></thead>
