@@ -597,8 +597,17 @@ répétés pendant l'appel. Les références dynamiques restent non applicables.
 Le résumé affiche Présent, Absent, Chemin refusé ou Non vérifiable à côté de
 chaque référence, sans warning systématique.
 
-Aucun contenu dépendant n'est ouvert ou parsé : seules les métadonnées sont
-consultées. Présence ne signifie ni syntaxe valide de la dépendance, ni résolution
-transitive, ni rendu valide. Une cible qui est aussi le template principal d'une
+Les dépendances directes statiques présentes sont désormais lues par la même
+primitive sécurisée (1 Mio, UTF-8 avec BOM) et parsées sans loader ni rendu.
+`TemplateDependency` ajoute `syntax`, `syntax_line` et `syntax_message`, avec les
+mêmes statuts et diagnostics que le template principal. Les autres dépendances
+restent non applicables. Le résumé affiche le statut Jinja uniquement lorsqu'il
+est applicable ; les erreurs donnent un warning unique par fichier.
+
+Le cache local partage présence, résultat de syntaxe et AST entre les usages.
+L'extraction de déclarations n'est appelée que pour les templates principaux :
+les includes/extends internes d'une dépendance ne sont ni extraits, ni vérifiés,
+ni ouverts. La profondeur reste 1. Syntaxe valide ne signifie ni dépendances
+internes valides, ni rendu réussi, ni graphe transitif. Une cible qui est aussi le template principal d'une
 autre route peut être analysée à ce titre, indépendamment de sa déclaration comme
 dépendance. Les configurations `VIEWS_DIR` et opt-ins restent hors contrat.

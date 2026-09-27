@@ -958,7 +958,7 @@ def test_dependency_presence(
     original_open, original_stat = os.open, Path.lstat
 
     def opened(path: Path, flags: int) -> int:
-        assert path in (controller, routes, source)
+        assert path in (controller, routes, source, target)
         return original_open(path, flags)
 
     def metadata(path: Path):
@@ -978,7 +978,8 @@ def test_dependency_presence(
     assert dependency.path == (None if setup == "dynamic" else reference)
     assert dependency.dynamic == (setup == "dynamic")
     assert dependency.presence == expected
-    assert len(result.warnings) == 1
+    assert dependency.syntax == ("unreadable" if setup == "file" else "not-applicable")
+    assert len(result.warnings) == (2 if setup == "file" else 1)
 
 
 def test_dependency_presence_shared_cache(
@@ -1014,13 +1015,15 @@ def test_dependency_presence_shared_cache(
     original_presence = bridge._template_presence  # pyright: ignore[reportPrivateUsage]
     original_open = os.open
     checked: list[str] = []
+    reads: list[Path] = []
 
     def presence(root: Path, reference: str):
         checked.append(reference)
         return original_presence(root, reference)
 
     def opened(path: Path, flags: int) -> int:
-        assert path in (controller, routes, first, second)
+        assert path in (controller, routes, first, second, target)
+        reads.append(path)
         return original_open(path, flags)
 
     def forbidden(*args: object, **kwargs: object) -> None:
@@ -1037,6 +1040,8 @@ def test_dependency_presence_shared_cache(
                 checked.count(name) == attempt
                 for name in ("one.html", "two.html", "base.html", "absent.html")
             )
+            assert all(reads.count(path) == attempt for path in (first, second, target))
+            assert len(result.warnings) == 2
             first_handler, second_handler = (r.handler for r in result.routes)
             assert first_handler and second_handler
             assert [d.presence for d in first_handler.template.dependencies] == [
@@ -1046,4 +1051,113 @@ def test_dependency_presence_shared_cache(
             ]
             assert [d.line for d in second_handler.template.dependencies] == [1, 2]
             assert len(second_handler.template.dependencies) == 2
+    assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}
+
+
+@pytest.mark.parametrize(
+    "content,status",
+    [
+        (b"{% if user %}{{ user.name }}{% endif %}", "valid"),
+        (b"{% if user %}\n{{ user.name }}", "invalid"),
+        (b"\xff", "unreadable"),
+        (b"x" * (1024 * 1024 + 1), "unreadable"),
+        (b'{% extends "never-parent.html" %}{% include "never-child.html" %}', "valid"),
+        (b"{{ unknown|unknown_filter }}", "valid"),
+        (b"\xef\xbb\xbf{{ unknown }}", "valid"),
+    ],
+)
+def test_direct_dependency_syntax(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    content: bytes,
+    status: str,
+) -> None:
+    import os
+
+    from jinja2 import Environment, Template, nodes
+
+    from forge_design.forge import routes as bridge
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/home.py"
+    controller.write_text(
+        "class HomeController:\n"
+        '    def one(self): return BaseController.render("one.html")\n'
+        '    def two(self): return BaseController.render("two.html")\n'
+    )
+    routes = project / "mvc/routes/__init__.py"
+    routes.write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/one", HomeController.one)\n'
+        'router.add("GET", "/two", HomeController.two)\n'
+    )
+    views = project / "mvc/views"
+    views.mkdir()
+    first, second, target = views / "one.html", views / "two.html", views / "part.html"
+    first.write_text('{% include "part.html" %}{% include "part.html" %}')
+    second.write_text('{% include "part.html" %}')
+    target.write_bytes(content)
+    snapshot = {
+        p: (p.read_bytes(), p.stat().st_mtime_ns)
+        for p in (controller, routes, first, second, target)
+    }
+    original_open, original_stat, original_parse = (
+        os.open,
+        Path.lstat,
+        Environment.parse,
+    )
+    original_extract = bridge._template_dependencies  # pyright: ignore[reportPrivateUsage]
+    reads: list[Path] = []
+    parses: list[str] = []
+    extractions: list[nodes.Template] = []
+
+    def opened(path: Path, flags: int) -> int:
+        assert path in snapshot
+        reads.append(path)
+        return original_open(path, flags)
+
+    def metadata(path: Path):
+        assert not path.name.startswith("never-")
+        return original_stat(path)
+
+    def parsed(environment: Environment, source: str):
+        assert environment.loader is None
+        parses.append(source)
+        return original_parse(environment, source)
+
+    def extracted(tree: nodes.Template):
+        extractions.append(tree)
+        return original_extract(tree)
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("scan, loader, compilation or rendering")
+
+    with monkeypatch.context() as guard:
+        guard.setattr(os, "open", opened)
+        guard.setattr(Path, "lstat", metadata)
+        guard.setattr(Environment, "parse", parsed)
+        guard.setattr(bridge, "_template_dependencies", extracted)
+        for name in ("get_template", "compile", "from_string"):
+            guard.setattr(Environment, name, forbidden)
+        for name in ("render", "render_async"):
+            guard.setattr(Template, name, forbidden)
+        for name in ("open", "iterdir", "glob", "rglob"):
+            guard.setattr(Path, name, forbidden)
+        for attempt in (1, 2):
+            result = read_routes(project)
+            assert reads.count(target) == attempt
+            assert len(parses) == attempt * (2 if status == "unreadable" else 3)
+            assert len(extractions) == attempt * 2
+            assert len(result.warnings) == (1 if status == "valid" else 2)
+            for route in result.routes:
+                assert route.handler and route.handler.template.syntax == "valid"
+                for dependency in route.handler.template.dependencies:
+                    assert (
+                        dependency.path == "part.html"
+                        and dependency.presence == "present"
+                    )
+                    assert dependency.syntax == status
+                    if status == "invalid":
+                        assert dependency.syntax_line and dependency.syntax_message
+                        assert len(dependency.syntax_message) <= 240
     assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}

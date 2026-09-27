@@ -57,6 +57,9 @@ class TemplateDependency:
     dynamic: bool
     line: int
     presence: TemplatePresenceStatus = "not-applicable"
+    syntax: TemplateSyntaxStatus = "not-applicable"
+    syntax_line: int | None = None
+    syntax_message: str | None = None
 
 
 @dataclass(frozen=True)
@@ -336,12 +339,14 @@ def _template_dependencies(tree: nodes.Template) -> tuple[TemplateDependency, ..
     return tuple(sorted(dependencies, key=lambda dependency: dependency.line))
 
 
-def _template_syntax(root: Path, template: TemplateResolution) -> TemplateResolution:
+def _template_syntax(
+    root: Path, template: TemplateResolution
+) -> tuple[TemplateResolution, nodes.Template | None]:
     assert template.path is not None and template.presence == "present"
     try:
         source = _read_source(root / "mvc/views" / template.path)
     except (RoutesSourceMissingError, RoutesSourceUnreadableError):
-        return replace(template, syntax="unreadable")
+        return replace(template, syntax="unreadable"), None
     try:
         # Pas de loader, extension, compilation, contexte ou rendu.
         tree = Environment(loader=None).parse(source)
@@ -353,56 +358,71 @@ def _template_syntax(root: Path, template: TemplateResolution) -> TemplateResolu
             syntax_message=" ".join(
                 (error.message or "Syntaxe Jinja invalide.").split()
             )[:240],
-        )
+        ), None
     except RecursionError:
-        return replace(template, syntax="unreadable")
-    return replace(template, syntax="valid", dependencies=_template_dependencies(tree))
+        return replace(template, syntax="unreadable"), None
+    return replace(template, syntax="valid"), tree
 
 
 def _with_template_presence(
     root: Path, routes: list[RouteInfo], warnings: list[str]
 ) -> tuple[RouteInfo, ...]:
     cache: dict[str, TemplateResolution] = {}
-    presence_cache: dict[str, TemplatePresenceStatus] = {}
+    parsed_cache: dict[str, tuple[TemplateResolution, nodes.Template | None]] = {}
 
-    def presence(reference: str) -> TemplatePresenceStatus:
-        if reference not in presence_cache:
-            presence_cache[reference] = _template_presence(root, reference)
-        return presence_cache[reference]
+    def parsed(reference: str) -> tuple[TemplateResolution, nodes.Template | None]:
+        if reference not in parsed_cache:
+            checked = TemplateResolution(
+                "found", reference, _template_presence(root, reference)
+            )
+            tree = None
+            if checked.presence == "present":
+                checked, tree = _template_syntax(root, checked)
+            parsed_cache[reference] = checked, tree
+            if checked.syntax == "invalid":
+                warnings.append(
+                    f"mvc/views/{reference}:{checked.syntax_line} : "
+                    f"syntaxe Jinja invalide : {checked.syntax_message}"
+                )
+            elif checked.syntax == "unreadable":
+                warnings.append(
+                    f"mvc/views/{reference} : syntaxe Jinja non vérifiable "
+                    "(lecture, encodage, taille ou profondeur)."
+                )
+        return parsed_cache[reference]
+
+    def dependency_syntax(dependency: TemplateDependency) -> TemplateDependency:
+        if dependency.dynamic or dependency.path is None:
+            return dependency
+        checked, _ = parsed(dependency.path)
+        return replace(
+            dependency,
+            presence=checked.presence,
+            syntax=checked.syntax,
+            syntax_line=checked.syntax_line,
+            syntax_message=checked.syntax_message,
+        )
 
     enriched: list[RouteInfo] = []
     for route in routes:
         handler = route.handler
         if handler is not None and handler.template.status == "found":
-            template = handler.template
-            if template.path is not None:
-                if template.path not in cache:
-                    checked = replace(template, presence=presence(template.path))
-                    if checked.presence == "present":
-                        checked = _template_syntax(root, checked)
+            reference = handler.template.path
+            if reference is not None:
+                if reference not in cache:
+                    checked, tree = parsed(reference)
+                    # Extraction uniquement pour les templates principaux des routes.
+                    if tree is not None:
                         checked = replace(
                             checked,
                             dependencies=tuple(
-                                replace(dependency, presence=presence(dependency.path))
-                                if not dependency.dynamic
-                                and dependency.path is not None
-                                else dependency
-                                for dependency in checked.dependencies
+                                dependency_syntax(dependency)
+                                for dependency in _template_dependencies(tree)
                             ),
                         )
-                    cache[template.path] = checked
-                    if checked.syntax == "invalid":
-                        warnings.append(
-                            f"mvc/views/{template.path}:{checked.syntax_line} : "
-                            f"syntaxe Jinja invalide : {checked.syntax_message}"
-                        )
-                    elif checked.syntax == "unreadable":
-                        warnings.append(
-                            f"mvc/views/{template.path} : syntaxe Jinja non vérifiable "
-                            "(lecture, encodage, taille ou profondeur)."
-                        )
+                    cache[reference] = checked
                 route = replace(
-                    route, handler=replace(handler, template=cache[template.path])
+                    route, handler=replace(handler, template=cache[reference])
                 )
         enriched.append(route)
     return tuple(enriched)

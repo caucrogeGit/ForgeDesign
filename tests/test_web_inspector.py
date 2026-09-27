@@ -506,18 +506,18 @@ def test_web_jinja_syntax(
 def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     (project / "mvc/controllers").mkdir()
     (project / "mvc/controllers/home.py").write_text(
-        'class HomeController:\n'
+        "class HomeController:\n"
         '    def index(self): return BaseController.render("home.html")\n'
     )
     (project / "mvc/routes/__init__.py").write_text(
-        'from mvc.controllers.home import HomeController\nrouter = Router()\n'
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
         'router.add("GET", "/", HomeController.index)\n'
     )
     (project / "mvc/views").mkdir()
     (project / "mvc/views/home.html").write_text(
         '{% extends "base.html" %}\n'
         '{% include "contacts/<script>.html" %}\n'
-        '{% include dynamic_name %}\n'
+        "{% include dynamic_name %}\n"
         '{% include "../secret.html" %}'
     )
     (project / "mvc/views/base.html").write_bytes(b"invalid Jinja \xff")
@@ -530,4 +530,56 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     assert "include: contacts/&lt;script&gt;.html — Absent" in html
     assert "include: ../secret.html — Chemin refusé" in html
     assert "<td>Présent</td><td>Valide</td>" in html
+    assert headers.get("Cache-Control") == "no-store"
+
+
+@pytest.mark.parametrize(
+    "content,label",
+    [
+        ('{% extends "never.html" %}{{ unknown }}', "Valide"),
+        ("{% if user %}", "Invalide"),
+        ("injected-error", "Invalide"),
+    ],
+)
+def test_web_dependency_syntax(
+    server: WSGIServer,
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    content: str,
+    label: str,
+) -> None:
+    from jinja2 import Environment, TemplateSyntaxError
+
+    original_parse = Environment.parse
+
+    def parsed(environment: Environment, source: str, *args: object, **kwargs: object):
+        if source == "injected-error":
+            raise TemplateSyntaxError("diagnostic <script> non fiable", 1)
+        return original_parse(environment, source)
+
+    monkeypatch.setattr(Environment, "parse", parsed)
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home.py").write_text(
+        "class HomeController:\n"
+        '    def index(self): return BaseController.render("home.html")\n'
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/", HomeController.index)\n'
+    )
+    (project / "mvc/views").mkdir()
+    (project / "mvc/views/home.html").write_text(
+        '{% include "part.html" %}{% include "absent.html" %}{% include dynamic %}'
+    )
+    (project / "mvc/views/part.html").write_text(content)
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and f"include: part.html — Présent — {label}" in html
+    assert "include: absent.html — Absent</li>" in html
+    assert "include: dynamique — —</li>" in html
+    assert "<script>" not in html and "Traceback" not in html
+    if content == "injected-error":
+        assert "&lt;script&gt;" in html
+    if label == "Invalide":
+        assert "part.html:1" in html
     assert headers.get("Cache-Control") == "no-store"
