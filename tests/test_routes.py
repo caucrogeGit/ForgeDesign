@@ -862,7 +862,7 @@ def test_jinja_dependencies(
     (project / "mvc/controllers").mkdir()
     controller = project / "mvc/controllers/home.py"
     controller.write_text(
-        'class HomeController:\n'
+        "class HomeController:\n"
         '    def index(self): return BaseController.render("home.html")\n'
     )
     routes = project / "mvc/routes/__init__.py"
@@ -883,5 +883,167 @@ def test_jinja_dependencies(
     result = read_routes(project)
     handler = result.routes[0].handler
     assert handler and handler.template.syntax == "valid"
-    assert handler.template.dependencies == expected
+    from dataclasses import replace
+
+    assert (
+        tuple(
+            replace(dependency, presence="not-applicable")
+            for dependency in handler.template.dependencies
+        )
+        == expected
+    )
     assert len(result.warnings) == 1
+
+
+@pytest.mark.parametrize(
+    "kind,reference,setup,expected",
+    [
+        ("extends", "base.html", "file", "present"),
+        ("extends", "base.html", "missing", "missing"),
+        ("include", "parts/table.html", "file", "present"),
+        ("import", "parts/macros.html", "file", "present"),
+        ("from-import", "parts/macros.html", "file", "present"),
+        ("include", "../secret.html", "missing", "invalid-path"),
+        ("include", "/etc/passwd", "missing", "invalid-path"),
+        ("include", "C:\\secret.html", "missing", "invalid-path"),
+        ("include", "parts/table.html", "link", "invalid-path"),
+        ("include", "parts/table.html", "parent-link", "invalid-path"),
+        ("include", "parts/table.html", "directory", "invalid-path"),
+        ("include", "parts/table.html", "permission", "unreadable"),
+        ("include", "variable", "dynamic", "not-applicable"),
+    ],
+)
+def test_dependency_presence(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    reference: str,
+    setup: str,
+    expected: str,
+) -> None:
+    import os
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/home.py"
+    controller.write_text(
+        "class HomeController:\n"
+        '    def index(self): return BaseController.render("home.html")\n'
+    )
+    routes = project / "mvc/routes/__init__.py"
+    routes.write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/", HomeController.index)\n'
+    )
+    views = project / "mvc/views"
+    (views / "parts").mkdir(parents=True)
+    target = views / reference
+    if setup == "file":
+        target.write_bytes(b"{% include 'must-not-follow.html' %}\xff")
+    elif setup == "directory":
+        target.mkdir()
+    elif setup == "link":
+        target.symlink_to(project / "config.py")
+    elif setup == "parent-link":
+        (views / "parts").rmdir()
+        (views / "parts").symlink_to(project, target_is_directory=True)
+    expression = reference if setup == "dynamic" else repr(reference)
+    declaration = {
+        "extends": "{% extends " + expression + " %}",
+        "include": "{% include " + expression + " %}",
+        "import": "{% import " + expression + " as macros %}",
+        "from-import": "{% from " + expression + " import field %}",
+    }[kind]
+    source = views / "home.html"
+    source.write_text(declaration)
+    original_open, original_stat = os.open, Path.lstat
+
+    def opened(path: Path, flags: int) -> int:
+        assert path in (controller, routes, source)
+        return original_open(path, flags)
+
+    def metadata(path: Path):
+        if setup == "permission" and path == target:
+            raise PermissionError("denied")
+        if setup == "dynamic":
+            assert path != target
+        return original_stat(path)
+
+    monkeypatch.setattr(os, "open", opened)
+    monkeypatch.setattr(Path, "lstat", metadata)
+    result = read_routes(project)
+    handler = result.routes[0].handler
+    assert handler and handler.template.syntax == "valid"
+    (dependency,) = handler.template.dependencies
+    assert dependency.kind == kind and dependency.line == 1
+    assert dependency.path == (None if setup == "dynamic" else reference)
+    assert dependency.dynamic == (setup == "dynamic")
+    assert dependency.presence == expected
+    assert len(result.warnings) == 1
+
+
+def test_dependency_presence_shared_cache(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    from forge_design.forge import routes as bridge
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/home.py"
+    controller.write_text(
+        "class HomeController:\n"
+        '    def one(self): return BaseController.render("one.html")\n'
+        '    def two(self): return BaseController.render("two.html")\n'
+    )
+    routes = project / "mvc/routes/__init__.py"
+    routes.write_text(
+        "from mvc.controllers.home import HomeController\nrouter = Router()\n"
+        'router.add("GET", "/one", HomeController.one)\n'
+        'router.add("GET", "/two", HomeController.two)\n'
+    )
+    views = project / "mvc/views"
+    views.mkdir()
+    first, second, target = views / "one.html", views / "two.html", views / "base.html"
+    first.write_text('{% include ["base.html", "absent.html", "two.html"] %}')
+    second.write_text('{% extends "base.html" %}\n{% include "base.html" %}')
+    target.write_bytes(b"invalid Jinja {{\xff")
+    snapshot = {
+        p: (p.read_bytes(), p.stat().st_mtime_ns)
+        for p in (controller, routes, first, second, target)
+    }
+    original_presence = bridge._template_presence  # pyright: ignore[reportPrivateUsage]
+    original_open = os.open
+    checked: list[str] = []
+
+    def presence(root: Path, reference: str):
+        checked.append(reference)
+        return original_presence(root, reference)
+
+    def opened(path: Path, flags: int) -> int:
+        assert path in (controller, routes, first, second)
+        return original_open(path, flags)
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("dependency content or scan")
+
+    with monkeypatch.context() as guard:
+        guard.setattr(bridge, "_template_presence", presence)
+        guard.setattr(os, "open", opened)
+        for name in ("open", "iterdir", "glob", "rglob"):
+            guard.setattr(Path, name, forbidden)
+        for attempt in (1, 2):
+            result = read_routes(project)
+            assert all(
+                checked.count(name) == attempt
+                for name in ("one.html", "two.html", "base.html", "absent.html")
+            )
+            first_handler, second_handler = (r.handler for r in result.routes)
+            assert first_handler and second_handler
+            assert [d.presence for d in first_handler.template.dependencies] == [
+                "present",
+                "missing",
+                "present",
+            ]
+            assert [d.line for d in second_handler.template.dependencies] == [1, 2]
+            assert len(second_handler.template.dependencies) == 2
+    assert snapshot == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in snapshot}

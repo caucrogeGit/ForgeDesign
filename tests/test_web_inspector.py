@@ -517,12 +517,17 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     (project / "mvc/views/home.html").write_text(
         '{% extends "base.html" %}\n'
         '{% include "contacts/<script>.html" %}\n'
-        '{% include dynamic_name %}'
+        '{% include dynamic_name %}\n'
+        '{% include "../secret.html" %}'
     )
+    (project / "mvc/views/base.html").write_bytes(b"invalid Jinja \xff")
     assert request(server, str(project))[0] == 200
     status, html, headers = request(server, method="GET", target="/routes")
     assert status == 200 and "extends: base.html" in html
     assert "include: contacts/&lt;script&gt;.html" in html
-    assert "include: dynamique" in html and "<script>" not in html
+    assert "include: dynamique — —" in html and "<script>" not in html
+    assert "extends: base.html — Présent" in html
+    assert "include: contacts/&lt;script&gt;.html — Absent" in html
+    assert "include: ../secret.html — Chemin refusé" in html
     assert "<td>Présent</td><td>Valide</td>" in html
     assert headers.get("Cache-Control") == "no-store"

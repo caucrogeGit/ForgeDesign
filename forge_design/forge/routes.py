@@ -56,6 +56,7 @@ class TemplateDependency:
     path: str | None
     dynamic: bool
     line: int
+    presence: TemplatePresenceStatus = "not-applicable"
 
 
 @dataclass(frozen=True)
@@ -362,6 +363,13 @@ def _with_template_presence(
     root: Path, routes: list[RouteInfo], warnings: list[str]
 ) -> tuple[RouteInfo, ...]:
     cache: dict[str, TemplateResolution] = {}
+    presence_cache: dict[str, TemplatePresenceStatus] = {}
+
+    def presence(reference: str) -> TemplatePresenceStatus:
+        if reference not in presence_cache:
+            presence_cache[reference] = _template_presence(root, reference)
+        return presence_cache[reference]
+
     enriched: list[RouteInfo] = []
     for route in routes:
         handler = route.handler
@@ -369,11 +377,19 @@ def _with_template_presence(
             template = handler.template
             if template.path is not None:
                 if template.path not in cache:
-                    checked = replace(
-                        template, presence=_template_presence(root, template.path)
-                    )
+                    checked = replace(template, presence=presence(template.path))
                     if checked.presence == "present":
                         checked = _template_syntax(root, checked)
+                        checked = replace(
+                            checked,
+                            dependencies=tuple(
+                                replace(dependency, presence=presence(dependency.path))
+                                if not dependency.dynamic
+                                and dependency.path is not None
+                                else dependency
+                                for dependency in checked.dependencies
+                            ),
+                        )
                     cache[template.path] = checked
                     if checked.syntax == "invalid":
                         warnings.append(

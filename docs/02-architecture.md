@@ -590,5 +590,15 @@ dans les branches, macros et blocs, sans en interpréter le comportement.
 Le cache existant conserve ce résultat après une seule lecture, un seul parsing
 et une seule extraction par template et par appel. Le résumé s'affiche sous la
 référence du template avec échappement, sans warning pour les cas dynamiques.
-Une dépendance détectée n'est ni chargée, ni vérifiée présente ou valide : aucun
-accès filesystem supplémentaire et aucun graphe transitif.
+Les dépendances statiques reçoivent désormais une `presence`, avec les mêmes
+statuts et la même primitive de confinement sous `mvc/views` que le template
+principal. Un cache de présence commun aux deux usages évite les contrôles
+répétés pendant l'appel. Les références dynamiques restent non applicables.
+Le résumé affiche Présent, Absent, Chemin refusé ou Non vérifiable à côté de
+chaque référence, sans warning systématique.
+
+Aucun contenu dépendant n'est ouvert ou parsé : seules les métadonnées sont
+consultées. Présence ne signifie ni syntaxe valide de la dépendance, ni résolution
+transitive, ni rendu valide. Une cible qui est aussi le template principal d'une
+autre route peut être analysée à ce titre, indépendamment de sa déclaration comme
+dépendance. Les configurations `VIEWS_DIR` et opt-ins restent hors contrat.
