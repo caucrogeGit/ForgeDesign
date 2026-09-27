@@ -8,16 +8,18 @@ import pytest
 from forge_design.app import create_tool_registry
 from forge_design.platform.tool_registry import ToolRegistry, UnknownToolError
 from forge_design.tools import project_inspector
+from forge_design.tools.entity_explorer import EntityExplorerTool
 from forge_design.tools.project_inspector import ProjectInspection, ProjectInspectorTool
 from forge_design.tools.route_explorer import RouteExplorerTool
 
 
-def test_registry_contains_only_inspector() -> None:
+def test_registry_contains_three_tools() -> None:
     registry = create_tool_registry()
     assert isinstance(registry, ToolRegistry)
     assert tuple(tool.id for tool in registry.list()) == (
         "project-inspector",
         "route-explorer",
+        "entity-explorer",
     )
     tool = registry.get("project-inspector")
     assert isinstance(tool, ProjectInspectorTool)
@@ -55,11 +57,13 @@ def test_compositions_are_independent() -> None:
     assert tuple(tool.id for tool in first.list()) == (
         "project-inspector",
         "route-explorer",
+        "entity-explorer",
         "test-tool",
     )
     assert tuple(tool.id for tool in second.list()) == (
         "project-inspector",
         "route-explorer",
+        "entity-explorer",
     )
     with pytest.raises(UnknownToolError):
         second.get("test-tool")
@@ -67,6 +71,7 @@ def test_compositions_are_independent() -> None:
     assert tuple(tool.id for tool in create_tool_registry().list()) == (
         "project-inspector",
         "route-explorer",
+        "entity-explorer",
     )
 
 
@@ -76,7 +81,8 @@ def test_composition_does_not_execute_inspector(
     def forbidden(*args: object, **kwargs: object) -> None:
         raise AssertionError("Composition must not inspect a project")
 
+    monkeypatch.setattr(EntityExplorerTool, "run", forbidden)
     monkeypatch.setattr(RouteExplorerTool, "run", forbidden)
     monkeypatch.setattr(ProjectInspectorTool, "run", forbidden)
     monkeypatch.setattr(project_inspector, "inspect_project", forbidden)
-    assert len(create_tool_registry().list()) == 2
+    assert len(create_tool_registry().list()) == 3

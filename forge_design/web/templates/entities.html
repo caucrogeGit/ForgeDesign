@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block title %}Entity Explorer — Forge Design{% endblock %}
+{% macro boolean(value) %}{{ 'Oui' if value else 'Non' }}{% endmacro %}
+{% block content %}
+<h1>Entity Explorer</h1>
+<p>Contrats JSON déclarés, en lecture seule. Les relations et la base de données ne sont pas analysées.</p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if result %}
+{% if result.errors or result.warnings %}
+<section aria-labelledby="entity-issues"><h2 id="entity-issues">Anomalies</h2><ul>
+{% for issue in result.errors + result.warnings %}
+<li data-code="{{ issue.code }}">{% if issue.source %}{{ issue.source.path }} : {% endif %}{{ issue.message }}</li>
+{% endfor %}
+</ul></section>
+{% endif %}
+{% if result.entities %}
+<table>
+<thead><tr><th>Entité</th><th>Table</th><th>Champs</th><th>Timestamps</th><th>Soft delete</th></tr></thead>
+<tbody>{% for entity in result.entities %}
+<tr><td>{{ entity.name }}</td><td>{{ entity.table }}</td><td>{{ entity.fields|length }}</td><td>{{ boolean(entity.timestamps) }}</td><td>{{ boolean(entity.soft_delete) }}</td></tr>
+{% endfor %}</tbody>
+</table>
+{% for entity in result.entities %}
+<details><summary>{{ entity.name }} — Champs</summary>
+<p>Source : {{ entity.source.path }}</p>
+<table><thead><tr><th>Champ</th><th>Type</th><th>Requis</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead>
+<tbody>{% for field in entity.fields %}
+<tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.required) }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
+{% if field.max_length is not none %}max_length={{ field.max_length }} {% endif %}
+{% if field.precision is not none %}precision={{ field.precision }} {% endif %}
+{% if field.scale is not none %}scale={{ field.scale }} {% endif %}
+{% if field.default_json is not none %}default={{ field.default_json }} {% endif %}
+{% if field.references is not none %}references={{ field.references }}{% endif %}
+</td></tr>{% endfor %}</tbody></table>
+</details>
+{% endfor %}
+{% else %}<p>Aucune entité interprétable.</p>{% endif %}
+{% endif %}
+{% endblock %}

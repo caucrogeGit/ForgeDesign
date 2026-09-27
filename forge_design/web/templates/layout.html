@@ -13,6 +13,7 @@
       <a href="/"{% if active_page == 'home' %} aria-current="page"{% endif %}>Accueil</a>
       <a href="/inspector"{% if active_page == 'inspector' %} aria-current="page"{% endif %}>Project Inspector</a>
       <a href="/routes"{% if active_page == 'routes' %} aria-current="page"{% endif %}>Route Explorer</a>
+      <a href="/entities"{% if active_page == 'entities' %} aria-current="page"{% endif %}>Entity Explorer</a>
     </nav>
     <div class="current-project">
       {% if current_project %}

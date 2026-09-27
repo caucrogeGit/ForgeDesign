@@ -14,6 +14,7 @@ from forge_design.app import create_tool_registry
 from forge_design.current_project import CurrentProjectContext
 from forge_design.project_selector import ProjectSelector
 from forge_design.recent_projects import RecentProjects
+from forge_design.web.entities import show_entities
 from forge_design.web.inspector import (
     inspect_submission,
     refresh_project,
@@ -73,6 +74,9 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     def routes(request: Request) -> Response:
         return show_routes(request, context, registry)
 
+    def entities(request: Request) -> Response:
+        return show_entities(request, context, registry)
+
     def source(request: Request) -> Response:
         return show_source(request, context)
 
@@ -112,6 +116,7 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
         no_store=True,
     )
     router.add("GET", "/routes", routes, public=True, no_store=True)
+    router.add("GET", "/entities", entities, public=True, no_store=True)
     router.add("GET", "/source", source, public=True, no_store=True)
     return Application(router, api_routes_module=None)
 

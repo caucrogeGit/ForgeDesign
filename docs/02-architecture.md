@@ -257,7 +257,9 @@ Cela garde les dépendances visibles et facilite les tests.
 
 Chaque appel crée un nouveau `ToolRegistry` et une nouvelle instance de
 `ProjectInspectorTool`, enregistrée explicitement sous `project-inspector`.
-`RouteExplorerTool` est également enregistré sous `route-explorer` ; ce sont les deux Tools intégrés. La fonction retourne le registre sans
+`RouteExplorerTool` est enregistré sous `route-explorer` et `EntityExplorerTool`
+sous `entity-explorer`. Ces trois Tools sont
+les seuls Tools intégrés, dans cet ordre. La fonction retourne le registre sans
 exécuter le Tool ni accéder à un projet.
 
 `forge_design/app.py` porte ce choix d'application, au-dessus de la Platform et
@@ -968,3 +970,22 @@ sélection optionnelle. Les filtres serveur restent seuls responsables du périm
 métier ; chaque nouveau DOM commence sans sélection. Aucun changement d'URL,
 de query string ou de contexte projet, aucun zoom/pan, déplacement ou édition.
 Le conteneur défilant existant et le retour à la ligne du panneau sont conservés.
+
+### Entity Explorer minimal (FD-ENTITIES-001)
+
+`read_entities → EntitiesResult → EntityExplorerTool → ToolRegistry → GET /entities`.
+Le Bridge `forge/entities.py` résout et reconnaît la racine par les APIs existantes,
+puis découvre uniquement les dossiers directs canoniques sous mvc/entities.
+Lecture JSON ancrée par descripteurs, sans liens ni contenu SQL/Python. Chaque
+fichier est borné à MAX_SOURCE_BYTES ; UTF-8/BOM, schema_version 1.0 uniquement.
+EntityInfo, EntityFieldInfo, EntityIssue et EntitiesResult sont gelés ; les listes
+exposées sont des tuples, les valeurs default des chaînes JSON immuables.
+Les entités sont ordonnées par dossier, les champs par déclaration. Erreurs
+localisées par SourceLocation et codes, sans traceback ni extrait de contenu.
+Le modèle applique les défauts booléens Forge, sans validation exhaustive du schéma
+ni des types métier, sans génération de champs système et sans analyse de relations.
+Le Web utilise le registre et le courant, ne sélectionne rien, relit à chaque GET
+et rend un tableau avec détails natifs et anomalies. Navigation fixe, échappement
+Jinja et no-store. Source textuelle uniquement ; aucun changement de Route Explorer,
+CurrentProjectContext, /source ou des POST.
+Voir [Entity Explorer](tools/entity-explorer.md) pour les limites du contrat.
