@@ -12,6 +12,7 @@ from core.http.router import Router
 
 from forge_design.app import create_tool_registry
 from forge_design.current_project import CurrentProjectContext
+from forge_design.project_selector import ProjectSelector
 from forge_design.recent_projects import RecentProjects
 from forge_design.web.inspector import (
     inspect_submission,
@@ -49,6 +50,8 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     context = CurrentProjectContext()
     store = recent_projects if recent_projects is not None else RecentProjects()
 
+    selector = ProjectSelector(registry, context, store)
+
     def index(request: Request) -> Response:
         return show_home(request, context, store, registry)
 
@@ -62,7 +65,7 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
         return index(request)
 
     def inspect(request: Request) -> Response:
-        return inspect_submission(request, registry, context, store)
+        return inspect_submission(request, selector, context)
 
     def refresh(request: Request) -> Response:
         return refresh_project(request, registry, context)
@@ -74,10 +77,12 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
         return show_source(request, context)
 
     def open_recent(request: Request) -> Response:
-        return recent_action(request, context, registry, store)
+        return recent_action(request, context, registry, store, selector=selector)
 
     def remove_recent(request: Request) -> Response:
-        return recent_action(request, context, registry, store, remove=True)
+        return recent_action(
+            request, context, registry, store, selector=selector, remove=True
+        )
 
     router = Router()
     router.add("GET", "/", index, public=True, no_store=True)

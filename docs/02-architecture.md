@@ -201,13 +201,29 @@ L'indication Ouvert compare le chemin mémorisé à la racine courante, même si
 état disque a changé. Ouvrir est proposé aux seuls disponibles non courants ;
 Retirer reste accessible pour tous les états.
 `POST /project/open-recent` exige l'appartenance du chemin à la liste relue côté
-serveur, puis délègue à Inspector. Un échec conserve l'ancien projet et l'entrée.
+serveur, puis délègue au service de sélection. Un échec conserve l'ancien projet et l'entrée.
 `POST /project/recent/remove` retire seulement cette entrée, même si le projet est
 ouvert. Les GET ne modifient rien. Les deux POST réutilisent `is_local_action`
 et le format de formulaire ; contrôle d'origine navigateur, pas authentification
 contre un programme local. Pages no-store et chemins échappés par Jinja.
 Un échec d'enregistrement affiche un avertissement sans annuler l'ouverture valide.
 Tous les tests utilisent une configuration XDG temporaire ou un store injecté.
+
+### Sélection explicite du courant (FD-PROJECT-005)
+
+Un `ProjectSelector` par application reçoit le registre, le contexte et le store.
+Inspector et open-recent partagent cette instance ; ils valident les données HTTP
+puis présentent son résultat immuable `ProjectSelectionResult`. Le service récupère
+Project Inspector via le registre et distingue selected, invalid, not-found,
+not-directory et resolution-error. Les exceptions inattendues restent propagées.
+Une inspection valide remplace le courant avec sa racine canonique, puis tente
+l'enregistrement du récent. L'échec du store devient recent_warning sans annuler
+la sélection. Les échecs de validation ne modifient ni contexte ni historique.
+Inspector conserve le détail ; open-recent rend l'accueil et un message sobre.
+L'inspection d'affichage des récents reste indépendante et sans activation.
+Actualisation et fermeture conservent leurs responsabilités distinctes. Aucun GET
+ne sélectionne de projet, aucune ouverture automatique ou persistance supplémentaire.
+
 
 Le frontend peut évoluer progressivement :
 

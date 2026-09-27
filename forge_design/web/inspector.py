@@ -12,7 +12,7 @@ from forge_design.forge.project_root import (
     ProjectRootResolutionError,
 )
 from forge_design.platform.tool_registry import ToolRegistry
-from forge_design.recent_projects import RecentProjects, RecentProjectsError
+from forge_design.project_selector import ProjectSelector
 from forge_design.tools.project_inspector import ProjectInspection
 from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
@@ -51,11 +51,10 @@ def show_inspector(request: Request, context: CurrentProjectContext) -> Response
 
 def inspect_submission(
     request: Request,
-    registry: ToolRegistry,
+    selector: ProjectSelector,
     context: CurrentProjectContext,
-    recent_projects: RecentProjects | None = None,
 ) -> Response:
-    """Valider les données HTTP puis déléguer intégralement au Tool enregistré.
+    """Valider les données HTTP puis déléguer au service de sélection.
 
     Route POST activant le projet en mémoire, sans session : l'origine HTTP locale
     exacte est obligatoire à la place du CSRF Forge fondé sur une session.
@@ -78,36 +77,20 @@ def inspect_submission(
         return _render(
             context, error="Le chemin dépasse la limite de 4096 caractères.", status=400
         )
-    return inspect_path(path, registry, context, recent_projects)
-
-
-def inspect_path(
-    path: str,
-    registry: ToolRegistry,
-    context: CurrentProjectContext,
-    recent_projects: RecentProjects | None = None,
-) -> Response:
-    """Inspecter après validation du formulaire ou appartenance aux récents."""
-    try:
-        result = registry.get("project-inspector").run(Path(path))
-    except (
-        ProjectRootNotFoundError,
-        ProjectRootNotDirectoryError,
-        ProjectRootResolutionError,
-    ) as error:
-        return _render(context, path, error=str(error), status=400)
-    # Le registre est hétérogène : on vérifie le résultat au point de consommation.
-    if not isinstance(result, ProjectInspection):
-        raise TypeError("project-inspector doit retourner ProjectInspection.")
-    message = None
-    if result.valid:
-        context.set_project(result)
-        if recent_projects is not None:
-            try:
-                recent_projects.add(result.root)
-            except RecentProjectsError as error:
-                message = f"Projet ouvert ; avertissement : {error}"
-    return _render(context, path, result=result, message=message)
+    selection = selector.open(Path(path))
+    message = (
+        f"Projet ouvert ; avertissement : {selection.recent_warning}"
+        if selection.recent_warning
+        else None
+    )
+    return _render(
+        context,
+        path,
+        result=selection.inspection,
+        error=selection.error,
+        message=message,
+        status=200 if selection.status in {"selected", "invalid"} else 400,
+    )
 
 
 def refresh_project(

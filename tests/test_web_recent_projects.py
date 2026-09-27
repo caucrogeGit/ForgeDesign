@@ -95,7 +95,7 @@ def test_restart_canonical_order_remove_and_isolation(tmp_path: Path) -> None:
         status, html, _ = call(
             restarted, "/project/open-recent", method="POST", value=str(first)
         )
-        assert status == 200 and "Projet Forge reconnu" in html
+        assert status == 200 and "Projet ouvert." in html
         assert store.list()[0].path == str(first)
         status, html, _ = call(
             restarted, "/project/recent/remove", method="POST", value=str(first)
@@ -127,7 +127,7 @@ def test_reopen_failure_keeps_current_and_history(tmp_path: Path, failure: str) 
         assert "Traceback" not in html
         assert str(current) in html and "Aucun projet ouvert." not in html
         if failure == "invalid":
-            assert "Projet Forge non reconnu" in html
+            assert "Le projet récent n’est plus disponible." in html
         assert store.path.read_bytes() == before
         assert str(old) in call(app)[1]
 

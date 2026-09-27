@@ -2,7 +2,9 @@
 
 Après une ouverture valide dans Project Inspector, Forge Design conserve le chemin
 canonique du projet. Les dix derniers projets sont proposés sur l’accueil.
-**Ouvrir** lance une nouvelle inspection ; **Retirer** enlève uniquement le raccourci.
+**Ouvrir** choisit explicitement le projet courant après une nouvelle inspection,
+puis rend l’accueil avec « Projet ouvert. » et « Ouvert ». La navigation existante
+permet ensuite de consulter les Tools. **Retirer** enlève uniquement le raccourci.
 Un projet retiré reste ouvert et ses fichiers restent intacts.
 
 Au redémarrage, la liste est conservée mais aucun projet n’est ouvert automatiquement.

@@ -7,6 +7,8 @@
     <p><a href="/inspector">Ouvrir Project Inspector</a></p>
     <section aria-labelledby="recent-projects-title">
       <h2 id="recent-projects-title">Projets récents</h2>
+      {% if message %}<p role="status">{{ message }}</p>{% endif %}
+      {% if selection_warning %}<p class="message error" role="alert">{{ selection_warning }}</p>{% endif %}
       {% if recent_warning %}<p class="message error" role="alert">{{ recent_warning }}</p>{% endif %}
       {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
       {% if recent_projects %}
