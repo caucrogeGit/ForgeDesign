@@ -642,7 +642,7 @@ Cinq colonnes fixes accueillent routes, handlers, contrôleurs, templates princi
 L’ordre des nœuds et des arêtes est conservé ; aucun parcours transitif n’intervient.
 Des couloirs au-dessus des nœuds portent les flèches et leurs types. Le tableau
 et la liste textuelle restent accessibles, les labels longs sont tronqués dans
-le SVG avec titre complet. Aucune interaction graphique n’est disponible.
+le SVG avec titre complet. Une interaction DOM locale optionnelle est décrite ci-dessous.
 
 ### Analyse transitive Jinja bornée
 
@@ -730,7 +730,7 @@ Le SVG conserve le défilement, les dimensions déterministes et les chemins ort
 y compris les retours vers une colonne précédente. Les arêtes de cycle sont pointillées
 et portent « (cycle) ». « Analyse partielle. » apparaît dans la section graphique si
 nécessaire. Le tableau diagnostique et la section textuelle des cycles sont conservés.
-Aucun JavaScript, interaction ou lecture supplémentaire du projet.
+Aucune lecture supplémentaire du projet ; la sélection DOM locale est décrite ci-dessous.
 
 ### Références et vue source en lecture seule
 
@@ -809,7 +809,7 @@ sans revérification filesystem. Les fichiers absents/refusés sont décrits dep
 leur déclaration ; une erreur syntaxique de dépendance conserve le lien vers sa
 déclaration et précise la ligne de l'erreur dans sa cible. Échappement Jinja et
 no-store restent actifs. Les filtres GET sont décrits ci-dessous ; aucun JavaScript
-ou mécanisme de correction.
+pour le filtrage ni mécanisme de correction.
 
 ### Recherche et filtres stateless
 
@@ -854,6 +854,43 @@ Le tableau, les liens source, le graphe et la section Cycles consomment seulemen
 les routes retenues et leurs fermetures déjà connues. Les dépendances partagées
 restent présentes. Les warnings historiques restent ceux du résultat complet.
 Une sélection vide conserve le projet ouvert et les diagnostics globaux applicables,
-sans tableau ni SVG vide. Aucun JavaScript, tri ou pagination ; no-store reste actif,
+sans tableau ni SVG vide. Aucun JavaScript de filtrage, tri ou pagination ; no-store reste actif,
 y compris sur les réponses 400. Une URL reproduit la sélection sur les données
 courantes, sans garantie d'instantané si le projet change entre deux GET.
+
+### Interaction locale du graphe
+
+`RouteGraph → RouteGraphLayout → SVG serveur → amélioration JavaScript locale`.
+Le fichier packagé `static/route-graph.js` est servi par GET /route-graph.js en
+text/javascript et référencé avec defer seulement lorsqu'un graphe est présent.
+La CSP Forge conserve script-src 'self', sans unsafe-inline ni modification.
+Aucune donnée métier n'est récupérée côté client ; aucune analyse n'est déclenchée
+par l'interaction. Ni requête, bibliothèque, outil de build ou stockage navigateur.
+
+Un conteneur data-route-graph borne tous les sélecteurs. Les nœuds portent leurs
+IDs RouteGraph déterministes, kind, label complet et presence ; les chemins portent
+source-id et target-id. Aucun RoutesResult sérialisé, aucun second système d'IDs.
+Le SVG utilise role=group, conservant titre/description, pour exposer ses boutons
+SVG descendants plutôt que les masquer derrière une image atomique.
+Les nœuds ont tabindex=0, role=button, aria-label et aria-pressed.
+
+Clic, Entrée ou Espace basculent la sélection. Une sélection différente remplace
+la précédente ; Échap dans le conteneur ou Désélectionner revient à l'état neutre,
+avec focus rendu au nœud précédent. Le bouton est caché à l'état neutre.
+Le script compare uniquement les extrémités des arêtes avec l'ID sélectionné,
+met en évidence les arêtes entrantes/sortantes et leurs voisins directs, sans
+parcours transitif. Bordures épaissies, focus en pointillés et texte de sélection
+complètent la couleur ; les autres éléments ne sont pas atténués.
+
+Le panneau expose les seuls kind/label/presence du GraphNode, avec libellés humains,
+textContent et annonce polie de l'état. Aucun innerHTML, HTML de projet interprété,
+style inline ou réécriture du SVG. Le nœud ne portant pas de SourceLocation,
+aucune association supplémentaire n'est inventée ; les liens source du tableau
+restent disponibles. Les marques de cycle existantes sont conservées.
+
+Sans JavaScript, tableau, diagnostics, SVG et liste des relations restent lisibles ;
+les liens source et filtres GET fonctionnent. Un message noscript explique la
+sélection optionnelle. Les filtres serveur restent seuls responsables du périmètre
+métier ; chaque nouveau DOM commence sans sélection. Aucun changement d'URL,
+de query string ou de contexte projet, aucun zoom/pan, déplacement ou édition.
+Le conteneur défilant existant et le retour à la ligne du panneau sont conservés.

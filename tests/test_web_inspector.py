@@ -541,7 +541,7 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     assert graph_html.count("<title>HomeController.index</title>") == 1
     assert graph_html.count(">handles</text>") == 2
     assert "<svg " in graph_html and graph_html.count("<marker ") == 1
-    assert 'role="img"' in graph_html and "viewBox=" in graph_html
+    assert 'role="group"' in graph_html and "viewBox=" in graph_html
     assert "dynamic_name" not in graph_html and "dynamique" not in graph_html
     assert "<script>" not in graph_html and "<table>" in html
     assert "<td>Présent</td><td>Valide</td>" in html
@@ -691,12 +691,13 @@ def test_web_transitive_graph(
     assert status == 200 and headers.get("Cache-Control") == "no-store"
     graph_html = html.split('class="route-graph"', 1)[1]
     assert "<title>&lt;script&gt;.html</title>" in graph_html
+    assert 'data-node-label="&lt;script&gt;.html"' in graph_html
     assert 'x="1830"' in graph_html
     assert "graph-edge-cycle" in graph_html and "(cycle)</text>" in graph_html
     assert ">Absent</text>" in graph_html
     assert ("Analyse partielle." in graph_html) == partial
     assert "Cycles de templates" in html and "<table>" in html and "<svg " in html
-    assert "<script" not in html
+    assert "<script>" not in html
     assert graph_html.count("<title>b.html</title>") == 1
     assert graph_html.count("<title>&lt;script&gt;.html</title>") == 1
     css = request(server, method="GET", target="/shell.css")[1]
@@ -921,7 +922,7 @@ def test_web_route_filters(
     assert f"{len(paths)} routes affichées sur 3" in html
     assert '<form method="get" action="/routes"' in html
     assert 'href="/routes">Réinitialiser</a>' in html
-    assert 'maxlength="256"' in html and "<script" not in html
+    assert 'maxlength="256"' in html and "<script>" not in html
     assert "Lecture statique" in html and "Cycles de templates" in html
     section = html.split('<section aria-labelledby="diagnostics-title">')[1].split(
         "</section>"
@@ -989,7 +990,7 @@ def test_web_route_filters_invalid_before_analysis(
     assert request(server, str(filter_project))[0] == 200
     status, html, headers = request(server, method="GET", target="/routes?" + query)
     assert status == 400 and headers["Cache-Control"] == "no-store"
-    assert "Traceback" not in html and "<script" not in html
+    assert "Traceback" not in html and "<script>" not in html
 
 
 @pytest.mark.parametrize("method", ["GTE", "DELETE"])
@@ -1024,3 +1025,52 @@ def test_web_route_filters_escape_and_source(
         target="/source?path=mvc%2Fcontrollers%2Fcontact.py&line=3",
     )
     assert status == 200 and 'id="line-3" class="source-target"' in source
+
+
+def test_graph_interaction_dom_and_resource(
+    server: WSGIServer, filter_project: Path
+) -> None:
+    from html.parser import HTMLParser
+
+    class Tags(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self.tags: list[tuple[str, dict[str, str | None]]] = []
+
+        def handle_starttag(
+            self, tag: str, attrs: list[tuple[str, str | None]]
+        ) -> None:
+            self.tags.append((tag, dict(attrs)))
+
+    assert request(server, str(filter_project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and headers["Cache-Control"] == "no-store"
+    policy = headers["Content-Security-Policy"]
+    assert "script-src 'self'" in policy and "unsafe-inline" not in policy
+    parser = Tags()
+    parser.feed(html)
+    scripts = [attrs for tag, attrs in parser.tags if tag == "script"]
+    assert scripts == [{"src": "/route-graph.js", "defer": None}]
+    assert '<script src="/route-graph.js" defer></script>' in html
+    nodes = [attrs for _tag, attrs in parser.tags if "data-node-id" in attrs]
+    edges = [attrs for _tag, attrs in parser.tags if "data-source-id" in attrs]
+    ids = {attrs["data-node-id"] for attrs in nodes}
+    assert len(ids) == len(nodes) and len(nodes) > 3
+    assert all(
+        a["role"] == "button" and a["tabindex"] == "0" and a["aria-pressed"] == "false"
+        for a in nodes
+    )
+    assert all(a["data-source-id"] in ids and a["data-target-id"] in ids for a in edges)
+    assert all("data-node-label" in a and "data-node-presence" in a for a in nodes)
+    assert (
+        "Sélectionnez un élément du graphe." in html
+        and "data-selection-details hidden" in html
+    )
+    assert "<table>" in html and "/source?path=" in html and "<noscript>" in html
+    assert "application/json" not in html and "application/ld+json" not in html
+    status, script, headers = request(server, method="GET", target="/route-graph.js")
+    assert status == 200 and headers["Content-Type"] == "text/javascript; charset=utf-8"
+    assert "textContent" in script and "fetch" not in script
+    status, empty, _ = request(server, method="GET", target="/routes?q=absentzzzz")
+    assert status == 200 and "<svg " not in empty and "<script" not in empty
+    assert request(server, method="POST", target="/route-graph.js")[0] == 405

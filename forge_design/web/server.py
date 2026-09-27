@@ -31,6 +31,13 @@ def _style(request: Request) -> Response:
     return Response(body=css.read_bytes(), content_type="text/css; charset=utf-8")
 
 
+def _graph_script(request: Request) -> Response:
+    script = files("forge_design.web").joinpath("static/route-graph.js")
+    return Response(
+        body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
+    )
+
+
 def create_application() -> Application:
     """Créer l'application Forge avec ses seules routes publiques explicites.
 
@@ -69,6 +76,7 @@ def create_application() -> Application:
     router = Router()
     router.add("GET", "/", index, public=True, no_store=True)
     router.add("GET", "/shell.css", _style, public=True)
+    router.add("GET", "/route-graph.js", _graph_script, public=True)
     router.add("GET", "/inspector", show, public=True, no_store=True)
     # Ces actions runtime sans session exigent une origine locale exacte.
     router.add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
