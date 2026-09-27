@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from forge_design.forge.routes import RouteInfo, RoutesResult
+from forge_design.limits import MAX_FILTER_QUERY_LENGTH
 from forge_design.tools.route_diagnostics import RouteDiagnostics
 
 Visibility = Literal["all", "public", "protected"]
@@ -19,8 +20,10 @@ class RouteFilter:
     diagnostics_only: bool = False
 
     def __post_init__(self) -> None:
-        if self.query is not None and len(self.query) > 256:
-            raise ValueError("Recherche limitée à 256 caractères.")
+        if self.query is not None and len(self.query) > MAX_FILTER_QUERY_LENGTH:
+            raise ValueError(
+                f"Recherche limitée à {MAX_FILTER_QUERY_LENGTH} caractères."
+            )
         if self.visibility not in {"all", "public", "protected"}:
             raise ValueError("Visibilité invalide.")
         if self.severity not in {"all", "error", "warning", "info"}:

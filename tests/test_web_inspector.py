@@ -1074,3 +1074,85 @@ def test_graph_interaction_dom_and_resource(
     status, empty, _ = request(server, method="GET", target="/routes?q=absentzzzz")
     assert status == 200 and "<svg " not in empty and "<script" not in empty
     assert request(server, method="POST", target="/route-graph.js")[0] == 405
+
+
+@pytest.mark.parametrize("variant", ["minimal", "rich", "broken", "unsupported"])
+def test_consolidated_projects_without_javascript(
+    server: WSGIServer, tmp_path: Path, variant: str
+) -> None:
+    from test_route_explorer_stability import make_project, snapshot
+
+    root = make_project(tmp_path, variant)
+    before = snapshot(root)
+    assert request(server, str(root))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and headers["Cache-Control"] == "no-store"
+    assert "Traceback" not in html
+    assert "<table>" in html and "<svg " in html and "/source?path=" in html
+    assert "Diagnostics" in html and "Cycles de templates" in html
+    assert "handles" in html and "defined-in" in html and "renders" in html
+    assert "script-src 'self'" in headers["Content-Security-Policy"]
+    assert "unsafe-inline" not in headers["Content-Security-Policy"]
+    if variant == "broken":
+        for code in (
+            "controller.missing",
+            "controller.method_missing",
+            "template.missing",
+            "template.syntax_invalid",
+            "template.dependency_missing",
+            "template.cycle",
+        ):
+            assert f'data-diagnostic-code="{code}"' in html
+    if variant != "minimal":
+        query = urlencode({"q": "contact", "method": "GET", "visibility": "public"})
+        status, filtered, _ = request(server, method="GET", target="/routes?" + query)
+        assert status == 200 and "1 routes affichées sur" in filtered
+        assert "<title>GET /contact/list</title>" in filtered
+        assert "<title>POST /contact/create</title>" not in filtered
+    source = request(
+        server,
+        method="GET",
+        target="/source?"
+        + urlencode({"path": "mvc/controllers/home_controller.py", "line": "4"}),
+    )
+    assert source[0] == 200 and 'id="line-4" class="source-target"' in source[1]
+    assert request(server, method="POST", target="/project/close")[0] == 200
+    assert (
+        request(server, method="GET", target="/source?path=mvc/views/home/index.html")[
+            0
+        ]
+        == 409
+    )
+    assert snapshot(root) == before
+
+
+@pytest.mark.parametrize("case", ["link", "parent-link", "large", "encoding", "secret"])
+def test_web_source_rejections_end_to_end(
+    server: WSGIServer, project: Path, case: str
+) -> None:
+    views = project / "mvc/views"
+    views.mkdir()
+    target = views / "a.html"
+    outside = project / "private.txt"
+    outside.write_text("NEVER EXPOSE")
+    if case == "link":
+        target.symlink_to(outside)
+    elif case == "parent-link":
+        (views / "linked").symlink_to(project, target_is_directory=True)
+        target = views / "linked/private.txt"
+    elif case == "large":
+        target.write_bytes(b"x" * (1024 * 1024 + 1))
+    elif case == "encoding":
+        target.write_bytes(b"\xff")
+    else:
+        target = views / "private.key"
+        target.write_text("NEVER EXPOSE")
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(
+        server,
+        method="GET",
+        target="/source?" + urlencode({"path": str(target.relative_to(project))}),
+    )
+    assert status == 400 and headers["Cache-Control"] == "no-store"
+    assert "Traceback" not in html and "NEVER EXPOSE" not in html
+    assert outside.read_text() == "NEVER EXPOSE"

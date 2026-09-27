@@ -15,8 +15,20 @@ from jinja2 import Environment, TemplateSyntaxError, nodes
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
-from forge_design.forge.source import SourceLocation, template_source
+from forge_design.forge.source import (
+    SourceLocation,
+    SourceReadError,
+    source_parts,
+    template_source,
+)
 from forge_design.forge.template_cycles import TemplateCycle, detect_template_cycles
+from forge_design.limits import (
+    MAX_ROUTE_BRANCHES,
+    MAX_SOURCE_BYTES,
+    MAX_SYNTAX_MESSAGE_LENGTH,
+    MAX_TEMPLATE_DEPTH,
+    MAX_VISITED_TEMPLATES,
+)
 
 
 class RoutesSourceMissingError(ValueError):
@@ -64,10 +76,6 @@ class TemplateDependency:
     syntax_line: int | None = None
     syntax_message: str | None = None
     source: SourceLocation | None = None
-
-
-MAX_TEMPLATE_DEPTH = 8
-MAX_VISITED_TEMPLATES = 128
 
 
 @dataclass(frozen=True)
@@ -315,18 +323,12 @@ def _template(method: ast.FunctionDef | ast.AsyncFunctionDef) -> TemplateResolut
 
 
 def _template_presence(root: Path, reference: str) -> TemplatePresenceStatus:
-    # Convention portable stricte : ne jamais normaliser un traversal en chemin sûr.
-    parts = reference.split("/")
-    if (
-        not reference
-        or "\\" in reference
-        or ":" in reference
-        or "\x00" in reference
-        or any(part in ("", ".", "..") for part in parts)
-    ):
+    # Même politique pour l'analyse et l'ouverture depuis la vue source.
+    try:
+        components = source_parts("mvc/views/" + reference)
+    except SourceReadError:
         return "invalid-path"
     candidate = root
-    components = ["mvc", "views", *parts]
     try:
         for index, component in enumerate(components):
             candidate = candidate / component
@@ -401,7 +403,7 @@ def _template_syntax(
             syntax_line=error.lineno,
             syntax_message=" ".join(
                 (error.message or "Syntaxe Jinja invalide.").split()
-            )[:240],
+            )[:MAX_SYNTAX_MESSAGE_LENGTH],
         ), None
     except RecursionError:
         return replace(template, syntax="unreadable"), None
@@ -734,8 +736,8 @@ def _read_source(path: Path) -> str:
                 raise RoutesSourceUnreadableError(
                     "Source remplacée pendant la lecture."
                 )
-            data = stream.read(1024 * 1024 + 1)
-        if len(data) > 1024 * 1024:
+            data = stream.read(MAX_SOURCE_BYTES + 1)
+        if len(data) > MAX_SOURCE_BYTES:
             raise RoutesSourceUnreadableError("Source supérieure à 1 Mio.")
         return data.decode("utf-8-sig")
     except (OSError, UnicodeError) as error:
@@ -780,7 +782,7 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
     cache: dict[str, ast.Module | None] = {}
     result = _parse(ast.Module(body=direct, type_ignores=[]), canonical, cache=cache)
     routes, warnings = list(result.routes), list(result.warnings)
-    for module, function in branches[:64]:
+    for module, function in branches[:MAX_ROUTE_BRANCHES]:
         filename = f"{module}.py"
         try:
             child = _tree(_read_source(directory / filename))
@@ -819,8 +821,10 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
             )
         except (RoutesSourceMissingError, RoutesSourceUnreadableError) as error:
             warnings.append(f"{filename} : branchement non résolu ({error}).")
-    if len(branches) > 64:
-        warnings.append("Limite de 64 branchements atteinte ; liste partielle.")
+    if len(branches) > MAX_ROUTE_BRANCHES:
+        warnings.append(
+            f"Limite de {MAX_ROUTE_BRANCHES} branchements atteinte ; liste partielle."
+        )
     return RoutesResult(
         _with_template_presence(canonical, routes, warnings), tuple(warnings)
     )

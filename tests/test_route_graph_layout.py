@@ -108,3 +108,32 @@ def test_template_with_both_roles_and_partial_chain() -> None:
     layout = layout_route_graph(graph)
     assert [n.x for n in layout.nodes] == [390, 1110, 1110]
     assert len(layout.edges) == 3
+
+
+@pytest.mark.parametrize("count", [10, 20, 100])
+def test_representative_size_shared_templates(count: int) -> None:
+    graph = RouteGraph(
+        tuple(GraphNode(f"r{i}", "route", f"GET /route/{i}") for i in range(count))
+        + (
+            GraphNode("h", "handler", "Contact.list"),
+            GraphNode("c", "controller", "mvc/controllers/contact.py"),
+        )
+        + tuple(GraphNode(f"t{i}", "template", f"page{i}.html") for i in range(8)),
+        tuple(GraphEdge(f"r{i}", "h", "handles") for i in range(count))
+        + (GraphEdge("h", "c", "defined-in"), GraphEdge("h", "t0", "renders"))
+        + tuple(GraphEdge(f"t{i}", f"t{i + 1}", "includes") for i in range(7))
+        + (GraphEdge("t7", "t0", "includes", in_cycle=True),),
+    )
+    layout = layout_route_graph(graph)
+    assert layout == layout_route_graph(graph)
+    assert 0 < layout.width < 5000 and 0 < layout.height < 20000
+    for i, node in enumerate(layout.nodes):
+        assert 0 <= node.x < node.x + node.width <= layout.width
+        assert 0 <= node.y < node.y + node.height <= layout.height
+        for other in layout.nodes[i + 1 :]:
+            assert (
+                node.x + node.width <= other.x
+                or other.x + other.width <= node.x
+                or node.y + node.height <= other.y
+                or other.y + other.height <= node.y
+            )

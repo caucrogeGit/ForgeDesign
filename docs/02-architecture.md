@@ -541,6 +541,11 @@ est vérifiée ; les autres statuts n’entraînent aucun contrôle de vue.
 
 La référence affichée reste inchangée. Les chemins absolus, segments vides,
 `.` ou `..`, antislashs, deux-points et caractères NUL sont refusés avant accès.
+La politique lexicale `source_parts` est partagée avec la vue source : segments
+cachés, segment `env`, extensions `.pem`/`.key`, noms de clés SSH commençant
+par `id_rsa`, `id_dsa`, `id_ecdsa` ou `id_ed25519`, et chemins complets
+de plus de 4096 caractères sont également refusés. Les bornes sont centralisées
+dans `forge_design/limits.py`.
 Chaque parent doit être un dossier ordinaire et la cible un fichier ordinaire ;
 tous les symlinks sont refusés. Un cache local à `read_routes` évite les contrôles
 répétés d’une même référence. Aucun scan ni fallback. La lecture des seules vues présentes est décrite ci-dessous.
@@ -751,7 +756,9 @@ Le diagnostic est un instantané ; la vue lit le fichier au moment de l’ouvert
 La politique stricte accepte seulement les fichiers .py directement sous mvc/routes
 et mvc/controllers, et les fichiers sous mvc/views. Chemins absolus, segments vides,
 segments commençant par un point, antislashs, deux-points et NUL sont refusés, ainsi
-que les chemins dépassant 4096 caractères. Aucun scan ni catalogue de fichiers ;
+que les chemins dépassant 4096 caractères. Les noms sensibles sont exclus par la
+même politique que les templates analysés (voir présence des templates).
+Aucun scan ni catalogue de fichiers ;
 Forge Design ne devient pas un explorateur général du projet. La route n’est pas
 une allowlist d’instantané : un chemin manuel respectant cette politique peut être lu.
 
