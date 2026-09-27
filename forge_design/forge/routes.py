@@ -15,6 +15,7 @@ from jinja2 import Environment, TemplateSyntaxError, nodes
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
+from forge_design.forge.source import SourceLocation, template_source
 from forge_design.forge.template_cycles import TemplateCycle, detect_template_cycles
 
 
@@ -62,6 +63,7 @@ class TemplateDependency:
     syntax: TemplateSyntaxStatus = "not-applicable"
     syntax_line: int | None = None
     syntax_message: str | None = None
+    source: SourceLocation | None = None
 
 
 MAX_TEMPLATE_DEPTH = 8
@@ -74,6 +76,7 @@ class TemplateNodeInfo:
     presence: TemplatePresenceStatus
     syntax: TemplateSyntaxStatus
     dependencies: tuple[TemplateDependency, ...]
+    source: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +97,7 @@ class TemplateResolution:
     syntax_message: str | None = None
     dependencies: tuple[TemplateDependency, ...] = ()
     dependency_graph: TemplateDependencyGraph | None = None
+    source: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,8 @@ class HandlerInfo:
     controller_file: str | None = None
     verification: Verification = "not-applicable"
     template: TemplateResolution = TemplateResolution()
+    class_source: SourceLocation | None = None
+    method_source: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -111,6 +117,7 @@ class RouteInfo:
     name: str | None
     public: bool
     handler: HandlerInfo | None = None
+    source: SourceLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -194,10 +201,12 @@ def _controller(
             f"Ligne {line} : contrôleur refusé (accès/lien/type) : {relative}."
         )
         return HandlerInfo(handler.reference, verification="unreadable")
-    status, template = _verify(
+    status, template, class_source, method_source = _verify(
         root, relative, symbol, handler.reference, cache, warnings
     )
-    return HandlerInfo(handler.reference, relative, status, template)
+    return HandlerInfo(
+        handler.reference, relative, status, template, class_source, method_source
+    )
 
 
 def _verify(
@@ -207,9 +216,11 @@ def _verify(
     reference: str,
     cache: dict[str, ast.Module | None],
     warnings: list[str],
-) -> tuple[Verification, TemplateResolution]:
+) -> tuple[
+    Verification, TemplateResolution, SourceLocation | None, SourceLocation | None
+]:
     if len(reference.split(".")) != 2:
-        return "not-applicable", TemplateResolution()
+        return "not-applicable", TemplateResolution(), None, None
     if relative not in cache:
         try:
             cache[relative] = _tree(_read_source(root / relative))
@@ -220,7 +231,7 @@ def _verify(
             )
     tree = cache[relative]
     if tree is None:
-        return "unreadable", TemplateResolution()
+        return "unreadable", TemplateResolution(), None, None
     classes = [
         node
         for node in tree.body
@@ -228,10 +239,11 @@ def _verify(
     ]
     if not classes:
         warnings.append(f"{relative} : classe {symbol} introuvable.")
-        return "class-missing", TemplateResolution()
+        return "class-missing", TemplateResolution(), None, None
     if len(classes) != 1:
         warnings.append(f"{relative} : classe {symbol} ambiguë.")
-        return "ambiguous", TemplateResolution()
+        return "ambiguous", TemplateResolution(), None, None
+    class_source = SourceLocation(relative, classes[0].lineno)
     method = reference.split(".")[1]
     methods = [
         node
@@ -243,11 +255,16 @@ def _verify(
         warnings.append(
             f"{relative} : méthode {method} non définie directement dans {symbol}."
         )
-        return "method-missing", TemplateResolution()
+        return "method-missing", TemplateResolution(), class_source, None
     if len(methods) != 1:
         warnings.append(f"{relative} : méthode {method} ambiguë dans {symbol}.")
-        return "ambiguous", TemplateResolution()
-    return "found", _template(methods[0])
+        return "ambiguous", TemplateResolution(), class_source, None
+    return (
+        "found",
+        _template(methods[0]),
+        class_source,
+        SourceLocation(relative, methods[0].lineno),
+    )
 
 
 def _template(method: ast.FunctionDef | ast.AsyncFunctionDef) -> TemplateResolution:
@@ -409,7 +426,10 @@ def _with_template_presence(
                     limit_reported = True
                 return TemplateResolution("found", reference), None
             checked = TemplateResolution(
-                "found", reference, _template_presence(root, reference)
+                "found",
+                reference,
+                _template_presence(root, reference),
+                source=template_source(reference),
             )
             tree = None
             if checked.presence == "present":
@@ -441,9 +461,19 @@ def _with_template_presence(
 
     def extracted(reference: str) -> tuple[TemplateDependency, ...]:
         if reference not in extracted_cache:
-            _, tree = parsed(reference)
+            checked, tree = parsed(reference)
             extracted_cache[reference] = (
-                _template_dependencies(tree) if tree is not None else ()
+                tuple(
+                    replace(
+                        d,
+                        source=SourceLocation(checked.source.path, d.line)
+                        if checked.source is not None
+                        else None,
+                    )
+                    for d in _template_dependencies(tree)
+                )
+                if tree is not None
+                else ()
             )
         return extracted_cache[reference]
 
@@ -502,6 +532,7 @@ def _with_template_presence(
                     current_result.presence,
                     current_result.syntax,
                     tuple(dependencies),
+                    current_result.source,
                 )
             )
         graph = TemplateDependencyGraph(reference, tuple(templates), truncated)
@@ -548,6 +579,7 @@ def _parse(
     receiver: str | None = None,
     imports: dict[str, tuple[str, str]] | None = None,
     cache: dict[str, ast.Module | None] | None = None,
+    source_path: str = "mvc/routes/__init__.py",
 ) -> RoutesResult:
     cache = {} if cache is None else cache
     controller_imports = _controller_imports(tree) if imports is None else imports
@@ -654,7 +686,12 @@ def _parse(
                             assert isinstance(m, str)
                             routes.append(
                                 RouteInfo(
-                                    m.upper(), prefix + path, name, public, handler
+                                    m.upper(),
+                                    prefix + path,
+                                    name,
+                                    public,
+                                    handler,
+                                    SourceLocation(source_path, call.lineno),
                                 )
                             )
                         continue
@@ -769,6 +806,7 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
                 args.args[0].arg,
                 _controller_imports(child),
                 cache,
+                "mvc/routes/" + filename,
             )
             routes.extend(parsed.routes)
             warnings.extend(

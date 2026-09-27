@@ -14,6 +14,7 @@ from forge_design.forge.routes import (
     TemplateDependency,
     read_routes,
 )
+from forge_design.forge.source import SourceLocation
 from forge_design.platform.tool import Tool
 from forge_design.tools.route_explorer import RouteExplorerTool
 
@@ -40,9 +41,28 @@ register_optins(router)
     assert tool.id == "route-explorer"
     result = tool.run(project)
     assert result.routes == (
-        RouteInfo("GET", "/api/items", "items", True),
-        RouteInfo("POST", "/api/items", "items", True),
-        RouteInfo("DELETE", "/items", None, False, HandlerInfo("missing_handler")),
+        RouteInfo(
+            "GET",
+            "/api/items",
+            "items",
+            True,
+            source=SourceLocation("mvc/routes/__init__.py", 4),
+        ),
+        RouteInfo(
+            "POST",
+            "/api/items",
+            "items",
+            True,
+            source=SourceLocation("mvc/routes/__init__.py", 4),
+        ),
+        RouteInfo(
+            "DELETE",
+            "/items",
+            None,
+            False,
+            HandlerInfo("missing_handler"),
+            SourceLocation("mvc/routes/__init__.py", 5),
+        ),
     )
     assert result == read_routes(project)
     assert result.warnings
@@ -204,6 +224,7 @@ def test_handler_references(project: Path, reference: str, branched: bool) -> No
                 if reference == "Contact.list"
                 else "not-applicable",
             ),
+            SourceLocation(str(target.relative_to(project)), 6),
         ),
     )
 
@@ -224,7 +245,11 @@ def test_dynamic_handler_keeps_route(project: Path, expression: str) -> None:
         f'router = Router()\nrouter.add("GET", "/", {expression})\n'
     )
     result = read_routes(project)
-    assert result.routes == (RouteInfo("GET", "/", None, False),)
+    assert result.routes == (
+        RouteInfo(
+            "GET", "/", None, False, source=SourceLocation("mvc/routes/__init__.py", 2)
+        ),
+    )
     assert any("handler dynamique non résolu" in warning for warning in result.warnings)
     assert all(expression not in warning for warning in result.warnings)
 
@@ -885,12 +910,12 @@ def test_jinja_dependencies(
     assert handler and handler.template.syntax == "valid"
     from dataclasses import replace
 
-    assert (
-        tuple(
-            replace(dependency, presence="not-applicable")
-            for dependency in handler.template.dependencies
-        )
-        == expected
+    assert tuple(
+        replace(dependency, presence="not-applicable")
+        for dependency in handler.template.dependencies
+    ) == tuple(
+        replace(d, source=SourceLocation("mvc/views/home.html", d.line))
+        for d in expected
     )
     assert len(result.warnings) == 1
 

@@ -731,3 +731,41 @@ y compris les retours vers une colonne précédente. Les arêtes de cycle sont p
 et portent « (cycle) ». « Analyse partielle. » apparaît dans la section graphique si
 nécessaire. Le tableau diagnostique et la section textuelle des cycles sont conservés.
 Aucun JavaScript, interaction ou lecture supplémentaire du projet.
+
+### Références et vue source en lecture seule
+
+`SourceLocation(path, line=None)` est gelé et conserve un chemin relatif.
+RouteInfo.source vient du fichier de routes effectivement analysé et de la ligne de
+l’appel add. HandlerInfo.class_source/method_source viennent des nœuds AST déjà lus,
+sans relecture ; aucune ligne n’est inventée pour une classe/méthode absente.
+TemplateResolution et TemplateNodeInfo portent la référence sous mvc/views ; la
+présence existante décide si le Web propose un lien. TemplateDependency.source
+localise sa déclaration dans son propre template parent, y compris transitif.
+
+Une colonne Sources dans le tableau expose ces liens textuels. Le RouteGraph et
+son SVG ne changent pas et restent purs, sans nœuds cliquables.
+`GET /source?path=...&line=...` utilise exclusivement le projet courant et la primitive
+séparée read_project_source. Aucun appel Inspector/Route Explorer ni cache persistant.
+Le diagnostic est un instantané ; la vue lit le fichier au moment de l’ouverture.
+
+La politique stricte accepte seulement les fichiers .py directement sous mvc/routes
+et mvc/controllers, et les fichiers sous mvc/views. Chemins absolus, segments vides,
+segments commençant par un point, antislashs, deux-points et NUL sont refusés, ainsi
+que les chemins dépassant 4096 caractères. Aucun scan ni catalogue de fichiers ;
+Forge Design ne devient pas un explorateur général du projet. La route n’est pas
+une allowlist d’instantané : un chemin manuel respectant cette politique peut être lu.
+
+Le lecteur exige open avec dir_fd et O_NOFOLLOW. Il ouvre chaque dossier relativement
+au descripteur parent avec O_DIRECTORY/O_NOFOLLOW, puis vérifie le fichier ordinaire
+sans lien, compare ses métadonnées avec celles du descripteur et lit au plus 1 Mio
+plus un octet de détection. UTF-8/BOM seulement. Aucune dégradation moins stricte
+sur une plateforme sans ces primitives : erreur explicite. Tous les descripteurs
+sont fermés. La racine canonique vient du contexte ; le contenu peut changer durant
+une lecture concurrente, sans promesse d’instantané atomique.
+
+La vue utilise du code échappé, numéros de lignes et marqueur textuel pour la cible.
+Une ligne valide sélectionne ±20 lignes ; sans ligne ou si elle dépasse le fichier,
+tout le fichier borné est affiché, avec diagnostic dans ce dernier cas. Les fins de
+ligne CRLF/CR sont adaptées pour la numérotation. Projet absent : 409 sans lecture ;
+source disparue : 404 ; refus/encodage/taille/ligne mal formée : 400. No-store pour
+la route entière, aucun POST source, éditeur externe, JavaScript ou écriture.

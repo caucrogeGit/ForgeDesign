@@ -43,3 +43,7 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .edge-label { font: 12px sans-serif; fill: #172033; text-anchor: middle; }
 
 .graph-edge-cycle { stroke-dasharray: 7 4; }
+
+.source-code { overflow: auto; }
+.source-code span { display: block; }
+.source-target { background: #fff0bd; font-weight: bold; }

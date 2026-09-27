@@ -1,5 +1,8 @@
 {% extends "layout.html" %}
 {% block title %}Route Explorer — Forge Design{% endblock %}
+{% macro location(source, available=true) -%}
+{% if source %}{% if available %}<a href="{{ source_url(source) }}">{% endif %}{{ source.path }}{% if source.line %}:{{ source.line }}{% endif %}{% if available %}</a>{% endif %}{% endif %}
+{%- endmacro %}
 {% block content %}
 <h1>Route Explorer</h1>
 {% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
@@ -9,8 +12,23 @@
 {% for warning in result.warnings %}<p>{{ warning }}</p>{% endfor %}
 {% if result.routes %}
 <table>
-  <thead><tr><th scope="col">Méthode</th><th scope="col">Chemin</th><th scope="col">Handler</th><th scope="col">Contrôleur</th><th scope="col">Vérification</th><th scope="col">Template</th><th scope="col">Présence</th><th scope="col">Jinja</th><th scope="col">Nom</th><th scope="col">Public</th></tr></thead>
-  <tbody>{% for route in result.routes %}<tr><td>{{ route.method }}</td><td>{{ route.path }}</td><td>{{ route.handler.reference if route.handler else '—' }}</td><td>{{ route.handler.controller_file if route.handler and route.handler.controller_file else '—' }}</td><td>{{ {'found': 'Trouvée', 'class-missing': 'Classe absente', 'method-missing': 'Méthode absente', 'unreadable': 'Non vérifiable', 'ambiguous': 'Ambiguë', 'not-applicable': '—'}[route.handler.verification] if route.handler else '—' }}</td><td>{% if route.handler and route.handler.template.status == 'found' %}{{ route.handler.template.path }}{% elif route.handler %}{{ {'none': '—', 'not-applicable': '—', 'dynamic': 'Dynamique', 'ambiguous': 'Plusieurs'}[route.handler.template.status] }}{% else %}—{% endif %}{% if route.handler and route.handler.template.dependencies %}<ul>{% for dependency in route.handler.template.dependencies %}<li>{{ dependency.kind }}: {{ 'dynamique' if dependency.dynamic else dependency.path }} — {{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[dependency.presence] }}{% if dependency.syntax != 'not-applicable' %} — {{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable'}[dependency.syntax] }}{% endif %}</li>{% endfor %}</ul>{% endif %}</td><td>{{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[route.handler.template.presence] if route.handler else '—' }}</td><td>{{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[route.handler.template.syntax] if route.handler else '—' }}</td><td>{{ route.name or '—' }}</td><td>{{ 'Oui' if route.public else 'Non' }}</td></tr>{% endfor %}</tbody>
+  <thead><tr><th scope="col">Méthode</th><th scope="col">Chemin</th><th scope="col">Handler</th><th scope="col">Contrôleur</th><th scope="col">Vérification</th><th scope="col">Template</th><th scope="col">Présence</th><th scope="col">Jinja</th><th scope="col">Nom</th><th scope="col">Public</th><th scope="col">Sources</th></tr></thead>
+  <tbody>{% for route in result.routes %}<tr><td>{{ route.method }}</td><td>{{ route.path }}</td><td>{{ route.handler.reference if route.handler else '—' }}</td><td>{{ route.handler.controller_file if route.handler and route.handler.controller_file else '—' }}</td><td>{{ {'found': 'Trouvée', 'class-missing': 'Classe absente', 'method-missing': 'Méthode absente', 'unreadable': 'Non vérifiable', 'ambiguous': 'Ambiguë', 'not-applicable': '—'}[route.handler.verification] if route.handler else '—' }}</td><td>{% if route.handler and route.handler.template.status == 'found' %}{{ route.handler.template.path }}{% elif route.handler %}{{ {'none': '—', 'not-applicable': '—', 'dynamic': 'Dynamique', 'ambiguous': 'Plusieurs'}[route.handler.template.status] }}{% else %}—{% endif %}{% if route.handler and route.handler.template.dependencies %}<ul>{% for dependency in route.handler.template.dependencies %}<li>{{ dependency.kind }}: {{ 'dynamique' if dependency.dynamic else dependency.path }} — {{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[dependency.presence] }}{% if dependency.syntax != 'not-applicable' %} — {{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable'}[dependency.syntax] }}{% endif %}</li>{% endfor %}</ul>{% endif %}</td><td>{{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[route.handler.template.presence] if route.handler else '—' }}</td><td>{{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[route.handler.template.syntax] if route.handler else '—' }}</td><td>{{ route.name or '—' }}</td><td>{{ 'Oui' if route.public else 'Non' }}</td><td>
+<details><summary>Sources</summary><ul>
+{% if route.source %}<li>Route : {{ location(route.source) }}</li>{% endif %}
+{% if route.handler %}
+{% if route.handler.controller_file %}<li>Contrôleur : <a href="{{ source_url(route.handler.controller_file) }}">{{ route.handler.controller_file }}</a></li>{% endif %}
+{% if route.handler.class_source %}<li>Classe : {{ location(route.handler.class_source) }}</li>{% endif %}
+{% if route.handler.method_source %}<li>Méthode : {{ location(route.handler.method_source) }}</li>{% endif %}
+{% if route.handler.template.source %}<li>Template : {{ location(route.handler.template.source, route.handler.template.presence == 'present') }}</li>{% endif %}
+{% if route.handler.template.dependency_graph %}
+{% for template in route.handler.template.dependency_graph.templates %}
+{% if template.source and template.path != route.handler.template.path %}<li>Template : {{ location(template.source, template.presence == 'present') }}</li>{% endif %}
+{% for dependency in template.dependencies %}{% if dependency.source %}<li>{{ dependency.kind }} : {{ location(dependency.source) }}</li>{% endif %}{% endfor %}
+{% endfor %}
+{% endif %}
+{% endif %}
+</ul></details></td></tr>{% endfor %}</tbody>
 </table>
 {% else %}<p>Aucune route statique trouvée dans cette source.</p>{% endif %}
 {% endif %}

@@ -685,3 +685,79 @@ def test_web_transitive_graph(
     assert graph_html.count("<title>&lt;script&gt;.html</title>") == 1
     css = request(server, method="GET", target="/shell.css")[1]
     assert ".graph-edge-cycle { stroke-dasharray:" in css
+
+
+def test_web_source_navigation(server: WSGIServer, project: Path) -> None:
+    from urllib.parse import urlencode
+
+    (project / "mvc/controllers").mkdir()
+    controller = project / "mvc/controllers/home.py"
+    controller.write_text(
+        'class Home:\n    def index(self): return BaseController.render("a.html")\n'
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import Home\nrouter = Router()\n"
+        'router.add("GET", "/", Home.index)\n'
+    )
+    views = project / "mvc/views"
+    views.mkdir()
+    target = views / "a.html"
+    target.write_text('<script>alert("x")</script>\n{% include "missing.html" %}\n')
+    snapshot = target.read_bytes(), target.stat().st_mtime_ns
+    assert request(server, str(project))[0] == 200
+    html = request(server, method="GET", target="/routes")[1]
+    for path, line in (
+        ("mvc/routes/__init__.py", 3),
+        ("mvc/controllers/home.py", 2),
+        ("mvc/views/a.html", 2),
+    ):
+        href = "/source?" + urlencode({"path": path, "line": line})
+        assert href.replace("&", "&amp;") in html
+    assert "/source?path=mvc%2Fviews%2Fa.html" in html
+    assert "/source?path=mvc%2Fviews%2Fmissing.html" not in html
+    url = "/source?" + urlencode({"path": "mvc/views/a.html", "line": 2})
+    status, html, headers = request(server, method="GET", target=url)
+    assert status == 200 and headers.get("Cache-Control") == "no-store"
+    assert 'id="line-2" class="source-target"' in html
+    assert "&lt;script&gt;" in html and "<script>" not in html
+    assert snapshot == (target.read_bytes(), target.stat().st_mtime_ns)
+    target.write_text("changed\n")
+    status, html, _ = request(server, method="GET", target=url)
+    assert status == 200 and "La ligne demandée n’est plus disponible." in html
+    assert "changed" in html
+    target.unlink()
+    assert request(server, method="GET", target=url)[0] == 404
+    assert request(server, method="POST", target=url)[0] != 200
+
+
+def test_web_source_without_project(
+    server: WSGIServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forge_design.web import source
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("Pas de lecture sans projet")
+
+    monkeypatch.setattr(source, "read_project_source", forbidden)
+    status, html, headers = request(
+        server, method="GET", target="/source?path=mvc/views/a"
+    )
+    assert status == 409 and "Aucun projet ouvert." in html
+    assert headers.get("Cache-Control") == "no-store"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "path=..%2F.env",
+        "path=%2Fetc%2Fpasswd",
+        "path=.env",
+        "path=mvc%2Fviews%2Fa&line=-1",
+        "path=mvc%2Fviews%2Fa&line=99999999999999999999999",
+    ],
+)
+def test_web_source_bad_request(server: WSGIServer, project: Path, query: str) -> None:
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/source?" + query)
+    assert status == 400 and "Traceback" not in html
+    assert headers.get("Cache-Control") == "no-store"

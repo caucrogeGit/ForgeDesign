@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block title %}Source — Forge Design{% endblock %}
+{% block content %}
+<h1>Source en lecture seule</h1>
+<p><a href="/routes">Retour à Route Explorer</a></p>
+<p>{{ path }}</p>
+<p>Le diagnostic est un instantané. Cette vue lit le fichier au moment de l’ouverture.</p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if message %}<p role="status">{{ message }}</p>{% endif %}
+{% if rows %}<pre class="source-code"><code>{% for number, text in rows %}<span id="line-{{ number }}"{% if number == line %} class="source-target"{% endif %}>{{ '>' if number == line else ' ' }} {{ number }} {{ text }}</span>
+{% endfor %}</code></pre>{% endif %}
+{% endblock %}
