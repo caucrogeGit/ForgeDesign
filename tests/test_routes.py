@@ -1117,7 +1117,6 @@ def test_direct_dependency_syntax(
         return original_open(path, flags)
 
     def metadata(path: Path):
-        assert not path.name.startswith("never-")
         return original_stat(path)
 
     def parsed(environment: Environment, source: str):
@@ -1147,7 +1146,7 @@ def test_direct_dependency_syntax(
             result = read_routes(project)
             assert reads.count(target) == attempt
             assert len(parses) == attempt * (2 if status == "unreadable" else 3)
-            assert len(extractions) == attempt * 2
+            assert len(extractions) == attempt * (3 if status == "valid" else 2)
             assert len(result.warnings) == (1 if status == "valid" else 2)
             for route in result.routes:
                 assert route.handler and route.handler.template.syntax == "valid"

@@ -643,3 +643,34 @@ L’ordre des nœuds et des arêtes est conservé ; aucun parcours transitif n�
 Des couloirs au-dessus des nœuds portent les flèches et leurs types. Le tableau
 et la liste textuelle restent accessibles, les labels longs sont tronqués dans
 le SVG avec titre complet. Aucune interaction graphique n’est disponible.
+
+### Analyse transitive Jinja bornée
+
+Le Bridge enrichit `TemplateResolution.dependency_graph` avec une
+`TemplateDependencyGraph` gelée par template principal : racine, tuple plat de
+`TemplateNodeInfo` et indicateur `truncated`. Chaque nœud conserve son chemin,
+présence, syntaxe et déclarations locales (kind, cible, ligne, dynamic) ; son chemin
+constitue la source de ces relations. Aucun objet récursif n’est construit.
+
+Les données directes des routes sont vérifiées en premier. Le parcours en largeur
+suit ensuite les seules références statiques, avec extraction uniquement après
+parsing valide. Les cibles absentes, refusées ou invalides sont des nœuds terminaux.
+L’ordre source et l’ordre de première découverte sont conservés. Une file et un
+ensemble local par racine empêchent les boucles, sans diagnostic métier de cycle.
+
+La profondeur principale vaut 0, la limite 8. Les déclarations du niveau 8 restent
+visibles sans contrôle de leurs cibles au titre de ce parcours. Une autre route
+principale peut analyser indépendamment la même cible. Au plus 128 références
+exactes font l’objet d’un contrôle par `read_routes`, échecs compris : aucun accès
+pour les nouvelles références au-delà. Elles restent déclarées avec statuts non
+applicables. Un warning unique par type de limite indique le résultat partiel.
+Cette borne globale prime aussi sur les données directes des projets très larges.
+
+Présence, lecture, parsing et extraction sont mis en cache localement entre racines ;
+les succès et échecs sont partagés, sans cache persistant. Chaque fermeture par
+racine parcourt ses propres relations connues. Aucune lecture hors de la politique
+`mvc/views`, aucun scan, loader ou rendu supplémentaire n’est autorisé.
+
+L’analyse transitive ne constitue ni un rendu, ni une résolution dynamique, ni un
+diagnostic de cycles. Le RouteGraph et le SVG restent fondés sur les seules données
+directes ; leur intégration transitive n’est pas réalisée ici.

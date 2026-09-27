@@ -3,6 +3,7 @@
 import ast
 import os
 import re
+from collections import deque
 from dataclasses import dataclass, replace
 from os import PathLike
 from pathlib import Path
@@ -62,6 +63,25 @@ class TemplateDependency:
     syntax_message: str | None = None
 
 
+MAX_TEMPLATE_DEPTH = 8
+MAX_VISITED_TEMPLATES = 128
+
+
+@dataclass(frozen=True)
+class TemplateNodeInfo:
+    path: str
+    presence: TemplatePresenceStatus
+    syntax: TemplateSyntaxStatus
+    dependencies: tuple[TemplateDependency, ...]
+
+
+@dataclass(frozen=True)
+class TemplateDependencyGraph:
+    root: str
+    templates: tuple[TemplateNodeInfo, ...]
+    truncated: bool = False
+
+
 @dataclass(frozen=True)
 class TemplateResolution:
     status: TemplateResolutionStatus = "not-applicable"
@@ -71,6 +91,7 @@ class TemplateResolution:
     syntax_line: int | None = None
     syntax_message: str | None = None
     dependencies: tuple[TemplateDependency, ...] = ()
+    dependency_graph: TemplateDependencyGraph | None = None
 
 
 @dataclass(frozen=True)
@@ -369,9 +390,22 @@ def _with_template_presence(
 ) -> tuple[RouteInfo, ...]:
     cache: dict[str, TemplateResolution] = {}
     parsed_cache: dict[str, tuple[TemplateResolution, nodes.Template | None]] = {}
+    extracted_cache: dict[str, tuple[TemplateDependency, ...]] = {}
+    limit_reported = False
+    depth_reported = False
 
     def parsed(reference: str) -> tuple[TemplateResolution, nodes.Template | None]:
+        nonlocal limit_reported
         if reference not in parsed_cache:
+            if len(parsed_cache) >= MAX_VISITED_TEMPLATES:
+                if not limit_reported:
+                    warnings.append(
+                        f"Limite globale de {MAX_VISITED_TEMPLATES} templates "
+                        "atteinte ; "
+                        "analyse partielle."
+                    )
+                    limit_reported = True
+                return TemplateResolution("found", reference), None
             checked = TemplateResolution(
                 "found", reference, _template_presence(root, reference)
             )
@@ -403,24 +437,85 @@ def _with_template_presence(
             syntax_message=checked.syntax_message,
         )
 
+    def extracted(reference: str) -> tuple[TemplateDependency, ...]:
+        if reference not in extracted_cache:
+            _, tree = parsed(reference)
+            extracted_cache[reference] = (
+                _template_dependencies(tree) if tree is not None else ()
+            )
+        return extracted_cache[reference]
+
+    # Les données directes ont priorité sur l'expansion transitive.
+    for route in routes:
+        handler = route.handler
+        if handler is None or handler.template.status != "found":
+            continue
+        reference = handler.template.path
+        if reference is not None and reference not in cache:
+            checked, _ = parsed(reference)
+            cache[reference] = replace(
+                checked,
+                dependencies=tuple(dependency_syntax(d) for d in extracted(reference)),
+            )
+
+    for reference, checked in tuple(cache.items()):
+        queue = deque([(reference, 0)])
+        discovered = {reference}
+        templates: list[TemplateNodeInfo] = []
+        truncated = False
+        while queue:
+            current, depth = queue.popleft()
+            current_result, _ = parsed(current)
+            if current not in parsed_cache:
+                truncated = True
+                continue
+            declarations = extracted(current)
+            dependencies: list[TemplateDependency] = []
+            for declaration in declarations:
+                if declaration.dynamic or declaration.path is None:
+                    dependencies.append(declaration)
+                    continue
+                if depth >= MAX_TEMPLATE_DEPTH:
+                    dependencies.append(declaration)
+                    truncated = True
+                    if not depth_reported:
+                        warnings.append(
+                            f"Profondeur maximale de {MAX_TEMPLATE_DEPTH} atteinte ; "
+                            "analyse partielle."
+                        )
+                        depth_reported = True
+                    continue
+                dependency = dependency_syntax(declaration)
+                dependencies.append(dependency)
+                path = declaration.path
+                if path not in parsed_cache:
+                    truncated = True
+                elif path not in discovered:
+                    discovered.add(path)
+                    queue.append((path, depth + 1))
+            templates.append(
+                TemplateNodeInfo(
+                    current,
+                    current_result.presence,
+                    current_result.syntax,
+                    tuple(dependencies),
+                )
+            )
+        cache[reference] = replace(
+            checked,
+            dependency_graph=TemplateDependencyGraph(
+                reference,
+                tuple(templates),
+                truncated,
+            ),
+        )
+
     enriched: list[RouteInfo] = []
     for route in routes:
         handler = route.handler
         if handler is not None and handler.template.status == "found":
             reference = handler.template.path
             if reference is not None:
-                if reference not in cache:
-                    checked, tree = parsed(reference)
-                    # Extraction uniquement pour les templates principaux des routes.
-                    if tree is not None:
-                        checked = replace(
-                            checked,
-                            dependencies=tuple(
-                                dependency_syntax(dependency)
-                                for dependency in _template_dependencies(tree)
-                            ),
-                        )
-                    cache[reference] = checked
                 route = replace(
                     route, handler=replace(handler, template=cache[reference])
                 )
