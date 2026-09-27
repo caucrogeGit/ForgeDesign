@@ -41,6 +41,13 @@ def _graph_script(request: Request) -> Response:
     )
 
 
+def _entity_graph_script(request: Request) -> Response:
+    script = files("forge_design.web").joinpath("static/entity-graph.js")
+    return Response(
+        body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
+    )
+
+
 def create_application(*, recent_projects: RecentProjects | None = None) -> Application:
     """Créer l'application Forge avec ses seules routes publiques explicites.
 
@@ -92,6 +99,7 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     router.add("GET", "/", index, public=True, no_store=True)
     router.add("GET", "/shell.css", _style, public=True)
     router.add("GET", "/route-graph.js", _graph_script, public=True)
+    router.add("GET", "/entity-graph.js", _entity_graph_script, public=True)
     router.add("GET", "/inspector", show, public=True, no_store=True)
     # Ces actions runtime sans session exigent une origine locale exacte.
     router.add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)

@@ -71,9 +71,9 @@ validation exhaustive des identifiants, unicités, couples de clés, types pivot
 compatibilité des politiques. Aucun SQL, DB, comparaison modèle/base,
 génération ou édition. La lecture est fondée uniquement sur les contrats JSON.
 
-## Graphe statique
+## Graphe des entités
 
-Le graphe complète les tableaux, sans interaction ni JavaScript. Chaque entité,
+Le SVG rendu par le serveur complète les tableaux et reste lisible sans JavaScript. Chaque entité,
 même isolée, affiche son nom, sa table et son nombre de champs. Chaque déclaration
 many_to_many dispose d’un pivot distinct, identifié par le texte « Pivot », des
 coins arrondis et une bordure discontinue.
@@ -87,7 +87,7 @@ anomalie et sa déclaration restent dans les sections textuelles.
 Entités à gauche et pivots à droite, dans leur ordre d’entrée ; un couloir par
 arête distingue les relations parallèles. Les longs labels sont tronqués dans
 le dessin, avec texte complet dans les titres SVG et tableaux. Le conteneur
-permet le défilement, y compris au clavier. Aucun zoom, sélection ou édition.
+permet le défilement, y compris au clavier. Aucun zoom ni édition.
 
 Les modèles `EntityGraph` et `EntityGraphLayout` sont immuables et indépendants du
 Bridge. Leur construction est linéaire dans les nœuds et arêtes et ne lit aucun
@@ -100,3 +100,22 @@ Le placement vise de petits graphes : sa hauteur augmente avec les relations et
 les rangées ; certains segments se croisent ou se partagent. Il n’y a ni moteur
 de réduction des croisements, ni plafond graphique supplémentaire, ni diagnostic
 de cycle de données. Une syntaxe interprétable n’est pas une validation de base.
+
+## Sélection et détails
+
+Cliquer une entité ou un pivot, ou utiliser Entrée/Espace sur son nœud, sélectionne
+cet élément. Une deuxième activation le désélectionne. Les bordures renforcées
+signalent le choix et ses voisins directs ; les arêtes incidentes sont soulignées.
+Pour `Article → article_tag → Tag`, sélectionner Article ne sélectionne pas Tag.
+Sélectionner le pivot met en évidence les deux entités voisines.
+
+Le panneau affiche le nom complet, la table, le nombre de champs (supplémentaires
+pour un pivot), le nombre d’arêtes incidentes et leur liste orientée avec les noms
+métier disponibles. Les parallèles restent distinctes ; une boucle compte une fois.
+Échap dans le graphe ou le bouton Désélectionner réinitialise le panneau et rend
+le focus au nœud choisi. Les autres éléments restent entièrement visibles.
+
+Le script local `entity-graph.js` ne consulte que les attributs du DOM déjà rendu.
+Aucune requête de données, persistance, modification du layout ou des tableaux.
+Un rechargement efface la sélection. Sans JavaScript, le SVG et les tableaux
+conservent toutes leurs informations ; seul le panneau interactif reste inactif.

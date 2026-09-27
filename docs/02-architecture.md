@@ -1012,5 +1012,14 @@ homonymes résolus vers la première occurrence sans nouveau diagnostic.
 Le layout place deux colonnes et un couloir supérieur par arête en temps linéaire,
 sans récursion ni hypothèse d’acyclicité. Coordonnées séparées des modèles Forge.
 Le template produit le SVG échappé, ses titres accessibles et IDs indexés sûrs.
-CSS local, aucun script, nouvelle route ou action ; les tableaux et anomalies
-restent présents. Les limites visuelles sont décrites dans le guide Entity Explorer.
+CSS local ; les tableaux et anomalies restent présents. Les limites visuelles sont décrites dans le guide Entity Explorer.
+
+
+FD-ENTITIES-004 ajoute une amélioration DOM locale via GET /entity-graph.js,
+ressource fixe packagée, chargée avec defer seulement si le graphe existe.
+Le SVG est un groupe accessible contenant des boutons de nœuds ; les data-* issus
+du graphe servent uniquement à sélectionner et afficher les voisins directs.
+Le panneau utilise textContent et une liste de relations incidentes, sans JSON
+embarqué, réseau, stockage, modification de coordonnées ou modèle métier client.
+Bridge, Tool, EntityGraph et layout restent inchangés. Sans script, SVG et tableaux
+restent disponibles ; le script Route Explorer et la CSP restent inchangés.

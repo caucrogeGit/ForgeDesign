@@ -67,12 +67,14 @@ def test_http_graph(
         assert "relation.entity_missing" in html and "&lt;script&gt;" in html
         document = SvgDocument()
         document.feed(html)
-        assert not any(tag == "script" for tag, _ in document.tags)
+        assert [
+            attrs.get("src") for tag, attrs in document.tags if tag == "script"
+        ] == (["/entity-graph.js"] if count else [])
         svgs = [attrs for tag, attrs in document.tags if tag == "svg"]
         if not count:
             assert svgs == []
         else:
-            assert len(svgs) == 1 and svgs[0]["role"] == "img"
+            assert len(svgs) == 1 and svgs[0]["role"] == "group"
             assert (
                 svgs[0]["aria-labelledby"]
                 == "entity-graph-title entity-graph-description"
@@ -89,7 +91,7 @@ def test_http_graph(
             ]
             assert len(nodes) == node_count
             assert all(
-                "tabindex" not in node and "onclick" not in node for node in nodes
+                node["tabindex"] == "0" and "onclick" not in node for node in nodes
             )
             assert [n["id"] for n in nodes] == [
                 f"entity-node-{i}" for i in range(node_count)
