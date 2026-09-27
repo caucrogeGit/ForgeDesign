@@ -1,10 +1,14 @@
 """Représentation pure des relations déjà décrites par Route Explorer."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from json import dumps
 from typing import Literal
 
-from forge_design.forge.routes import RoutesResult, TemplatePresenceStatus
+from forge_design.forge.routes import (
+    RoutesResult,
+    TemplateDependencyGraph,
+    TemplatePresenceStatus,
+)
 
 GraphNodeKind = Literal["route", "handler", "controller", "template"]
 GraphEdgeKind = Literal[
@@ -25,12 +29,14 @@ class GraphEdge:
     source: str
     target: str
     kind: GraphEdgeKind
+    in_cycle: bool = False
 
 
 @dataclass(frozen=True)
 class RouteGraph:
     nodes: tuple[GraphNode, ...]
     edges: tuple[GraphEdge, ...]
+    transitive_truncated: bool = False
 
 
 def build_route_graph(result: RoutesResult) -> RouteGraph:
@@ -41,6 +47,7 @@ def build_route_graph(result: RoutesResult) -> RouteGraph:
     """
     nodes: dict[str, GraphNode] = {}
     edges: dict[GraphEdge, None] = {}
+    closures: dict[str, TemplateDependencyGraph] = {}
 
     def node(
         kind: GraphNodeKind,
@@ -82,6 +89,10 @@ def build_route_graph(result: RoutesResult) -> RouteGraph:
             "template", template.path, template.path, presence=template.presence
         )
         edge(handler_id, template_id, "renders")
+        if template.dependency_graph is not None:
+            closures.setdefault(
+                template.dependency_graph.root, template.dependency_graph
+            )
         for dependency in template.dependencies:
             if dependency.dynamic or dependency.path is None:
                 continue
@@ -92,4 +103,39 @@ def build_route_graph(result: RoutesResult) -> RouteGraph:
                 presence=dependency.presence,
             )
             edge(template_id, dependency_id, dependency_kinds[dependency.kind])
-    return RouteGraph(tuple(nodes.values()), tuple(edges))
+    # Conserver le préfixe direct, puis ajouter les fermetures dans l'ordre des racines.
+    cyclic: set[tuple[str, str, GraphEdgeKind]] = set()
+    for closure in closures.values():
+        for source in closure.templates:
+            source_id = node(
+                "template", source.path, source.path, presence=source.presence
+            )
+            for dependency in source.dependencies:
+                if dependency.dynamic or dependency.path is None:
+                    continue
+                target_id = node(
+                    "template",
+                    dependency.path,
+                    dependency.path,
+                    presence=dependency.presence,
+                )
+                edge(source_id, target_id, dependency_kinds[dependency.kind])
+        for cycle in closure.cycles:
+            for relation in cycle.edges:
+                # Les diagnostics marquent uniquement les arêtes déjà représentées.
+                cyclic.add(
+                    (relation.source, relation.target, dependency_kinds[relation.kind])
+                )
+    marked = tuple(
+        replace(relation, in_cycle=True)
+        if (nodes[relation.source].label, nodes[relation.target].label, relation.kind)
+        in cyclic
+        and nodes[relation.source].kind == nodes[relation.target].kind == "template"
+        else relation
+        for relation in edges
+    )
+    return RouteGraph(
+        tuple(nodes.values()),
+        marked,
+        any(closure.truncated for closure in closures.values()),
+    )

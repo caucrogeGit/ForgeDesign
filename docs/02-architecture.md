@@ -701,3 +701,33 @@ avec lignes et types échappés. Le RouteGraph et le SVG restent directs.
 En cas de troncature, « Analyse partielle. » reste visible, même si un cycle connu
 est retourné. « Aucun cycle détecté dans l’analyse disponible. » n’est pas une
 preuve d’absence dans le projet lorsque la fermeture est tronquée.
+
+### RouteGraph transitif et cycles connus
+
+`TemplateDependencyGraph + cycles → RouteGraph → RouteGraphLayout → SVG` : aucune
+découverte n’est effectuée après le Bridge. Le builder conserve d’abord son préfixe
+direct, puis parcourt une fois chaque fermeture principale dans l’ordre des routes.
+Les nœuds de la table et leurs déclarations locales ajoutent uniquement des relations
+connues. Templates et arêtes identiques sont mutualisés globalement ; références
+absentes, refusées ou non contrôlées restent du texte avec leur statut connu.
+Les dépendances dynamiques ne créent pas de cible graphique.
+
+`GraphEdge.in_cycle` indique l’appartenance à une arête des diagnostics fournis,
+sans nouvelle détection ni canonicalisation. Un marquage connu dans une fermeture
+s’applique aussi à l’arête partagée dans les autres. `RouteGraph.transitive_truncated`
+agrège les troncatures. Les champs sont ajoutés avec valeurs par défaut compatibles.
+Le premier statut rencontré reste conservé selon la politique du builder existant.
+
+Le layout calcule les distances minimales depuis toutes les cibles de renders par
+une file multi-sources. Routes, handlers et contrôleurs restent aux niveaux 0/1/2 ;
+les templates principaux au niveau 3, puis un niveau par distance minimale.
+Chaque template est enfilé au plus une fois ; les cycles n’accroissent pas la distance
+indéfiniment. Un template également principal reste au niveau 3. Les nœuds sont
+empilés dans leur ordre d’entrée. Le placement et le parcours des arêtes restent
+linéaires dans la taille du graphe. Les templates isolés éventuels restent au niveau 4.
+
+Le SVG conserve le défilement, les dimensions déterministes et les chemins orthogonaux,
+y compris les retours vers une colonne précédente. Les arêtes de cycle sont pointillées
+et portent « (cycle) ». « Analyse partielle. » apparaît dans la section graphique si
+nécessaire. Le tableau diagnostique et la section textuelle des cycles sont conservés.
+Aucun JavaScript, interaction ou lecture supplémentaire du projet.

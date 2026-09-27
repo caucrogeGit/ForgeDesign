@@ -30,13 +30,14 @@
 {% if graph %}
 <section class="route-graph" aria-labelledby="relations-title">
   <h2 id="relations-title">Vue des relations</h2>
-  <p id="relations-description">Vue graphique statique des relations connues, de gauche à droite : routes, handlers, contrôleurs, templates principaux et dépendances. Le tableau et la liste des relations donnent les libellés complets.</p>
+  <p id="relations-description">Vue graphique statique des relations connues, de gauche à droite : routes, handlers, contrôleurs, templates principaux puis dépendances par distance minimale. Le tableau et la liste des relations donnent les libellés complets.</p>
+  {% if graph.transitive_truncated %}<p>Analyse partielle.</p>{% endif %}
   <div class="graph-scroll" tabindex="0" role="region" aria-label="Graphe des routes, défilement horizontal">
   <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="relations-title relations-description" viewBox="0 0 {{ graph_layout.width }} {{ graph_layout.height }}" width="{{ graph_layout.width }}" height="{{ graph_layout.height }}">
     <defs><marker id="route-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
     {% for item in graph_layout.edges %}
-    <path class="graph-edge" d="{{ item.path }}" marker-end="url(#route-arrow)" />
-    <text class="edge-label" x="{{ item.label_x }}" y="{{ item.label_y }}">{{ item.edge.kind }}</text>
+    <path class="graph-edge{% if item.edge.in_cycle %} graph-edge-cycle{% endif %}" d="{{ item.path }}" marker-end="url(#route-arrow)" />
+    <text class="edge-label" x="{{ item.label_x }}" y="{{ item.label_y }}">{{ item.edge.kind }}{% if item.edge.in_cycle %} (cycle){% endif %}</text>
     {% endfor %}
     {% for item in graph_layout.nodes %}
     <g class="graph-node">
@@ -51,7 +52,7 @@
   </div>
   <ul class="graph-edges">
   {% for edge in graph.edges %}
-    <li>{{ graph_nodes[edge.source].label }} → <strong>{{ edge.kind }}</strong> → {{ graph_nodes[edge.target].label }}</li>
+    <li>{{ graph_nodes[edge.source].label }} → <strong>{{ edge.kind }}{% if edge.in_cycle %} (cycle){% endif %}</strong> → {{ graph_nodes[edge.target].label }}</li>
   {% endfor %}
   </ul>
 </section>

@@ -1,5 +1,6 @@
 """Placement pur et déterministe du graphe, sans découverte de relations."""
 
+from collections import deque
 from dataclasses import dataclass
 
 from forge_design.tools.route_graph import GraphEdge, GraphNode, RouteGraph
@@ -32,29 +33,40 @@ class RouteGraphLayout:
 
 
 def layout_route_graph(graph: RouteGraph) -> RouteGraphLayout:
-    """Colonnes fixes ; priorité principale pour les templates à double rôle.
+    """Distances minimales multi-sources, sans découverte ni détection de cycle.
 
-    Chaque arête dispose d'un couloir horizontal au-dessus des nœuds. Aucun
-    parcours transitif : seules les cibles de renders déterminent les principaux.
+    Un template principal reste au niveau 3 même s'il est aussi dépendance.
+    Les éventuels templates sans chemin depuis un principal restent au niveau 4.
     """
-    principals = {edge.target for edge in graph.edges if edge.kind == "renders"}
-    columns = {"route": 0, "handler": 1, "controller": 2, "template": 4}
-    counts = [0] * 5
+    templates = {node.id for node in graph.nodes if node.kind == "template"}
+    adjacency: dict[str, list[str]] = {key: [] for key in templates}
+    levels: dict[str, int] = {}
+    for edge in graph.edges:
+        if edge.kind == "renders" and edge.target in templates:
+            levels[edge.target] = 3
+        elif edge.source in templates and edge.target in templates:
+            adjacency[edge.source].append(edge.target)
+    queue = deque(levels)
+    while queue:
+        source = queue.popleft()
+        for target in adjacency[source]:
+            if target not in levels:
+                levels[target] = levels[source] + 1
+                queue.append(target)
+    columns = {"route": 0, "handler": 1, "controller": 2}
+    counts: dict[int, int] = {}
     nodes: list[PositionedNode] = []
     top = 60 + 24 * len(graph.edges)
     for node in graph.nodes:
         column = (
-            3
-            if node.kind == "template" and node.id in principals
-            else columns[node.kind]
+            levels.get(node.id, 4) if node.kind == "template" else columns[node.kind]
         )
+        row = counts.get(column, 0)
         label = node.label if len(node.label) <= 30 else node.label[:29] + "…"
         nodes.append(
-            PositionedNode(
-                node, 30 + column * 360, top + counts[column] * 132, 260, 100, label
-            )
+            PositionedNode(node, 30 + column * 360, top + row * 132, 260, 100, label)
         )
-        counts[column] += 1
+        counts[column] = row + 1
     positions = {item.node.id: item for item in nodes}
     edges: list[PositionedEdge] = []
     for index, edge in enumerate(graph.edges):

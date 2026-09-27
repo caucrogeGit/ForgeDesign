@@ -642,3 +642,46 @@ def test_web_template_cycles(
         assert html.count("Cycle de templates Jinja :") == 1
     else:
         assert "Aucun cycle détecté dans l’analyse disponible." in section
+
+
+@pytest.mark.parametrize("partial", [False, True])
+def test_web_transitive_graph(
+    server: WSGIServer,
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    partial: bool,
+) -> None:
+    from forge_design.forge import routes as bridge
+
+    (project / "mvc/controllers").mkdir()
+    (project / "mvc/controllers/home.py").write_text(
+        'class Home:\n    def index(self): return BaseController.render("a.html")\n'
+    )
+    (project / "mvc/routes/__init__.py").write_text(
+        "from mvc.controllers.home import Home\nrouter = Router()\n"
+        'router.add("GET", "/", Home.index)\n'
+    )
+    views = project / "mvc/views"
+    views.mkdir()
+    (views / "a.html").write_text('{% include "b.html" %}{% include "missing.html" %}')
+    (views / "b.html").write_text('{% extends "<script>.html" %}')
+    (views / "<script>.html").write_text(
+        '{% include "b.html" %}{% include "unvisited" %}'
+    )
+    if partial:
+        monkeypatch.setattr(bridge, "MAX_VISITED_TEMPLATES", 4)
+    assert request(server, str(project))[0] == 200
+    status, html, headers = request(server, method="GET", target="/routes")
+    assert status == 200 and headers.get("Cache-Control") == "no-store"
+    graph_html = html.split('class="route-graph"', 1)[1]
+    assert "<title>&lt;script&gt;.html</title>" in graph_html
+    assert 'x="1830"' in graph_html
+    assert "graph-edge-cycle" in graph_html and "(cycle)</text>" in graph_html
+    assert ">Absent</text>" in graph_html
+    assert ("Analyse partielle." in graph_html) == partial
+    assert "Cycles de templates" in html and "<table>" in html and "<svg " in html
+    assert "<script" not in html
+    assert graph_html.count("<title>b.html</title>") == 1
+    assert graph_html.count("<title>&lt;script&gt;.html</title>") == 1
+    css = request(server, method="GET", target="/shell.css")[1]
+    assert ".graph-edge-cycle { stroke-dasharray:" in css
