@@ -998,3 +998,19 @@ du document et source_index conservés, diagnostics locaux réutilisant EntityIs
 Les références sont comparées aux noms déjà lus, sans nouvelle recherche. Aucune
 orchestration dans le Tool, modification du registre ou du contexte. La page
 existante présente les relations sous les entités, sans nouvelle route ou script.
+
+
+### Graphe Entity Explorer (FD-ENTITIES-003)
+
+`EntitiesResult → build_entity_graph → EntityGraph → layout_entity_graph → SVG`.
+Les deux transformations sont pures et utilisent des dataclasses gelées et tuples,
+indépendants des types RouteGraph. Elles consomment le résultat du seul appel du
+Tool effectué par GET /entities ; aucun changement du Bridge ou du registre.
+Les nœuds conservent les occurrences d’entités et un pivot par many_to_many dont
+les deux extrémités existent. Ordre et relations parallèles conservés ; noms
+homonymes résolus vers la première occurrence sans nouveau diagnostic.
+Le layout place deux colonnes et un couloir supérieur par arête en temps linéaire,
+sans récursion ni hypothèse d’acyclicité. Coordonnées séparées des modèles Forge.
+Le template produit le SVG échappé, ses titres accessibles et IDs indexés sûrs.
+CSS local, aucun script, nouvelle route ou action ; les tableaux et anomalies
+restent présents. Les limites visuelles sont décrites dans le guide Entity Explorer.

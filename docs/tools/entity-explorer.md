@@ -46,7 +46,7 @@ texte ; la politique `/source` reste inchangée.
 La section Relations présente many_to_one (la source porte la FK) et many_to_many
 (pivot avec ses clés source/cible et champs supplémentaires), dans l’ordre du
 document. Inverse_name est affiché seulement s’il existe. Source et index
-relations[n] identifient la déclaration, sans lien /source ou graphe.
+relations[n] identifient la déclaration, sans lien /source.
 
 Le document exige schema_version "1.0" et une liste relations. Fichier absent ou
 liste vide : aucune relation déclarée. Legacy et versions inconnues sont refusés.
@@ -68,5 +68,35 @@ comparaison FK/references n’est ajouté. Aucun on_update interne n’est inven
 
 Cette lecture ne remplace pas la validation métier officielle Forge : pas de
 validation exhaustive des identifiants, unicités, couples de clés, types pivot ou
-compatibilité des politiques. Aucun SQL, DB, graphe, comparaison modèle/base,
+compatibilité des politiques. Aucun SQL, DB, comparaison modèle/base,
 génération ou édition. La lecture est fondée uniquement sur les contrats JSON.
+
+## Graphe statique
+
+Le graphe complète les tableaux, sans interaction ni JavaScript. Chaque entité,
+même isolée, affiche son nom, sa table et son nombre de champs. Chaque déclaration
+many_to_many dispose d’un pivot distinct, identifié par le texte « Pivot », des
+coins arrondis et une bordure discontinue.
+
+Les flèches suivent `from_entity → to_entity` pour many_to_one : la source porte
+la clé étrangère. Une many_to_many suit `source → pivot → cible`, avec le nom
+métier sur le premier segment. Les auto-relations, cycles et relations parallèles
+sont conservés. Une extrémité manquante empêche de dessiner la relation ; son
+anomalie et sa déclaration restent dans les sections textuelles.
+
+Entités à gauche et pivots à droite, dans leur ordre d’entrée ; un couloir par
+arête distingue les relations parallèles. Les longs labels sont tronqués dans
+le dessin, avec texte complet dans les titres SVG et tableaux. Le conteneur
+permet le défilement, y compris au clavier. Aucun zoom, sélection ou édition.
+
+Les modèles `EntityGraph` et `EntityGraphLayout` sont immuables et indépendants du
+Bridge. Leur construction est linéaire dans les nœuds et arêtes et ne lit aucun
+fichier. Les IDs utilisent les positions dans le résultat : reproductibles pour
+une même entrée, ils ne sont pas des identifiants persistants après réordonnancement.
+En cas de noms d’entités identiques, chaque occurrence reste visible et les relations
+désignent la première. Aucune fusion de pivots ou correction métier n’est tentée.
+
+Le placement vise de petits graphes : sa hauteur augmente avec les relations et
+les rangées ; certains segments se croisent ou se partagent. Il n’y a ni moteur
+de réduction des croisements, ni plafond graphique supplémentaire, ni diagnostic
+de cycle de données. Une syntaxe interprétable n’est pas une validation de base.

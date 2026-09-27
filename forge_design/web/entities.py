@@ -12,6 +12,8 @@ from forge_design.forge.project_root import (
 )
 from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.platform.tool_registry import ToolRegistry
+from forge_design.tools.entity_graph import build_entity_graph
+from forge_design.web.entity_graph_layout import layout_entity_graph
 from forge_design.web.rendering import render_page
 
 
@@ -39,5 +41,10 @@ def show_entities(
             "current_project": context.inspection,
             "result": result,
             "error": error,
+            "entity_layout": (
+                layout_entity_graph(build_entity_graph(result))
+                if result is not None
+                else None
+            ),
         },
     )

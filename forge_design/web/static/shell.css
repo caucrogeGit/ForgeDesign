@@ -63,3 +63,15 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .graph-node:focus-visible rect { stroke-width: 4; stroke-dasharray: 4 3; }
 .graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .graph-details dd { margin-bottom: .75rem; }
+
+/* Entity Explorer : SVG statique, sans interaction de nœuds. */
+.entity-graph-scroll { overflow: auto; max-height: 45rem; }
+.entity-graph-scroll:focus-visible { outline: 2px solid currentColor; }
+.entity-graph { display: block; max-width: none; }
+.entity-graph text { fill: currentColor; font-size: 13px; }
+.entity-graph marker path { fill: currentColor; }
+.entity-edge > path { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.entity-edge text { text-anchor: middle; }
+.entity-node rect { fill: #fff; stroke: #526477; stroke-width: 2; }
+.entity-node-pivot rect { stroke-dasharray: 6 3; }
+.entity-node-name { font-weight: bold; }
