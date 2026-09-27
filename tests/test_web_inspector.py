@@ -529,6 +529,15 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     assert "extends: base.html — Présent" in html
     assert "include: contacts/&lt;script&gt;.html — Absent" in html
     assert "include: ../secret.html — Chemin refusé" in html
+    graph_html = html.split('class="route-graph"', 1)[1]
+    assert "Vue des relations" in graph_html and "GET /" in graph_html
+    assert "HomeController.index" in graph_html
+    assert "mvc/controllers/home.py" in graph_html and "home.html" in graph_html
+    assert "extends</strong> → base.html" in graph_html
+    assert "includes</strong> → contacts/&lt;script&gt;.html" in graph_html
+    assert "contacts/&lt;script&gt;.html — Absent" in graph_html
+    assert "dynamic_name" not in graph_html and "dynamique" not in graph_html
+    assert "<script>" not in graph_html and "<table>" in html
     assert "<td>Présent</td><td>Valide</td>" in html
     assert headers.get("Cache-Control") == "no-store"
 

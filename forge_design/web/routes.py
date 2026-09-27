@@ -15,6 +15,7 @@ from forge_design.forge.routes import (
     RoutesSourceUnreadableError,
 )
 from forge_design.platform.tool_registry import ToolRegistry
+from forge_design.tools.route_graph import build_route_graph
 from forge_design.web.rendering import render_page
 
 
@@ -35,6 +36,7 @@ def show_routes(context: CurrentProjectContext, registry: ToolRegistry) -> Respo
             error = str(exc)
         if result is not None and not isinstance(result, RoutesResult):
             raise TypeError("route-explorer doit retourner RoutesResult.")
+    graph = build_route_graph(result) if result is not None else None
     return render_page(
         "routes.html",
         {
@@ -42,5 +44,7 @@ def show_routes(context: CurrentProjectContext, registry: ToolRegistry) -> Respo
             "current_project": context.inspection,
             "result": result,
             "error": error,
+            "graph": graph,
+            "graph_nodes": {node.id: node for node in graph.nodes} if graph else {},
         },
     )

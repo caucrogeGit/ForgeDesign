@@ -14,4 +14,19 @@
 </table>
 {% else %}<p>Aucune route statique trouvée dans cette source.</p>{% endif %}
 {% endif %}
+{% if graph %}
+<section class="route-graph" aria-labelledby="relations-title">
+  <h2 id="relations-title">Vue des relations</h2>
+  <ul class="graph-nodes">
+  {% for node in graph.nodes %}
+    <li><strong>{{ {'route': 'Route', 'handler': 'Handler', 'controller': 'Contrôleur', 'template': 'Template'}[node.kind] }}</strong> : {{ node.label }}{% if node.presence != 'not-applicable' %} — {{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable'}[node.presence] }}{% endif %}</li>
+  {% else %}<li>Aucune relation disponible.</li>{% endfor %}
+  </ul>
+  <ul class="graph-edges">
+  {% for edge in graph.edges %}
+    <li>{{ graph_nodes[edge.source].label }} → <strong>{{ edge.kind }}</strong> → {{ graph_nodes[edge.target].label }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% endblock %}

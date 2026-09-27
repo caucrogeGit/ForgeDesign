@@ -611,3 +611,23 @@ ni ouverts. La profondeur reste 1. Syntaxe valide ne signifie ni dépendances
 internes valides, ni rendu réussi, ni graphe transitif. Une cible qui est aussi le template principal d'une
 autre route peut être analysée à ce titre, indépendamment de sa déclaration comme
 dépendance. Les configurations `VIEWS_DIR` et opt-ins restent hors contrat.
+
+### Graphe direct de Route Explorer
+
+`RoutesResult → build_route_graph → RouteGraph → représentation Web` : le module
+`forge_design.tools.route_graph` transforme uniquement les modèles déjà produits
+par le Bridge. Il ne découvre aucune donnée, ne consulte aucun fichier et ne
+parse aucune source. Aucun nouveau Tool n’est enregistré.
+
+Les nœuds immuables route, handler, contrôleur et template sont mutualisés par
+identité syntaxique (méthode et chemin pour une route). Les arêtes représentent
+handles, defined-in, renders et les quatre déclarations de dépendances directes.
+Les références statiques absentes restent visibles ; les dépendances dynamiques
+restent dans le tableau sans nœud artificiel. Les IDs encodent des tuples JSON,
+sans identifiant aléatoire. L’ordre de première découverte est conservé, ainsi
+que les métadonnées de première occurrence si une entrée contradictoire est fournie.
+Aucune identité runtime des handlers ni analyse transitive n’est déduite.
+
+La page `/routes` conserve le tableau diagnostique et ajoute « Vue des relations » :
+blocs de nœuds et liste de relations en HTML/CSS, avec libellés échappés et présence
+textuelle. Le Web ne construit pas les relations et conserve `no-store`.

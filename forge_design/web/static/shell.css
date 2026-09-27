@@ -30,3 +30,8 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .current-project { margin-top: 1.25rem; overflow-wrap: anywhere; }
 .current-project p { margin: .5rem 0; }
 .current-project form { margin-top: .75rem; }
+
+.graph-nodes { display: grid; gap: .5rem; padding: 0; list-style: none; }
+.graph-nodes li { border: 1px solid #ccd2da; padding: .75rem; border-radius: .25rem; }
+.graph-edges { padding-left: 1.5rem; }
+.graph-edges li { margin-block: .5rem; overflow-wrap: anywhere; }
