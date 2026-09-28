@@ -36,7 +36,12 @@ class EntityFilter:
             raise ValueError("Type de relation invalide.")
         if self.severity not in {"all", "error", "warning", "info"}:
             raise ValueError("Sévérité invalide.")
-        object.__setattr__(self, "query", (self.query or "").strip().casefold() or None)
+        query = (self.query or "").strip().casefold() or None
+        if query is not None and len(query) > MAX_FILTER_QUERY_LENGTH:
+            raise ValueError(
+                f"Recherche normalisée limitée à {MAX_FILTER_QUERY_LENGTH} caractères."
+            )
+        object.__setattr__(self, "query", query)
 
 
 @dataclass(frozen=True)

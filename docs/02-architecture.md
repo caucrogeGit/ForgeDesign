@@ -1111,3 +1111,28 @@ directement des SourceLocation. Les diagnostics et filtres ne changent pas.
 sans retour arbitraire. Le lecteur valide à nouveau la même politique à sa frontière ;
 il n’existe pas de seconde politique de catégorisation. Aucun paramètre de retour,
 route, Tool, JavaScript ou contrôle de saisie libre ajouté.
+
+
+### Stabilisation Entity Explorer (FD-ENTITIES-008)
+
+Les plafonds de découverte/inspection et de structures sont dans limits.py :
+4096 entrées, 256 candidats d’entité, 512 déclarations de relations, 256 champs
+par entité et 64 champs par pivot. Un nom supplémentaire détecte la troncature de
+découverte avant le tri lexical borné. Ce sous-ensemble n’a pas d’ordre global
+stable si le filesystem dépasse 4096 entrées. Décodage JSON toujours borné à 1 Mio.
+Les warnings entity/relation.analysis_truncated et entity/relation.fields_truncated
+suivent exclusivement EntitiesResult.warnings → EntityDiagnostics → rendu existant.
+Aucune deuxième analyse selon les filtres, aucun nœud fantôme pour éléments non lus.
+
+Le Bridge réutilise source_parts pour valider le chemin canonique du candidat :
+une seule politique lexicale Entity/source. L’ouverture de la racine parcourt ses
+parents sans symlink ; le dossier d’entité ouvert est comparé par samestat aux
+métadonnées découvertes. Le contrôle stat/open/fstat des JSON reste en place.
+Des compteurs linéaires signalent les noms et tables identiques parmi les faits lus,
+avec warning sur chaque occurrence. Pas de validation Forge exhaustive ajoutée.
+
+Les signatures publiques de lecture, diagnostics, filtre, graphe et layout sont
+verrouillées par tests ; les dataclasses existantes restent gelées et inchangées.
+La recherche refuse également une longueur >256 après casefold, pour garantir
+qu’une valeur normalisée affichée soit soumissible à nouveau. Les contrats source,
+retours, stateless, CSP, no-store et JS restent inchangés.

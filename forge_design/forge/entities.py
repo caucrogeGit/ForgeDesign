@@ -2,19 +2,28 @@
 
 import json
 import os
-import re
+from collections import Counter
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
+from itertools import islice
 from os import PathLike
+from pathlib import Path
 from stat import S_ISDIR, S_ISREG
 from typing import Literal, cast
 
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
-from forge_design.forge.source import SourceLocation
-from forge_design.limits import MAX_SOURCE_BYTES
+from forge_design.forge.source import SourceLocation, SourceReadError, source_parts
+from forge_design.limits import (
+    MAX_ENTITY_DIRECTORY_ENTRIES,
+    MAX_ENTITY_FIELDS,
+    MAX_ENTITY_FILES,
+    MAX_ENTITY_PIVOT_FIELDS,
+    MAX_ENTITY_RELATIONS,
+    MAX_SOURCE_BYTES,
+)
 
 
 @dataclass(frozen=True)
@@ -146,7 +155,7 @@ def _entity(data: dict[str, object], source: SourceLocation) -> EntityInfo:
     return EntityInfo(
         _text(data.get("name")),
         _text(data.get("table")),
-        tuple(_field(item) for item in cast(list[object], fields)),
+        tuple(_field(item) for item in cast(list[object], fields)[:MAX_ENTITY_FIELDS]),
         _boolean(options, "timestamps", False),
         _boolean(options, "soft_delete", False),
         source,
@@ -155,6 +164,17 @@ def _entity(data: dict[str, object], source: SourceLocation) -> EntityInfo:
 
 @contextmanager
 def _directory(name: str, parent: int | None = None) -> Generator[int, None, None]:
+    if parent is None:
+        with ExitStack() as stack:
+            parts = Path(name).absolute().parts
+            descriptor = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            stack.callback(os.close, descriptor)
+            for part in parts[1:]:
+                if part == "..":
+                    raise OSError("Racine non canonique.")
+                descriptor = stack.enter_context(_directory(part, descriptor))
+            yield descriptor
+        return
     descriptor = os.open(
         name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent
     )
@@ -187,10 +207,18 @@ def _constant(value: str) -> object:
     raise ValueError("Constante JSON non standard.")
 
 
-def _load(parent: int, folder: str, errors: list[EntityIssue]) -> EntityInfo | None:
+def _load(
+    parent: int,
+    folder: str,
+    errors: list[EntityIssue],
+    warnings: list[EntityIssue],
+    metadata: os.stat_result,
+) -> EntityInfo | None:
     source = SourceLocation(f"mvc/entities/{folder}/{folder}.json")
     try:
         with _directory(folder, parent) as directory:
+            if not os.path.samestat(metadata, os.fstat(directory)):
+                raise OSError("Dossier remplacé après découverte.")
             content = _read(directory, folder + ".json")
     except FileNotFoundError:
         errors.append(
@@ -218,7 +246,16 @@ def _load(parent: int, folder: str, errors: list[EntityIssue]) -> EntityInfo | N
                 )
             )
             return None
-        return _entity(data, source)
+        entity = _entity(data, source)
+        if len(cast(list[object], data["fields"])) > MAX_ENTITY_FIELDS:
+            warnings.append(
+                EntityIssue(
+                    "entity.fields_truncated",
+                    f"Champs limités aux {MAX_ENTITY_FIELDS} premières déclarations.",
+                    source,
+                )
+            )
+        return entity
     except (ValueError, RecursionError):
         errors.append(
             EntityIssue(
@@ -265,7 +302,10 @@ def _relation(data: dict[str, object], index: int) -> RelationInfo:
             True,
             True,
             _on_delete(pivot.get("on_delete", "cascade")),
-            tuple(_field(item) for item in cast(list[object], fields)),
+            tuple(
+                _field(item)
+                for item in cast(list[object], fields)[:MAX_ENTITY_PIVOT_FIELDS]
+            ),
         )
     return RelationInfo(
         cast(Literal["many_to_one", "many_to_many"], kind),
@@ -281,7 +321,10 @@ def _relation(data: dict[str, object], index: int) -> RelationInfo:
 
 
 def _read_relations(
-    directory: int, entities: list[EntityInfo], errors: list[EntityIssue]
+    directory: int,
+    entities: list[EntityInfo],
+    errors: list[EntityIssue],
+    warnings: list[EntityIssue],
 ) -> tuple[RelationInfo, ...]:
     def issue(code: str, message: str, index: int | None = None) -> None:
         errors.append(
@@ -316,13 +359,35 @@ def _read_relations(
         return ()
     names = {entity.name for entity in entities}
     result: list[RelationInfo] = []
-    for index, item in enumerate(cast(list[object], items)):
+    if len(cast(list[object], items)) > MAX_ENTITY_RELATIONS:
+        warnings.append(
+            EntityIssue(
+                "relation.analysis_truncated",
+                f"Relations limitées à {MAX_ENTITY_RELATIONS} déclarations.",
+                _RELATIONS_SOURCE,
+            )
+        )
+    for index, item in enumerate(cast(list[object], items)[:MAX_ENTITY_RELATIONS]):
         try:
             relation_data = _object(item)
             if relation_data.get("type") not in ("many_to_one", "many_to_many"):
                 issue("type_unsupported", "Type de relation non pris en charge.", index)
                 continue
             relation = _relation(relation_data, index)
+            if relation.many_to_many is not None:
+                pivot = _object(relation_data["pivot"])
+                if (
+                    len(cast(list[object], pivot.get("fields", [])))
+                    > MAX_ENTITY_PIVOT_FIELDS
+                ):
+                    warnings.append(
+                        EntityIssue(
+                            "relation.fields_truncated",
+                            f"Champs pivot limités à {MAX_ENTITY_PIVOT_FIELDS}.",
+                            _RELATIONS_SOURCE,
+                            index,
+                        )
+                    )
         except (ValueError, RecursionError):
             issue(
                 "structure_invalid", "Structure minimale de relation invalide.", index
@@ -349,6 +414,7 @@ def read_entities(root: str | PathLike[str]) -> EntitiesResult:
     if not detect_forge_project(canonical).valid:
         raise NotForgeProjectError("La racine n'est pas un projet Forge reconnu.")
     errors: list[EntityIssue] = []
+    warnings: list[EntityIssue] = []
     entities: list[EntityInfo] = []
     relations: tuple[RelationInfo, ...] = ()
     location = SourceLocation("mvc/entities")
@@ -365,15 +431,36 @@ def read_entities(root: str | PathLike[str]) -> EntitiesResult:
     try:
         with _directory(str(canonical)) as project, _directory("mvc", project) as mvc:
             with _directory("entities", mvc) as directory:
-                for name in sorted(os.listdir(directory)):
-                    if (
-                        not re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name)
-                        or name == "env"
-                        or name.startswith(
-                            ("id_rsa", "id_dsa", "id_ecdsa", "id_ed25519")
+                # Borne aussi les entrées ignorées : listdir matérialisait tout.
+                with os.scandir(directory) as entries:
+                    names = [
+                        entry.name
+                        for entry in islice(entries, MAX_ENTITY_DIRECTORY_ENTRIES + 1)
+                    ]
+                if len(names) > MAX_ENTITY_DIRECTORY_ENTRIES:
+                    warnings.append(
+                        EntityIssue(
+                            "entity.analysis_truncated",
+                            f"Découverte bornée : {MAX_ENTITY_DIRECTORY_ENTRIES}.",
+                            location,
                         )
-                    ):
+                    )
+                inspected = 0
+                for name in sorted(names[:MAX_ENTITY_DIRECTORY_ENTRIES]):
+                    try:
+                        source_parts(f"mvc/entities/{name}/{name}.json")
+                    except SourceReadError:
                         continue
+                    if inspected == MAX_ENTITY_FILES:
+                        warnings.append(
+                            EntityIssue(
+                                "entity.analysis_truncated",
+                                f"Inspection limitée à {MAX_ENTITY_FILES} candidats.",
+                                location,
+                            )
+                        )
+                        break
+                    inspected += 1
                     try:
                         metadata = os.stat(
                             name, dir_fd=directory, follow_symlinks=False
@@ -398,23 +485,34 @@ def read_entities(root: str | PathLike[str]) -> EntitiesResult:
                             )
                         )
                         continue
-                    if entity := _load(directory, name, errors):
+                    if entity := _load(directory, name, errors, warnings, metadata):
                         entities.append(entity)
-                relations = _read_relations(directory, entities, errors)
+                relations = _read_relations(directory, entities, errors, warnings)
     except FileNotFoundError:
-        return EntitiesResult(
-            tuple(entities),
-            tuple(errors),
-            (
-                EntityIssue(
-                    "entity.source_missing",
-                    "Dossier des entités absent ou disparu.",
-                    location,
-                ),
-            ),
+        warnings.append(
+            EntityIssue(
+                "entity.source_missing",
+                "Dossier des entités absent ou disparu.",
+                location,
+            )
         )
     except OSError:
         errors.append(
             EntityIssue("entity.unreadable", "Dossier inaccessible ou lié.", location)
         )
-    return EntitiesResult(tuple(entities), tuple(errors), relations=relations)
+    name_counts = Counter(entity.name for entity in entities)
+    table_counts = Counter(entity.table for entity in entities)
+    for entity in entities:
+        for code, count, label in (
+            ("entity.name_duplicate", name_counts[entity.name], "Nom métier"),
+            ("entity.table_duplicate", table_counts[entity.table], "Table"),
+        ):
+            if count > 1:
+                warnings.append(
+                    EntityIssue(
+                        code,
+                        f"{label} partagé par {count} entités interprétées.",
+                        entity.source,
+                    )
+                )
+    return EntitiesResult(tuple(entities), tuple(errors), tuple(warnings), relations)

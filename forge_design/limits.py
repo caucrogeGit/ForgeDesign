@@ -1,4 +1,4 @@
-"""Bornes internes de Route Explorer, sans configuration persistante."""
+"""Bornes internes des explorateurs, sans configuration persistante."""
 
 MAX_SOURCE_BYTES = 1024 * 1024
 MAX_SOURCE_PATH_LENGTH = 4096
@@ -7,3 +7,9 @@ MAX_ROUTE_BRANCHES = 64
 MAX_SYNTAX_MESSAGE_LENGTH = 240
 MAX_TEMPLATE_DEPTH = 8
 MAX_VISITED_TEMPLATES = 128
+
+MAX_ENTITY_DIRECTORY_ENTRIES = 4096
+MAX_ENTITY_FILES = 256
+MAX_ENTITY_RELATIONS = 512
+MAX_ENTITY_FIELDS = 256
+MAX_ENTITY_PIVOT_FIELDS = 64

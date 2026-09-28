@@ -34,7 +34,7 @@ Chaque GET relit les JSON, sans cache dans le contexte. Fichiers ordinaires UTF-
 avec BOM accepté, au plus 1 Mio chacun ; liens refusés, parcours des parents par
 descripteurs et ouverture sans suivi de liens. Les primitives POSIX nécessaires
 sont requises. Le contenu peut changer pendant la lecture : aucun instantané
-atomique garanti. Le nombre d’entités n’est pas plafonné dans cette version.
+atomique garanti. Les plafonds centralisés sont décrits dans « Limites connues ».
 
 Aucun import du projet, lecture Python/SQL, commande Forge, connexion à une base,
 édition ou écriture. Les relations sont lues uniquement dans `relations.json`, sans recherche
@@ -156,8 +156,8 @@ Le formulaire de `/entities` utilise uniquement GET. L’URL contient tout l’�
 Réinitialiser revient à `/entities`. Aucun cookie, stockage navigateur, session,
 contexte projet ou historique ne conserve les filtres.
 
-`q` est limité à 256 caractères avant normalisation, puis strip/casefold est
-appliqué. La recherche est une sous-chaîne Unicode, sans regex : nom/table et
+`q` est limité à 256 caractères avant et après normalisation strip/casefold.
+Une expansion Unicode excessive est refusée avant affichage. La recherche est une sous-chaîne Unicode, sans regex : nom/table et
 nom/type/references des champs d’entités ; extrémités, nom/inverse, clé étrangère,
 table/clés du pivot et nom/type/references des champs pivot pour les relations.
 Les valeurs normalisées restent visibles dans le formulaire.
@@ -215,3 +215,72 @@ Le retour est déduit du chemin validé : Retour à Entity Explorer vers `/entit
 sans préserver les filtres. Aucun return_to fourni par le client n’est utilisé.
 Aucun formulaire de chemin, catalogue de fichiers ou navigation dossier n’est ajouté.
 Les nœuds du graphe conservent leur interaction locale.
+
+
+## API stable actuelle
+
+| API | Entrée → sortie | Responsabilité |
+|---|---|---|
+| `read_entities(root)` | racine str/PathLike → `EntitiesResult` | Lecture JSON statique, bornée et confinée |
+| `EntitiesResult` | tuples entities/errors/warnings/relations | Faits disponibles, sans projection Web |
+| `EntityInfo`, `EntityFieldInfo` | valeurs déclaratives et source | Contrat minimal immuable des entités/champs |
+| `RelationInfo`, `ManyToOneInfo`, `ManyToManyInfo` | extrémités, index source et options | Déclarations, sans SQL ni résolution DB |
+| `EntityExplorerTool.run(root)` | Path → `EntitiesResult` | Adaptateur du Bridge, sans filtres |
+| `build_entity_diagnostics(result)` | résultat → `EntityDiagnostics` | Conservation des issues, erreurs puis warnings |
+| `filter_entities(result, diagnostics, filters)` | faits complets + `EntityFilter` → `EntityFilteredView` | Sélection pure et supports graphiques |
+| `build_entity_graph(result)` | résultat → `EntityGraph` | Nœuds/arêtes déterministes |
+| `build_entity_graph_from_items(entities, relations)` | tuples → `EntityGraph` | Même projection pour une vue filtrée |
+| `layout_entity_graph(graph)` | graphe aux IDs uniques/extrémités présentes → `EntityGraphLayout` | Placement pur à deux colonnes |
+
+Les dataclasses exposent des tuples et sont gelées. Aucun de ces contrats n’exécute
+Forge, n’importe le projet ou n’interroge une base. Les transformations après lecture
+n’effectuent aucun accès filesystem. Les IDs graphiques sont locaux à la projection.
+Les limites d’analyse relèvent du Bridge ; les fonctions pures acceptent les faits fournis.
+
+## Limites connues
+
+| Constante centralisée | Valeur | Comportement au dépassement |
+|---|---:|---|
+| MAX_SOURCE_BYTES | 1 Mio/fichier | Refus local de lecture |
+| MAX_ENTITY_DIRECTORY_ENTRIES | 4096 | Préfixe de découverte conservé, warning entity.analysis_truncated |
+| MAX_ENTITY_FILES | 256 | Candidats canoniques inspectés, puis arrêt et même warning |
+| MAX_ENTITY_RELATIONS | 512 | Premières déclarations (invalides incluses), warning relation.analysis_truncated |
+| MAX_ENTITY_FIELDS | 256 | Premiers champs interprétés, warning entity.fields_truncated |
+| MAX_ENTITY_PIVOT_FIELDS | 64 | Premiers champs pivot, warning relation.fields_truncated |
+| MAX_FILTER_QUERY_LENGTH | 256 | HTTP 400 avant/après normalisation si dépassement |
+
+La découverte lit au plus 4097 noms (un témoin de dépassement), trie seulement les
+4096 premiers dans l’ordre lexical, puis inspecte au plus 256 candidats. Les entrées
+ignorées comptent dans la borne de découverte ; un candidat inaccessible ou invalide
+compte dans la borne d’inspection. Sous ces bornes, l’ordre lexical historique est
+inchangé. Au-delà de 4096 entrées, le sous-ensemble dépend de l’ordre fourni par le
+filesystem, et un warning le signale ; aucun ordre global n’est promis.
+Les champs et relations conservent leur ordre JSON. Le document JSON entier est
+encore décodé, sous la borne 1 Mio, avant limitation des objets interprétés.
+Les compteurs représentent les données disponibles, pas le volume total non analysé.
+Les filtres n’élargissent jamais l’analyse ; les warnings globaux ne sélectionnent
+aucun élément arbitraire avec diagnostics=only.
+
+`entity.name_duplicate` et `entity.table_duplicate` sont des warnings par occurrence
+sur les EntityInfo déjà lus (égalité exacte, sans casefold). Les données sont gardées,
+le graphe désigne la première occurrence du nom, y compris en vue filtrée. Ces
+constats ne prétendent pas valider les règles SQL ou remplacer check:model.
+Les champs tronqués au-delà du plafond ne sont pas validés ; /source permet de
+consulter le contrat entier. Des références vers des entités non disponibles,
+y compris non analysées, peuvent produire relation.entity_missing.
+
+L’analyse reste statique JSON et minimale : aucune validation Forge exhaustive,
+DB, SQL, édition ou génération. L’état filesystem n’est pas atomique globalement.
+Les parents sont ancrés par descripteurs sans symlink ; le dossier d’entité est
+comparé à sa découverte et chaque fichier à son stat avant ouverture. Un dossier
+ouvert peut être renommé et son contenu modifié : aucun instantané global n’est promis.
+La taille cumulée peut atteindre 256 Mio de contrats d’entités plus 1 Mio de relations,
+même si la lecture est séquentielle ; les objets Python ajoutent leur propre coût mémoire.
+Le layout reste simple : grandes hauteurs, segments partagés/croisements possibles,
+labels tronqués visuellement, pas d’optimisation des croisements. Interaction locale
+seulement, validation navigateur/lecteur d’écran réelle non effectuée.
+
+Pour /source, le contrat historique de paramètres est conservé et testé : première
+valeur non vide de path/line, autres valeurs et clés inconnues ignorées. Cette
+convention diffère de /entities qui refuse les doublons détectables et clés inconnues ;
+la politique lexicale s’applique toujours à la valeur effectivement retenue.
