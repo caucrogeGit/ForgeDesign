@@ -318,7 +318,7 @@ def test_relations_http(tmp_path: Path) -> None:
             "position",
             "Nom inverse",
             "relations[1]",
-            "Anomalies",
+            "Diagnostics",
         ):
             assert value in html
         table = html.split('id="relations-title"', 1)[1]

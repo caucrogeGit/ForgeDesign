@@ -28,7 +28,7 @@ Il s’agit d’une interprétation minimale, pas d’une validation complète d
 Forge : types inconnus affichés sans liste prédéfinie, propriétés hors périmètre
 ignorées, contraintes métier et cohérence SQL non vérifiées. Les champs doivent
 former une liste non vide ; les attributs affichés sont contrôlés quant à leur
-type. Les erreurs restent locales à l’entité et apparaissent dans **Anomalies**.
+type. Les erreurs restent locales à l’entité et apparaissent dans **Diagnostics**.
 
 Chaque GET relit les JSON, sans cache dans le contexte. Fichiers ordinaires UTF-8
 avec BOM accepté, au plus 1 Mio chacun ; liens refusés, parcours des parents par
@@ -119,3 +119,30 @@ Le script local `entity-graph.js` ne consulte que les attributs du DOM déjà re
 Aucune requête de données, persistance, modification du layout ou des tableaux.
 Un rechargement efface la sélection. Sans JavaScript, le SVG et les tableaux
 conservent toutes leurs informations ; seul le panneau interactif reste inactif.
+
+## Diagnostics structurés
+
+La section **Diagnostics** présente les compteurs d’erreurs, d’avertissements et
+d’informations, puis une liste avec sévérité explicite, code, message et source.
+Sans anomalie, les trois compteurs valent zéro et la page indique :
+« Aucun diagnostic dans les informations disponibles. » Aucun score ou verdict
+global n’est déduit ; cette présentation ne remplace pas une validation Forge exhaustive.
+
+La projection pure `build_entity_diagnostics(EntitiesResult)` conserve les codes,
+messages, sources et occurrences du Bridge, erreurs puis avertissements dans
+leur ordre initial. La sévérité vient exclusivement de `errors` ou `warnings` ;
+aucune information artificielle n’est créée. Les codes stables sont :
+
+- `entity.source_missing`, `entity.unreadable`, `entity.json_invalid`,
+  `entity.schema_version_unsupported`, `entity.structure_invalid` ;
+- `relation.unreadable`, `relation.json_invalid`,
+  `relation.schema_version_unsupported`, `relation.structure_invalid`,
+  `relation.type_unsupported`, `relation.entity_missing`.
+
+La source reste textuelle, sans lien `/source`. Le sujet est le chemin source ou
+`relations[n]` si un index est disponible. Une relation interprétée à référence
+manquante reste dans le tableau. Aucun diagnostic ne modifie le graphe.
+`severity` et `code` sont structurés et exposés par les attributs DOM
+`data-diagnostic-severity` et `data-diagnostic-code` ; l’index éventuel est exposé
+par `data-diagnostic-relation-index`. Ces contrats préparent un futur ticket de
+filtres, sans filtrage dans cette version.

@@ -7,13 +7,19 @@
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if result %}
 <p>{{ result.entities|length }} entités — {{ result.relations|length }} relations interprétées</p>
-{% if result.errors or result.warnings %}
-<section aria-labelledby="entity-issues"><h2 id="entity-issues">Anomalies</h2><ul>
-{% for issue in result.errors + result.warnings %}
-<li data-code="{{ issue.code }}">{% if issue.source %}{{ issue.source.path }}{% if issue.source_index is not none %} — relations[{{ issue.source_index }}]{% endif %} : {% endif %}{{ issue.message }}</li>
+<section aria-labelledby="entity-diagnostics"><h2 id="entity-diagnostics">Diagnostics</h2>
+<p>{{ diagnostics.error_count }} erreur(s) — {{ diagnostics.warning_count }} avertissement(s) — {{ diagnostics.info_count }} information(s)</p>
+{% if diagnostics.items %}
+<ul>
+{% for diagnostic in diagnostics.items %}
+<li data-diagnostic-code="{{ diagnostic.code }}" data-diagnostic-severity="{{ diagnostic.severity }}"{% if diagnostic.relation_index is not none %} data-diagnostic-relation-index="{{ diagnostic.relation_index }}"{% endif %}>
+<strong>{{ {'error': 'Erreur', 'warning': 'Avertissement', 'info': 'Information'}[diagnostic.severity] }}</strong> — <code>{{ diagnostic.code }}</code> — {{ diagnostic.message }}
+{% if diagnostic.source or diagnostic.subject %}<p>{% if diagnostic.source %}{{ diagnostic.source.path }}{% endif %}{% if diagnostic.subject and (not diagnostic.source or diagnostic.subject != diagnostic.source.path) %}{% if diagnostic.source %} — {% endif %}{{ diagnostic.subject }}{% endif %}</p>{% endif %}
+</li>
 {% endfor %}
-</ul></section>
-{% endif %}
+</ul>
+{% else %}<p>Aucun diagnostic dans les informations disponibles.</p>{% endif %}
+</section>
 {% if entity_layout and entity_layout.nodes %}
 <section aria-labelledby="entity-graph-heading" data-entity-graph>
 <h2 id="entity-graph-heading">Graphe des entités</h2>

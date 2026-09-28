@@ -1023,3 +1023,34 @@ Le panneau utilise textContent et une liste de relations incidentes, sans JSON
 embarqué, réseau, stockage, modification de coordonnées ou modèle métier client.
 Bridge, Tool, EntityGraph et layout restent inchangés. Sans script, SVG et tableaux
 restent disponibles ; le script Route Explorer et la CSP restent inchangés.
+
+### Diagnostics Entity Explorer (FD-ENTITIES-005)
+
+Un seul appel à `EntityExplorerTool.run()` par GET `/entities` fournit le résultat
+aux deux projections indépendantes :
+
+```text
+EntitiesResult
+├→ build_entity_graph → EntityGraph → layout_entity_graph → SVG
+└→ build_entity_diagnostics → EntityDiagnostics → liste Diagnostics
+```
+
+`tools/entity_diagnostics.py` définit ses propres dataclasses gelées
+`EntityDiagnostic` et `EntityDiagnostics`, avec un tuple d’items et les compteurs
+error/warning/info. Le modèle Route Explorer porte `route_indices`, disponibilité
+des sources et consolidation des occurrences ; il n’est pas généralisé pour ce
+ticket. Aucun couplage entre domaines ni changement du Bridge, Tool ou registre.
+
+La projection conserve strictement code, message, source et source_index (devenu
+relation_index), sans lecture filesystem, JSON, appel Forge ou analyse métier.
+Le sujet est `relations[n]`, sinon le chemin source disponible. Les sévérités
+viennent des tuples errors et warnings, parcourus dans cet ordre, sans tri ni
+déduplication. Aucun diagnostic info artificiel, cycle, score ou verdict global.
+Les codes existants sont un contrat interne testé. Les données structurées et
+attributs DOM code/severity préparent les filtres futurs, sans en introduire.
+
+Le rendu serveur affiche les trois compteurs, une liste avec sévérités textuelles,
+codes, messages échappés et sources non navigables. Aucun aria-live de section,
+script ou route supplémentaire ; tableaux, graphe et interaction sont conservés.
+Sans résultat, aucun diagnostic n’est construit ; les erreurs globales du Tool
+suivent le traitement Web existant. Chaque GET relit les faits sans cache.

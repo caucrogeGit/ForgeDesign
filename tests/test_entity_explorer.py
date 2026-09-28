@@ -76,7 +76,7 @@ def test_http_entities_and_refresh(
             "255",
             "Timestamps",
             "Soft delete",
-            "Anomalies",
+            "Diagnostics",
             "mvc/entities/contact/contact.json",
         ):
             assert value in html
