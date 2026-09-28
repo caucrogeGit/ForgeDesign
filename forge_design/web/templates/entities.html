@@ -5,8 +5,16 @@
 <h1>Entity Explorer</h1>
 <p>Contrats JSON déclarés, en lecture seule. Les relations sont déclaratives ; la base de données n’est pas analysée.</p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<form method="get" action="/entities" class="route-filters" aria-label="Filtres des entités">
+<div><label for="entity-query">Recherche</label><input type="search" id="entity-query" name="q" maxlength="256" value="{{ filters.query or '' }}"></div>
+<div><label for="entity-type">Type</label><select id="entity-type" name="type">{% for value, label in [('all', 'Tous'), ('entity', 'Entités'), ('relation', 'Relations')] %}<option value="{{ value }}"{% if filters.item_type == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<div><label for="entity-relation">Type de relation</label><select id="entity-relation" name="relation">{% for value, label in [('all', 'Tous'), ('many_to_one', 'many_to_one'), ('many_to_many', 'many_to_many')] %}<option value="{{ value }}"{% if filters.relation_type == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<div><label for="entity-severity">Sévérité des diagnostics</label><select id="entity-severity" name="severity">{% for value, label in [('all', 'Toutes'), ('error', 'Erreurs'), ('warning', 'Avertissements'), ('info', 'Informations')] %}<option value="{{ value }}"{% if filters.severity == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<label class="filter-checkbox" for="entity-diagnostics-only"><input type="checkbox" id="entity-diagnostics-only" name="diagnostics" value="only"{% if filters.diagnostics_only %} checked{% endif %}> Uniquement avec diagnostics</label>
+<div class="filter-actions"><button type="submit">Filtrer</button> <a href="/entities">Réinitialiser</a></div>
+</form>
 {% if result %}
-<p>{{ result.entities|length }} entités — {{ result.relations|length }} relations interprétées</p>
+<p>{{ view.entities|length }} entités affichées sur {{ view.total_entities }} — {{ view.relations|length }} relations affichées sur {{ view.total_relations }}</p>
 <section aria-labelledby="entity-diagnostics"><h2 id="entity-diagnostics">Diagnostics</h2>
 <p>{{ diagnostics.error_count }} erreur(s) — {{ diagnostics.warning_count }} avertissement(s) — {{ diagnostics.info_count }} information(s)</p>
 {% if diagnostics.items %}
@@ -59,14 +67,15 @@
 </section>
 <script src="/entity-graph.js" defer></script>
 {% endif %}
-{% if result.entities %}
+{% if filters.item_type != 'relation' %}
+{% if view.entities %}
 <table>
 <thead><tr><th>Entité</th><th>Table</th><th>Champs</th><th>Timestamps</th><th>Soft delete</th></tr></thead>
-<tbody>{% for entity in result.entities %}
+<tbody>{% for entity in view.entities %}
 <tr><td>{{ entity.name }}</td><td>{{ entity.table }}</td><td>{{ entity.fields|length }}</td><td>{{ boolean(entity.timestamps) }}</td><td>{{ boolean(entity.soft_delete) }}</td></tr>
 {% endfor %}</tbody>
 </table>
-{% for entity in result.entities %}
+{% for entity in view.entities %}
 <details><summary>{{ entity.name }} — Champs</summary>
 <p>Source : {{ entity.source.path }}</p>
 <table><thead><tr><th>Champ</th><th>Type</th><th>Requis</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead>
@@ -80,12 +89,14 @@
 </td></tr>{% endfor %}</tbody></table>
 </details>
 {% endfor %}
-{% else %}<p>Aucune entité interprétable.</p>{% endif %}
+{% else %}<p>{{ 'Aucune entité ne correspond aux filtres.' if result.entities else 'Aucune entité interprétable.' }}</p>{% endif %}
+{% endif %}
+{% if filters.item_type != 'entity' %}
 <section aria-labelledby="relations-title">
 <h2 id="relations-title">Relations</h2>
-{% if result.relations %}
+{% if view.relations %}
 <table><thead><tr><th>Type</th><th>Source</th><th>Relation</th><th>Cible</th><th>Détails</th></tr></thead><tbody>
-{% for relation in result.relations %}
+{% for relation in view.relations %}
 <tr><td>{{ relation.type }}</td><td>{{ relation.from_entity }}</td><td>{{ relation.name }}</td><td>{{ relation.to_entity }}</td><td>
 <p>{{ relation.source.path }} — relations[{{ relation.source_index }}]</p>
 {% if relation.inverse_name is not none %}<p>Nom inverse : {{ relation.inverse_name }}</p>{% endif %}
@@ -111,8 +122,9 @@
 {% else %}
 {% set state = namespace(invalid=false) %}
 {% for issue in result.errors %}{% if issue.code.startswith('relation.') %}{% set state.invalid = true %}{% endif %}{% endfor %}
-<p>{{ 'Aucune relation interprétable.' if state.invalid else 'Aucune relation déclarée.' }}</p>
+<p>{{ 'Aucune relation ne correspond aux filtres.' if result.relations else ('Aucune relation interprétable.' if state.invalid else 'Aucune relation déclarée.') }}</p>
 {% endif %}
 </section>
+{% endif %}
 {% endif %}
 {% endblock %}

@@ -144,5 +144,47 @@ La source reste textuelle, sans lien `/source`. Le sujet est le chemin source ou
 manquante reste dans le tableau. Aucun diagnostic ne modifie le graphe.
 `severity` et `code` sont structurés et exposés par les attributs DOM
 `data-diagnostic-severity` et `data-diagnostic-code` ; l’index éventuel est exposé
-par `data-diagnostic-relation-index`. Ces contrats préparent un futur ticket de
-filtres, sans filtrage dans cette version.
+par `data-diagnostic-relation-index`. Le filtrage GET décrit ci-dessous utilise
+les diagnostics structurés côté serveur.
+
+## Filtres GET
+
+Le formulaire de `/entities` utilise uniquement GET. L’URL contient tout l’état :
+`q`, `type=all|entity|relation`, `relation=all|many_to_one|many_to_many`,
+`severity=all|error|warning|info` et `diagnostics=only` (ou `all`).
+Réinitialiser revient à `/entities`. Aucun cookie, stockage navigateur, session,
+contexte projet ou historique ne conserve les filtres.
+
+`q` est limité à 256 caractères avant normalisation, puis strip/casefold est
+appliqué. La recherche est une sous-chaîne Unicode, sans regex : nom/table et
+nom/type/references des champs d’entités ; extrémités, nom/inverse, clé étrangère,
+table/clés du pivot et nom/type/references des champs pivot pour les relations.
+Les valeurs normalisées restent visibles dans le formulaire.
+
+Les critères se combinent. `type=entity` masque les relations ; `type=relation`
+masque les tableaux et détails d’entités. Le type de relation ne restreint que
+les relations, pas les entités directement retenues. Le graphe ajoute les premières
+occurrences des extrémités nécessaires aux relations retenues, sans les ajouter
+aux tableaux d’entités ni aux compteurs. Les relations à extrémité absente restent
+dans le tableau ; aucun nœud absent n’est inventé. Les IDs sont locaux à chaque vue.
+
+Les diagnostics sont filtrés uniquement par sévérité, jamais par recherche ou type.
+Ils peuvent donc concerner un élément masqué. Les diagnostics globaux restent
+visibles. `severity` seul ne limite pas les éléments ; `diagnostics=only` retient
+ceux associés à un diagnostic de la sévérité demandée : égalité exacte de chemin
+source pour les entités, égalité de relation_index/source_index pour les relations.
+Aucune association par message ou nom métier. Les extrémités graphiques de support
+peuvent être sans diagnostic. Exemple :
+`/entities?q=article&relation=many_to_many&severity=error&diagnostics=only`.
+
+Les compteurs d’éléments comparent les tableaux filtrés à l’inventaire complet ;
+les compteurs de diagnostics concernent leur projection par sévérité. Ordres et
+occurrences sont conservés. Aucun résultat : message explicite ; aucun nœud :
+ni SVG ni script interactif. Chaque GET valide appelle le Tool une seule fois,
+sans lui transmettre les filtres, et conserve `Cache-Control: no-store`.
+
+Valeur invalide, paramètre inconnu, recherche trop longue ou répétition détectable :
+HTTP 400 avant appel Tool. Le parseur public Forge élimine les valeurs vides :
+`q=` équivaut à l’absence, `q=&q=Article` est une recherche unique, et deux valeurs
+non vides sont refusées. Cette convention s’applique à tous les paramètres.
+POST reste refusé. Aucun fichier projet ou de configuration n’est écrit par ces GET.

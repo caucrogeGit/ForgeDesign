@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from forge_design.forge.entities import EntitiesResult
+from forge_design.forge.entities import EntitiesResult, EntityInfo, RelationInfo
 
 
 @dataclass(frozen=True)
@@ -36,10 +36,17 @@ def build_entity_graph(result: EntitiesResult) -> EntityGraph:
     Les identifiants sont des positions typées, indépendantes des textes projet.
     Les relations dont une extrémité manque restent dans les diagnostics initiaux.
     """
+    return build_entity_graph_from_items(result.entities, result.relations)
+
+
+def build_entity_graph_from_items(
+    entities: tuple[EntityInfo, ...], relations: tuple[RelationInfo, ...]
+) -> EntityGraph:
+    """Même projection pour les tuples d'une vue filtrée, sans EntitiesResult fictif."""
     nodes: list[EntityGraphNode] = []
     edges: list[EntityGraphEdge] = []
     names: dict[str, str] = {}
-    for index, entity in enumerate(result.entities):
+    for index, entity in enumerate(entities):
         identity = f"entity:{index}"
         nodes.append(
             EntityGraphNode(
@@ -47,7 +54,7 @@ def build_entity_graph(result: EntitiesResult) -> EntityGraph:
             )
         )
         names.setdefault(entity.name, identity)
-    for index, relation in enumerate(result.relations):
+    for index, relation in enumerate(relations):
         source = names.get(relation.from_entity)
         target = names.get(relation.to_entity)
         if source is None or target is None:

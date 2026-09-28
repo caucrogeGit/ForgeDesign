@@ -1054,3 +1054,33 @@ codes, messages échappés et sources non navigables. Aucun aria-live de section
 script ou route supplémentaire ; tableaux, graphe et interaction sont conservés.
 Sans résultat, aucun diagnostic n’est construit ; les erreurs globales du Tool
 suivent le traitement Web existant. Chaque GET relit les faits sans cache.
+
+### Filtres Entity Explorer (FD-ENTITIES-006)
+
+```text
+GET /entities → parse_entity_filter → EntityFilter
+EntityExplorerTool.run(root) → EntitiesResult complet
+                            → build_entity_diagnostics → EntityDiagnostics complet
+(result, diagnostics, filters) → filter_entities → EntityFilteredView
+    ├→ entities / relations → tableaux et compteurs affichés / totaux
+    ├→ diagnostics → liste filtrée par sévérité seule
+    └→ graph_entities / relations → build_entity_graph_from_items → layout → SVG
+```
+
+EntityFilter et EntityFilteredView sont gelés, les collections exposées sont des
+tuples. Le filtre est pur : aucune lecture, JSON, validation Forge, requête ou
+écriture. Le résultat et les diagnostics bruts sont conservés. Les associations
+reposent sur source.path et relation_index/source_index, sans analyser les textes.
+Les diagnostics globaux ne sélectionnent aucun élément arbitraire.
+
+Le graphe conserve son algorithme ; une entrée par tuples a été extraite pour
+éviter un faux EntitiesResult filtré. Son API historique reste un wrapper compatible.
+Les graph_entities incluent les éléments directement retenus et les premières
+occurrences des extrémités nécessaires, dans l’ordre original. Les tableaux
+n’affichent que la sélection directe. Aucun masquage CSS/JS, aucun état persistant.
+
+La frontière Web valide les paramètres et refuse les valeurs invalides, inconnues,
+répétées non vides et q > MAX_FILTER_QUERY_LENGTH (256) en HTTP 400. Les valeurs
+vides éliminées par Request Forge sont considérées absentes ; cette limite de
+détection des répétitions est documentée et testée. Les erreurs sont traitées avant
+appel Tool. Route Explorer, Bridge, diagnostics bruts, registre et JS restent inchangés.
