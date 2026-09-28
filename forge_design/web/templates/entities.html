@@ -1,6 +1,9 @@
 {% extends "layout.html" %}
 {% block title %}Entity Explorer — Forge Design{% endblock %}
 {% macro boolean(value) %}{{ 'Oui' if value else 'Non' }}{% endmacro %}
+{% macro location(source) -%}
+{% if source %}{% if source_available(source) %}<a href="{{ source_url(source.path) }}">{{ source.path }}</a>{% else %}{{ source.path }}{% endif %}{% endif %}
+{%- endmacro %}
 {% block content %}
 <h1>Entity Explorer</h1>
 <p>Contrats JSON déclarés, en lecture seule. Les relations sont déclaratives ; la base de données n’est pas analysée.</p>
@@ -22,7 +25,7 @@
 {% for diagnostic in diagnostics.items %}
 <li data-diagnostic-code="{{ diagnostic.code }}" data-diagnostic-severity="{{ diagnostic.severity }}"{% if diagnostic.relation_index is not none %} data-diagnostic-relation-index="{{ diagnostic.relation_index }}"{% endif %}>
 <strong>{{ {'error': 'Erreur', 'warning': 'Avertissement', 'info': 'Information'}[diagnostic.severity] }}</strong> — <code>{{ diagnostic.code }}</code> — {{ diagnostic.message }}
-{% if diagnostic.source or diagnostic.subject %}<p>{% if diagnostic.source %}{{ diagnostic.source.path }}{% endif %}{% if diagnostic.subject and (not diagnostic.source or diagnostic.subject != diagnostic.source.path) %}{% if diagnostic.source %} — {% endif %}{{ diagnostic.subject }}{% endif %}</p>{% endif %}
+{% if diagnostic.source or diagnostic.subject %}<p>{% if diagnostic.source %}{{ location(diagnostic.source) }}{% endif %}{% if diagnostic.subject and (not diagnostic.source or diagnostic.subject != diagnostic.source.path) %}{% if diagnostic.source %} — {% endif %}{{ diagnostic.subject }}{% endif %}</p>{% endif %}
 </li>
 {% endfor %}
 </ul>
@@ -77,7 +80,7 @@
 </table>
 {% for entity in view.entities %}
 <details><summary>{{ entity.name }} — Champs</summary>
-<p>Source : {{ entity.source.path }}</p>
+<p>Source : {{ location(entity.source) }}</p>
 <table><thead><tr><th>Champ</th><th>Type</th><th>Requis</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead>
 <tbody>{% for field in entity.fields %}
 <tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.required) }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
@@ -98,7 +101,7 @@
 <table><thead><tr><th>Type</th><th>Source</th><th>Relation</th><th>Cible</th><th>Détails</th></tr></thead><tbody>
 {% for relation in view.relations %}
 <tr><td>{{ relation.type }}</td><td>{{ relation.from_entity }}</td><td>{{ relation.name }}</td><td>{{ relation.to_entity }}</td><td>
-<p>{{ relation.source.path }} — relations[{{ relation.source_index }}]</p>
+<p>{{ location(relation.source) }} — relations[{{ relation.source_index }}]</p>
 {% if relation.inverse_name is not none %}<p>Nom inverse : {{ relation.inverse_name }}</p>{% endif %}
 {% if relation.many_to_one %}{% set one = relation.many_to_one %}
 <p>Clé étrangère : {{ one.foreign_key }} — portée par {{ relation.from_entity }}</p>

@@ -98,7 +98,7 @@ def test_http_diagnostics(
             if a.get("aria-labelledby") == "entity-diagnostics"
         )
         assert "aria-live" not in section
-        assert "/source?" not in html and "<script>message" not in html
+        assert "/source?path=" in html and "<script>message" not in html
         assert "<script>source" not in html
         assert [a.get("src") for tag, a in document.tags if tag == "script"] == [
             "/entity-graph.js"

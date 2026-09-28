@@ -325,7 +325,7 @@ def test_relations_http(tmp_path: Path) -> None:
         assert table.index("many_to_one") < table.index("many_to_many")
         assert "&lt;script&gt;inverse" in html and "<script>" not in html
         assert '<a href="/entities" aria-current="page">' in html
-        assert "/source?" not in html and "<svg" in html
+        assert "/source?path=" in html and "<svg" in html
         assert call(app, "/routes")[0] == 200
         path.write_text("{")
         html = call(app, "/entities")[1]

@@ -18,6 +18,7 @@ from forge_design.tools.entity_graph import build_entity_graph_from_items
 from forge_design.web.entity_filters import parse_entity_filter
 from forge_design.web.entity_graph_layout import layout_entity_graph
 from forge_design.web.rendering import render_page
+from forge_design.web.source import source_available, source_url
 
 
 def show_entities(
@@ -54,6 +55,8 @@ def show_entities(
             "result": result,
             "view": view,
             "filters": filters,
+            "source_available": source_available,
+            "source_url": source_url,
             "error": error,
             "diagnostics": (view.diagnostics if view is not None else None),
             "entity_layout": (

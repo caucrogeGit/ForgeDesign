@@ -82,7 +82,7 @@ def test_http_entities_and_refresh(
             assert value in html
         assert '<a href="/entities" aria-current="page">' in html
         assert "&lt;script&gt;Contact" in html and "<script>" not in html
-        assert "/source?" not in html
+        assert "/source?path=" in html
         assert before == (target.read_bytes(), target.stat().st_mtime_ns)
         target.write_text("{")
         assert "Aucune entité interprétable." in call(app, "/entities")[1]

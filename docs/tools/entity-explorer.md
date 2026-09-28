@@ -38,15 +38,15 @@ atomique garanti. Le nombre d’entités n’est pas plafonné dans cette versio
 
 Aucun import du projet, lecture Python/SQL, commande Forge, connexion à une base,
 édition ou écriture. Les relations sont lues uniquement dans `relations.json`, sans recherche
-de fichiers supplémentaires. Aucun champ système implicite n’est inventé. Le chemin source est affiché en
-texte ; la politique `/source` reste inchangée.
+de fichiers supplémentaires. Aucun champ système implicite n’est inventé. Le chemin source est affiché en lien lorsque la politique `/source` l’autorise
+(voir Navigation source).
 
 ## Relations déclarées
 
 La section Relations présente many_to_one (la source porte la FK) et many_to_many
 (pivot avec ses clés source/cible et champs supplémentaires), dans l’ordre du
 document. Inverse_name est affiché seulement s’il existe. Source et index
-relations[n] identifient la déclaration, sans lien /source.
+relations[n] identifient la déclaration ; le lien source ouvre le fichier entier.
 
 Le document exige schema_version "1.0" et une liste relations. Fichier absent ou
 liste vide : aucune relation déclarée. Legacy et versions inconnues sont refusés.
@@ -139,7 +139,8 @@ aucune information artificielle n’est créée. Les codes stables sont :
   `relation.schema_version_unsupported`, `relation.structure_invalid`,
   `relation.type_unsupported`, `relation.entity_missing`.
 
-La source reste textuelle, sans lien `/source`. Le sujet est le chemin source ou
+La source autorisée devient un lien `/source` ; sinon elle reste textuelle.
+Le sujet est le chemin source ou
 `relations[n]` si un index est disponible. Une relation interprétée à référence
 manquante reste dans le tableau. Aucun diagnostic ne modifie le graphe.
 `severity` et `code` sont structurés et exposés par les attributs DOM
@@ -188,3 +189,29 @@ HTTP 400 avant appel Tool. Le parseur public Forge élimine les valeurs vides :
 `q=` équivaut à l’absence, `q=&q=Article` est une recherche unique, et deux valeurs
 non vides sont refusées. Cette convention s’applique à tous les paramètres.
 POST reste refusé. Aucun fichier projet ou de configuration n’est écrit par ces GET.
+
+
+## Navigation source
+
+Les sources d’entités, de relations et de diagnostics sont cliquables uniquement
+si la politique lexicale les autorise. Pour les contrats d’entités, seuls
+`mvc/entities/<snake>/<snake>.json` et `mvc/entities/relations.json` sont acceptés.
+Le nom de dossier suit `[a-z][a-z0-9]*(?:_[a-z0-9]+)*` et correspond exactement au
+nom du JSON. Traversal, chemins absolus, segments cachés/sensibles, fichiers Python,
+SQL et JSON non canoniques sont refusés. Les liens proviennent des SourceLocation
+existantes, sans reconstruire le chemin depuis le nom métier.
+
+La page `/source` affiche le texte brut UTF-8/BOM, au plus 1 Mio, avec numéros de
+ligne et échappement HTML. Un JSON invalide reste consultable depuis son diagnostic.
+Les sources non renseignées, dossiers ou refusées lexicalement ne deviennent pas des
+liens trompeurs ; une source autorisée mais disparue retourne 404 à l’ouverture.
+L’autorisation lexicale d’un lien ne garantit pas que le fichier existe ou soit
+lisible : la lecture vérifie alors tous les segments, refuse les symlinks et les
+fichiers non réguliers. Aucun parsing JSON, exécution ou écriture.
+
+Les liens Entity Explorer ouvrent le fichier entier sans paramètre line ni
+pseudo-ancre ; relations[n] reste une information textuelle à côté du lien.
+Le retour est déduit du chemin validé : Retour à Entity Explorer vers `/entities`,
+sans préserver les filtres. Aucun return_to fourni par le client n’est utilisé.
+Aucun formulaire de chemin, catalogue de fichiers ou navigation dossier n’est ajouté.
+Les nœuds du graphe conservent leur interaction locale.

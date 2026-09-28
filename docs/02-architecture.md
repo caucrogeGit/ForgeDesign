@@ -823,7 +823,8 @@ séparée read_project_source. Aucun appel Inspector/Route Explorer ni cache per
 Le diagnostic est un instantané ; la vue lit le fichier au moment de l’ouverture.
 
 La politique stricte accepte seulement les fichiers .py directement sous mvc/routes
-et mvc/controllers, et les fichiers sous mvc/views. Chemins absolus, segments vides,
+et mvc/controllers, les fichiers sous mvc/views et, depuis FD-ENTITIES-007,
+les seuls JSON canoniques d’entités décrits ci-dessous. Chemins absolus, segments vides,
 segments commençant par un point, antislashs, deux-points et NUL sont refusés, ainsi
 que les chemins dépassant 4096 caractères. Les noms sensibles sont exclus par la
 même politique que les templates analysés (voir présence des templates).
@@ -1084,3 +1085,29 @@ répétées non vides et q > MAX_FILTER_QUERY_LENGTH (256) en HTTP 400. Les vale
 vides éliminées par Request Forge sont considérées absentes ; cette limite de
 détection des répétitions est documentée et testée. Les erreurs sont traitées avant
 appel Tool. Route Explorer, Bridge, diagnostics bruts, registre et JS restent inchangés.
+
+
+### Navigation source Entity Explorer (FD-ENTITIES-007)
+
+`source_parts` reste l’unique autorité lexicale pour routes/controllers/views/entities.
+La branche entities accepte exactement `mvc/entities/relations.json` ou
+`mvc/entities/<snake>/<snake>.json`, avec nom lexical minuscule et correspondance
+exacte dossier/fichier. Les refus globaux (cachés, env, suffixes de secrets, préfixes
+SSH, segments vides, traversal, antislash, deux-points, NUL, longueur) restent actifs.
+Les règles routes/controllers (.py direct) et views (fichiers imbriqués) ne changent pas.
+
+`read_project_source` conserve openat, O_DIRECTORY/O_NOFOLLOW/O_NONBLOCK,
+fstat/samestat, limite 1 Mio et UTF-8/BOM. L’ancrage de la racine parcourt désormais
+aussi ses parents par descripteurs pour refuser un lien intermédiaire. Aucun JSON
+parsé : un contrat invalide reste une source textuelle lisible. Pas d’écriture.
+
+Le helper Web `source_available` utilise seulement source_parts, sans filesystem.
+Le template Entity Explorer affiche les sources autorisées via source_url(path),
+sans ligne artificielle ; les autres restent échappées en texte. Les chemins viennent
+directement des SourceLocation. Les diagnostics et filtres ne changent pas.
+
+/source déduit active_page du résultat validé de source_parts : entities mène à
+/entities, les trois espaces historiques à /routes. Chemin refusé : état neutre,
+sans retour arbitraire. Le lecteur valide à nouveau la même politique à sa frontière ;
+il n’existe pas de seconde politique de catégorisation. Aucun paramètre de retour,
+route, Tool, JavaScript ou contrôle de saisie libre ajouté.

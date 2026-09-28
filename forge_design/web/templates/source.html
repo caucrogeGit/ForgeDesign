@@ -2,7 +2,8 @@
 {% block title %}Source — Forge Design{% endblock %}
 {% block content %}
 <h1>Source en lecture seule</h1>
-<p><a href="/routes">Retour à Route Explorer</a></p>
+{% if active_page == 'entities' %}<p><a href="/entities">Retour à Entity Explorer</a></p>
+{% elif active_page == 'routes' %}<p><a href="/routes">Retour à Route Explorer</a></p>{% endif %}
 <p>{{ path }}</p>
 <p>Le diagnostic est un instantané. Cette vue lit le fichier au moment de l’ouverture.</p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}

@@ -1,6 +1,7 @@
 """Références relatives et lecture confinée des espaces source autorisés."""
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from stat import S_ISDIR, S_ISREG
@@ -18,6 +19,14 @@ class SourceReadError(ValueError):
     """Source refusée ou non lisible selon le contrat de la vue source."""
 
 
+def _is_entity_source(parts: tuple[str, ...]) -> bool:
+    return parts == ("mvc", "entities", "relations.json") or (
+        len(parts) == 4
+        and re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", parts[2]) is not None
+        and parts[3] == parts[2] + ".json"
+    )
+
+
 def source_parts(path: str) -> tuple[str, ...]:
     """Politique lexicale, sans normalisation ni consultation filesystem."""
     parts = tuple(path.split("/"))
@@ -25,7 +34,7 @@ def source_parts(path: str) -> tuple[str, ...]:
         len(path) > MAX_SOURCE_PATH_LENGTH
         or len(parts) < 3
         or parts[0] != "mvc"
-        or parts[1] not in {"routes", "controllers", "views"}
+        or parts[1] not in {"routes", "controllers", "views", "entities"}
         or any(not part or part.startswith(".") for part in parts)
         or any(
             part.casefold() == "env"
@@ -36,7 +45,11 @@ def source_parts(path: str) -> tuple[str, ...]:
             for part in parts
         )
         or any(c in path for c in ("\\", ":", "\x00"))
-        or (parts[1] != "views" and (len(parts) != 3 or not parts[-1].endswith(".py")))
+        or (
+            parts[1] in {"routes", "controllers"}
+            and (len(parts) != 3 or not parts[-1].endswith(".py"))
+        )
+        or (parts[1] == "entities" and not _is_entity_source(parts))
     ):
         raise SourceReadError("Chemin source refusé.")
     return parts
@@ -63,7 +76,14 @@ def read_project_source(root: Path, path: str) -> str:
     descriptors: list[int] = []
     try:
         directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-        descriptors.append(os.open(root, directory_flags))
+        # Ancrer aussi chaque parent de la racine : O_NOFOLLOW sur le seul
+        # chemin complet ne protège pas ses segments intermédiaires.
+        root_parts = root.absolute().parts
+        descriptors.append(os.open(root_parts[0], directory_flags))
+        for part in root_parts[1:]:
+            if part == "..":
+                raise SourceReadError("Racine source non canonique.")
+            descriptors.append(os.open(part, directory_flags, dir_fd=descriptors[-1]))
         for part in parts[:-1]:
             descriptor = os.open(part, directory_flags, dir_fd=descriptors[-1])
             descriptors.append(descriptor)
