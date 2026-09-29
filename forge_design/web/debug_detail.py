@@ -16,6 +16,8 @@ from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.limits import MAX_DEBUG_LINE_BYTES
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.debug_detail import find_debug_event
+from forge_design.tools.debug_flow import build_debug_flow
+from forge_design.web.debug_flow_layout import layout_debug_flow
 from forge_design.web.rendering import render_page
 
 
@@ -81,6 +83,9 @@ def show_debug_detail(
             "active_page": "debug",
             "current_project": context.inspection,
             "event": event,
+            "flow_layout": layout_debug_flow(build_debug_flow(event))
+            if event is not None
+            else None,
             "error": error,
             "truncated": result.truncated
             if isinstance(result, DebugErrorsResult)

@@ -178,3 +178,33 @@ L’URL est le seul état de sélection. Un append conserve normalement le coupl
 une rotation/réécriture peut rendre le lien obsolète et produire 404. Si le même
 couple ligne/id est réutilisé, le détail montre les données de la lecture actuelle :
 ce couple n’est pas un identifiant immuable de contenu ou de fichier.
+
+## Flux runtime statique (FD-DEBUG-004)
+
+Le détail affiche après le résumé un SVG des étapes structurées connues, dans
+l’ordre conceptuel request → router → controller → sql → template. Les étapes
+absentes sont sautées ; chaque étape présente est reliée à la suivante. Ce schéma
+n’est pas une trace d’exécution ni une preuve d’appel entre ces composants.
+
+Une request présente crée Requête, avec seulement méthode et chemin disponibles.
+Une request vide reste un nœud Requête sans détail, sans inventer GET ou /.
+Route, Contrôleur, SQL et Template exigent leur propriété textuelle renseignée ;
+None et chaîne vide ne créent pas ces étapes. SQL indique seulement « Requête
+disponible », jamais la requête intégrale, même dans le title. La query HTTP ne
+figure pas dans le graphe. Model et Response ne sont pas créés : le contrat actuel
+ne les décrit pas. Category, exception, hint, location et frames ne permettent
+aucune inférence, même si une frame mentionne mvc/models.
+
+Les rectangles 220 × 90 sont espacés de 80 pixels, dans un conteneur défilant.
+Les détails visuels sont limités à 24 caractères avec ellipse ; les textes complets
+restent dans les sections existantes et dans les title des nœuds hors SQL.
+Le modèle logique et les données d’origine ne sont pas tronqués. Le SVG porte
+role=img, titre et description référencés ; les types sont explicitement écrits.
+Les flèches ont un marker local. Sans étape, aucun SVG : « Aucun flux structuré
+disponible pour cet événement. »
+
+Aucune interaction métier, sélection, zoom, pan, JavaScript ou nouvelle lecture.
+La construction et le layout sont des fonctions pures déterministes depuis le
+DebugError sélectionné. Les détails textuels restent tous accessibles ; les pages
+400/404/409 ne construisent aucun graphe. Les limites du masquage du Bridge restent
+applicables ; aucune valeur brute supplémentaire n’est récupérée.

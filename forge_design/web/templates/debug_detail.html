@@ -21,6 +21,25 @@
 </dl>
 <p>Cette propriété appartient au contrat Forge. Forge Design applique malgré tout son masquage défensif.</p>
 </section>
+<section aria-labelledby="debug-flow-heading"><h2 id="debug-flow-heading">Flux runtime</h2>
+{% if flow_layout and flow_layout.nodes %}
+<p>Étapes renseignées dans le journal, reliées dans leur ordre conceptuel. Ce schéma ne constitue pas une trace d’exécution.</p>
+<div class="debug-flow-scroll" tabindex="0" aria-label="Flux runtime défilant">
+<svg class="debug-flow" role="img" aria-labelledby="debug-flow-title debug-flow-description" viewBox="0 0 {{ flow_layout.width }} {{ flow_layout.height }}" width="{{ flow_layout.width }}" height="{{ flow_layout.height }}">
+<title id="debug-flow-title">Flux des étapes runtime connues</title>
+<desc id="debug-flow-description">Seules les informations présentes dans le journal Forge sont représentées, dans un ordre conceptuel de gauche à droite.</desc>
+<defs><marker id="debug-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
+{% for item in flow_layout.edges %}<path class="debug-flow-edge" data-source-id="{{ item.edge.source }}" data-target-id="{{ item.edge.target }}" d="M {{ item.x1 }} {{ item.y1 }} L {{ item.x2 }} {{ item.y2 }}" marker-end="url(#debug-flow-arrow)" />{% endfor %}
+{% for item in flow_layout.nodes %}
+<g id="{{ item.node.id }}" class="debug-flow-node debug-flow-node-{{ item.node.kind }}" data-node-kind="{{ item.node.kind }}">
+<title>{{ item.node.label }}{% if item.node.detail %} — {{ item.node.detail }}{% endif %}</title>
+<rect x="{{ item.x }}" y="{{ item.y }}" width="{{ item.width }}" height="{{ item.height }}" rx="5" />
+<text x="{{ item.x + 12 }}" y="{{ item.y + 28 }}">{{ item.node.label }}</text>
+<text class="debug-flow-detail" x="{{ item.x + 12 }}" y="{{ item.y + 58 }}">{{ item.detail }}</text>
+</g>{% endfor %}
+</svg></div>
+{% else %}<p>Aucun flux structuré disponible pour cet événement.</p>{% endif %}
+</section>
 <section aria-labelledby="debug-request"><h2 id="debug-request">Requête HTTP</h2>
 {% if event.request %}<dl>
 <dt>Méthode</dt><dd>{{ event.request.method or '—' }}</dd>

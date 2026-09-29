@@ -1187,3 +1187,20 @@ Il n’expose pas de JSONL original ni de représentation automatique de l’obj
 Les liens de liste sont construits par urlencode ; les chemins de frames restent
 du texte. Navigation Debug Center active, no-store, retour fixe /debug, aucun JS.
 Bridge, redaction, filtres et Tool demeurent inchangés ; quatre Tools seulement.
+
+### Flux runtime du détail Debug Center
+
+Le même DebugError sélectionné alimente indépendamment le détail textuel et
+`tools/debug_flow.build_debug_flow` → DebugFlow →
+`web/debug_flow_layout.layout_debug_flow` → SVG Jinja statique.
+Les dataclasses logiques et géométriques sont gelées, les collections en tuples.
+IDs fixes par type ; arêtes entre étapes renseignées successives seulement.
+Le layout horizontal ne relit pas le projet et ne connaît ni Tool ni Request.
+Les labels longs sont raccourcis exclusivement dans la projection géométrique.
+
+Request/route/controller/sql/template sont les seules propriétés sources. Aucun
+Model/Response inféré depuis une catégorie, une exception ou une frame. SQL n’est
+pas copié dans le flux, qui porte uniquement une mention de disponibilité. Ce
+schéma est conceptuel, sans prétendre reconstruire un historique d’exécution.
+Aucune route, dépendance, interaction ou Tool ajouté ; unique appel debug-center
+inchangé. Le SVG est serveur, accessible, échappé, sans JavaScript ou asset externe.

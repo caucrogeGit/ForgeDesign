@@ -83,3 +83,13 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .entity-node:focus-visible rect { stroke-width: 4; stroke-dasharray: 4 3; }
 .entity-graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .entity-graph-details dd { margin-bottom: .75rem; }
+
+/* Debug Center : étapes connues, sans interaction métier. */
+.debug-flow-scroll { overflow: auto; }
+.debug-flow-scroll:focus-visible { outline: 2px solid currentColor; }
+.debug-flow { display: block; max-width: none; }
+.debug-flow-node rect { fill: #fff; stroke: #526477; stroke-width: 2; }
+.debug-flow-node text { fill: currentColor; font: 14px system-ui, sans-serif; }
+.debug-flow-node .debug-flow-detail { font: 12px monospace; }
+.debug-flow-edge { fill: none; stroke: #526477; stroke-width: 2; }
+.debug-flow marker path { fill: #526477; }
