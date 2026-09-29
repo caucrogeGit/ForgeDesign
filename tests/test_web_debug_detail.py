@@ -15,7 +15,7 @@ from test_web_recent_projects import call, project, running
 from forge_design.current_project import CurrentProjectContext
 from forge_design.forge.debug_errors import DebugErrorsResult, read_debug_errors
 from forge_design.forge.project_version import NotForgeProjectError
-from forge_design.limits import MAX_DEBUG_LINE_BYTES
+from forge_design.limits import MAX_DEBUG_EVENT_ID_LENGTH
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.recent_projects import RecentProjects
 from forge_design.tools.debug_center import DebugCenterTool
@@ -83,14 +83,14 @@ def test_parser_bounds_and_unchanged_id() -> None:
     assert (
         len(
             debug_detail.parse_debug_detail(
-                request("line=1&id=" + "x" * MAX_DEBUG_LINE_BYTES)
+                request("line=1&id=" + "x" * MAX_DEBUG_EVENT_ID_LENGTH)
             )[1]
         )
-        == MAX_DEBUG_LINE_BYTES
+        == MAX_DEBUG_EVENT_ID_LENGTH
     )
     with pytest.raises(ValueError):
         debug_detail.parse_debug_detail(
-            request("line=1&id=" + "x" * (MAX_DEBUG_LINE_BYTES + 1))
+            request("line=1&id=" + "x" * (MAX_DEBUG_EVENT_ID_LENGTH + 1))
         )
 
 
@@ -249,7 +249,7 @@ def test_tool_errors_and_no_raw_access(
 
     monkeypatch.setattr(DebugCenterTool, "run", fail)
     response = debug_detail.show_debug_detail(request("line=1&id=x"), context, registry)
-    assert response.status == 200  # Same project-error policy as the list.
+    assert response.status == 409  # Same unavailable-project policy as the list.
 
     def wrong(self: DebugCenterTool, root: Path) -> str:
         return "wrong type"

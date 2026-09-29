@@ -34,6 +34,10 @@ ignorées. Les champs obligatoires manquants ne reçoivent pas de valeur invent�
 | MAX_DEBUG_EVENTS | 2000 | Tableau synchrone de taille bornée |
 | MAX_DEBUG_LINE_BYTES | 64 Kio | Événement avec traceback, sans accumulation illimitée |
 | MAX_DEBUG_SCAN_BYTES | 8 Mio | Arrêt même avec uniquement des lignes invalides ou vides |
+| MAX_DEBUG_ISSUES | 2000 | Plafond total, diagnostic final inclus |
+| MAX_DEBUG_TRACEBACK_FRAMES | 256 | Pile structurée raisonnable par événement |
+| MAX_DEBUG_POST_KEYS | 256 | Noms de formulaire par événement |
+| MAX_DEBUG_HEADERS | 128 | Noms d’en-têtes par événement |
 
 La lecture binaire commence au début, dans l’ordre physique. La taille d’une ligne
 inclut son éventuel terminateur et le BOM initial. Les lignes vides sont ignorées,
@@ -48,7 +52,12 @@ n’est pas interprété : sa fin ne peut pas être établie dans ce budget.
 Les premiers événements seulement sont donc disponibles pour un gros journal.
 Le budget porte sur les octets consommés par le lecteur ; le flux utilise le petit
 buffer binaire standard de Python. La mémoire des objets Python et diagnostics
-s’ajoute aux octets JSON ; les lignes invalides peuvent produire de nombreux diagnostics.
+s’ajoute aux octets JSON. Le lecteur s’arrête après 1999 diagnostics individuels,
+réservant la dernière place de MAX_DEBUG_ISSUES à un unique analysis_truncated.
+Le résultat ne dépasse donc jamais 2000 issues, diagnostic global compris.
+Une collection interne trop grande invalide la ligne (structure_invalid), puis
+la lecture continue : aucun événement partiel n’est fabriqué, truncated reste
+réservé aux arrêts globaux par borne. Le décodage JSON reste borné par 64 Kio.
 
 Codes : `debug.unreadable`, `debug.line_too_long`, `debug.json_invalid`,
 `debug.schema_version_unsupported`, `debug.structure_invalid`,
@@ -62,8 +71,10 @@ une erreur locale.
 `redact_debug_text` masque les affectations explicites password/passwd/pwd/secret,
 token/access_token/refresh_token/api_key/apikey, authorization/cookie/set-cookie,
 sans distinction de casse, avec `=` ou `:` et valeurs éventuellement citées.
-Authorization: Bearer et les headers Cookie/Set-Cookie sont masqués jusqu’à la fin
-de ligne ; une query masque les paramètres sensibles et conserve les autres.
+Authorization avec : ou = (y compris Bearer) et les headers Cookie/Set-Cookie sont masqués jusqu’à la fin
+de ligne ; les valeurs citées inachevées sont également masquées jusqu’à la fin
+physique de ligne. Une query ordinaire masque les paramètres sensibles et conserve
+les autres ; la forme header peut masquer conservativement tout le reste.
 Le SQL reçoit ce masquage textuel, sans analyse SQL. Aucun double brut des textes
 masqués n’est conservé dans le modèle public. Les chemins et fonctions des frames
 restent des textes bornés sans masquage générique.
@@ -80,8 +91,8 @@ stat/fstat après ouverture. Les FIFO, sockets, devices et symlinks sont refusé
 Aucun instantané global n’est garanti : un fichier ouvert peut encore être modifié
 par un autre processus. `/source` n’autorise pas le journal.
 
-La page utilise uniquement le modèle masqué, échappé par Jinja. Elle n’affiche ni
-JSONL original brut. Le détail explicite les propriétés du modèle masqué. Aucun JS,
+La page utilise uniquement le modèle masqué, échappé par Jinja. Elle n’affiche pas
+le JSONL original brut. Le détail explicite les propriétés du modèle masqué. Aucun JS,
 polling, surveillance filesystem, SSE ou WebSocket. Une modification externe est
 visible lors du prochain GET, dans les bornes ci-dessus.
 
@@ -157,17 +168,20 @@ Les chemins restent textuels ; aucune nouvelle navigation source.
 
 Les paramètres sont validés avant le Tool : line est décimal ASCII positif sur
 au plus neuf chiffres, comme /source ; id est non vide, conservé exactement, au
-plus MAX_DEBUG_LINE_BYTES (65536) caractères, réutilisant la borne textuelle
-existante plutôt qu’une regex de format. Les limites de longueur d’URL du serveur
-HTTP ou navigateur peuvent être plus faibles pour des IDs extrêmes ou encodés.
+plus MAX_DEBUG_EVENT_ID_LENGTH (256) caractères Unicode. Cette borne Web est
+indépendante des octets du JSONL : au pire 3072 caractères percent-encodés pour
+256 emoji, plus le petit préfixe et le numéro de ligne. Aucun format d’ID imposé.
+Le Bridge conserve les IDs plus longs ; la liste n’offre pas de lien pour ceux-ci,
+puisque le parser les refuserait. La limite n’est pas une promesse universelle
+sur les restrictions des intermédiaires HTTP.
 Un ID vide, accepté historiquement par le Bridge, reste visible dans la liste
 mais n’a pas de lien de détail, puisque l’URL exige un ID non vide.
 
 Clés inconnues présentes et répétitions non vides donnent 400. Les valeurs vides
 sont éliminées par Request, comme pour la liste. Paramètres invalides : 400 sans
 Tool ; paramètres valides sans projet : 409 ; couple absent après lecture : 404.
-Les erreurs de racine/projet suivent la politique existante de la liste (message
-d’erreur sous 200), sans être requalifiées en événement absent. Type de retour
+Les erreurs de racine/projet suivent la même politique sur liste et détail (message
+d’erreur sous 409 sur les deux pages), sans être requalifiées en événement absent. Type de retour
 Tool incorrect : erreur de programmation explicite. 200/400/404/409 sont no-store,
 POST reste 405. Une lecture partielle est signalée même sur une 404 ; le détail
 ne contourne jamais la fenêtre du Bridge pour chercher une ligne plus loin.
@@ -208,3 +222,34 @@ La construction et le layout sont des fonctions pures déterministes depuis le
 DebugError sélectionné. Les détails textuels restent tous accessibles ; les pages
 400/404/409 ne construisent aucun graphe. Les limites du masquage du Bridge restent
 applicables ; aucune valeur brute supplémentaire n’est récupérée.
+
+
+## Contrats stabilisés (FD-DEBUG-005)
+
+Les APIs read_debug_errors, redact_debug_text, filter_debug_events,
+find_debug_event (line_number/event_id nommés), build_debug_flow et
+layout_debug_flow conservent leurs signatures. Modèles gelés et tuples inchangés.
+DEBUG_SCHEMA_VERSION, DEBUG_LEVELS et DEBUG_CATEGORIES sont définis dans le module
+neutre forge/debug_contract.py ; la projection ajoute seulement le choix all.
+Les six codes d’issue restent inchangés. Les types de flux model/response sont
+réservés dans le modèle, jamais produits avec DebugError v1.0.
+
+Le masquage des textes requis est conservé après revue : schema_version, level et
+category canoniques sont inchangés ; timestamp ISO, environment et exception_type
+canoniques ne contiennent pas d’affectation sensible. Les textes arbitraires dans
+ces champs et id restent protégés. Deux IDs contenant des secrets différents
+peuvent devenir identiques après masquage ; la sélection porte sur l’ID **public
+masqué** et la ligne, ce qui conserve la distinction entre occurrences. Aucune
+identité brute parallèle n’est stockée ou exposée. La recherche ne retrouve pas
+les secrets retirés. Les dates arbitraires restent non interprétables pour le tri.
+
+Chaînes vides, NUL et contrôles ASCII restent acceptés par le Bridge sous sa borne
+UTF-8 : aucune nouvelle restriction arbitraire. Ces textes ne constituent pas du
+HTML, et les liens sont encodés. Leur affichage peut varier selon le navigateur.
+Le graphe n’effectue aucune interprétation d’URL ou de style depuis ces valeurs.
+
+Sans projet, la liste reste une page de navigation 200 et le détail une ressource
+nécessitant un projet (409). Un projet devenu invalide/disparu/non résoluble donne
+409 sur les deux pages. Un couple absent après lecture valide donne 404. Erreurs
+GET contrôlées 200/400/404/409 : no-store. Les erreurs de programmation inattendues
+restent gérées par Forge, sans nouveau contrat 5xx spécifique au Debug Center.

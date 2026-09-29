@@ -1204,3 +1204,21 @@ pas copié dans le flux, qui porte uniquement une mention de disponibilité. Ce
 schéma est conceptuel, sans prétendre reconstruire un historique d’exécution.
 Aucune route, dépendance, interaction ou Tool ajouté ; unique appel debug-center
 inchangé. Le SVG est serveur, accessible, échappé, sans JavaScript ou asset externe.
+
+
+### Bornes et contrats stabilisés du Debug Center
+
+Le module neutre forge/debug_contract.py définit une seule version de schéma et
+les niveaux/catégories réutilisés par le Bridge et la projection (choix all ajouté).
+limits.py borne aussi les issues (2000, dernier emplacement réservé à la troncature),
+frames (256), noms POST (256), noms headers (128), et l’ID Web (256 caractères).
+Les collections trop grandes invalident la ligne sans produire un événement partiel.
+Les signatures et modèles publics restent inchangés, aucun index/cache ajouté.
+
+Les textes structurants canoniques ne sont pas altérés par le masquage ; le choix
+de masquer les IDs arbitraires sensibles est conservé, la ligne distinguant les
+collisions d’ID public. Les liens de détail ne sont produits que pour un ID public
+non vide dans la borne Web. Erreurs projet : 409 sur liste et détail ; absence de
+projet : liste 200, détail 409 ; occurrence absente après lecture : 404. La politique
+no-store des routes reste inchangée. La redaction traite également les headers avec
+= et les valeurs citées non refermées ; elle reste défensive et non exhaustive.

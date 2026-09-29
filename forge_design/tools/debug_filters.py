@@ -3,22 +3,12 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from forge_design.forge.debug_contract import DEBUG_CATEGORIES, DEBUG_LEVELS
 from forge_design.forge.debug_errors import DebugError, DebugErrorsResult, DebugIssue
 from forge_design.limits import MAX_FILTER_QUERY_LENGTH
 
-LEVELS = ("all", "ERROR", "WARNING", "INFO", "CRITICAL")
-CATEGORIES = (
-    "all",
-    "runtime",
-    "controller",
-    "routing",
-    "template",
-    "database",
-    "configuration",
-    "http",
-    "unknown",
-)
-
+LEVELS = ("all",) + DEBUG_LEVELS
+CATEGORIES = ("all",) + DEBUG_CATEGORIES
 
 @dataclass(frozen=True)
 class DebugFilter:

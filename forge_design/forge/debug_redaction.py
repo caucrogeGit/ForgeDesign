@@ -8,10 +8,11 @@ _KEYS = (
 )
 _ASSIGNMENT = re.compile(
     rf"""(?i)(?<![\w-])((?:{_KEYS})["']?\s*[:=]\s*)"""
-    r"""(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s&,;"'<>]+)"""
+    # Une valeur citée inachevée reste sensible jusqu’à la fin de ligne.
+    r"""(?:"(?:\\.|[^"\\\r\n])*"?|'(?:\\.|[^'\\\r\n])*'?|[^\s&,;"'<>]+)"""
 )
 _HEADER = re.compile(
-    r"(?im)(?<![\w-])((?:authorization|cookie|set-cookie)\s*:\s*)[^\r\n]+"
+    r"""(?im)(?<![\w-])((?:authorization|cookie|set-cookie)["']?\s*[:=]\s*)[^\r\n]+"""
 )
 
 

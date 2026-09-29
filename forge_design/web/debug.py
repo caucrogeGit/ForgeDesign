@@ -44,9 +44,10 @@ def show_debug(
             ProjectRootResolutionError,
             NotForgeProjectError,
         ) as exc:
-            error = str(exc)
-        if result is not None and not isinstance(result, DebugErrorsResult):
-            raise TypeError("debug-center doit retourner DebugErrorsResult.")
+            error, status = str(exc), 409
+        else:
+            if not isinstance(result, DebugErrorsResult):
+                raise TypeError("debug-center doit retourner DebugErrorsResult.")
     return render_page(
         "debug.html",
         {

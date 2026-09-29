@@ -8,6 +8,11 @@ from pathlib import Path
 from stat import S_ISDIR, S_ISREG
 from typing import BinaryIO, cast
 
+from forge_design.forge.debug_contract import (
+    DEBUG_CATEGORIES,
+    DEBUG_LEVELS,
+    DEBUG_SCHEMA_VERSION,
+)
 from forge_design.forge.debug_redaction import redact_debug_text
 from forge_design.forge.filesystem import open_directory
 from forge_design.forge.project_detection import detect_forge_project
@@ -15,8 +20,12 @@ from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.limits import (
     MAX_DEBUG_EVENTS,
+    MAX_DEBUG_HEADERS,
+    MAX_DEBUG_ISSUES,
     MAX_DEBUG_LINE_BYTES,
+    MAX_DEBUG_POST_KEYS,
     MAX_DEBUG_SCAN_BYTES,
+    MAX_DEBUG_TRACEBACK_FRAMES,
 )
 
 
@@ -97,10 +106,13 @@ def _optional(data: dict[str, object], key: str) -> str | None:
     return redact_debug_text(_text(data[key])) if key in data else None
 
 
-def _list(value: object) -> list[object]:
+def _list(value: object, limit: int) -> list[object]:
     if not isinstance(value, list):
         raise ValueError
-    return cast(list[object], value)
+    values = cast(list[object], value)
+    if len(values) > limit:
+        raise ValueError
+    return values
 
 
 def _frame(value: object) -> DebugFrame:
@@ -123,18 +135,9 @@ def _event(data: dict[str, object], number: int) -> DebugError:
         "message",
     )
     texts = {key: redact_debug_text(_text(data.get(key))) for key in required}
-    if texts["level"] not in {"ERROR", "WARNING", "INFO", "CRITICAL"}:
+    if texts["level"] not in DEBUG_LEVELS:
         raise ValueError
-    if texts["category"] not in {
-        "runtime",
-        "controller",
-        "routing",
-        "template",
-        "database",
-        "configuration",
-        "http",
-        "unknown",
-    }:
+    if texts["category"] not in DEBUG_CATEGORIES:
         raise ValueError
     safe = data.get("safe_for_display")
     if not isinstance(safe, bool):
@@ -146,8 +149,14 @@ def _event(data: dict[str, object], number: int) -> DebugError:
             _optional(req, "method"),
             _optional(req, "path"),
             _optional(req, "query"),
-            tuple(redact_debug_text(_text(v)) for v in _list(req.get("post_keys", []))),
-            tuple(redact_debug_text(_text(v)) for v in _list(req.get("headers", []))),
+            tuple(
+                redact_debug_text(_text(v))
+                for v in _list(req.get("post_keys", []), MAX_DEBUG_POST_KEYS)
+            ),
+            tuple(
+                redact_debug_text(_text(v))
+                for v in _list(req.get("headers", []), MAX_DEBUG_HEADERS)
+            ),
         )
     location = None
     if "location" in data:
@@ -159,7 +168,10 @@ def _event(data: dict[str, object], number: int) -> DebugError:
         line_number=number,
         request=request,
         location=location,
-        traceback=tuple(_frame(v) for v in _list(data.get("traceback", []))),
+        traceback=tuple(
+            _frame(v)
+            for v in _list(data.get("traceback", []), MAX_DEBUG_TRACEBACK_FRAMES)
+        ),
         hint=_optional(data, "hint"),
         route=_optional(data, "route"),
         controller=_optional(data, "controller"),
@@ -179,7 +191,12 @@ def _scan(stream: BinaryIO) -> DebugErrorsResult:
     scanned = number = 0
     truncated = False
     try:
-        while scanned < MAX_DEBUG_SCAN_BYTES and len(events) < MAX_DEBUG_EVENTS:
+        # Réserver un emplacement pour l’unique diagnostic de troncature.
+        while (
+            scanned < MAX_DEBUG_SCAN_BYTES
+            and len(events) < MAX_DEBUG_EVENTS
+            and len(issues) < MAX_DEBUG_ISSUES - 1
+        ):
             raw = stream.readline(
                 min(MAX_DEBUG_LINE_BYTES + 1, MAX_DEBUG_SCAN_BYTES - scanned)
             )
@@ -219,7 +236,7 @@ def _scan(stream: BinaryIO) -> DebugErrorsResult:
             try:
                 data = _object(value)
                 version = _text(data.get("schema_version"))
-                if version != "1.0":
+                if version != DEBUG_SCHEMA_VERSION:
                     issues.append(
                         DebugIssue(
                             "debug.schema_version_unsupported",
@@ -245,6 +262,9 @@ def _scan(stream: BinaryIO) -> DebugErrorsResult:
                 "debug.unreadable", "Lecture du journal interrompue.", number + 1
             )
         )
+    if len(issues) >= MAX_DEBUG_ISSUES:
+        issues = issues[: MAX_DEBUG_ISSUES - 1]
+        truncated = True
     if truncated:
         issues.append(
             DebugIssue("debug.analysis_truncated", "Limite de lecture atteinte.")

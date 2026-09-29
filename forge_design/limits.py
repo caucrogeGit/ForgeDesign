@@ -18,3 +18,11 @@ MAX_ENTITY_PIVOT_FIELDS = 64
 MAX_DEBUG_EVENTS = 2000
 MAX_DEBUG_LINE_BYTES = 64 * 1024
 MAX_DEBUG_SCAN_BYTES = 8 * 1024 * 1024
+
+# Diagnostic final inclus ; collections invalidées sans découpage silencieux.
+MAX_DEBUG_ISSUES = 2000
+MAX_DEBUG_TRACEBACK_FRAMES = 256
+MAX_DEBUG_POST_KEYS = 256
+MAX_DEBUG_HEADERS = 128
+# Caractères Unicode ; jusqu’à 3072 octets de percent-encoding pour 256 emoji.
+MAX_DEBUG_EVENT_ID_LENGTH = 256

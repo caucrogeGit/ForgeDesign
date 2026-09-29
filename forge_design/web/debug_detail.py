@@ -13,7 +13,7 @@ from forge_design.forge.project_root import (
     ProjectRootResolutionError,
 )
 from forge_design.forge.project_version import NotForgeProjectError
-from forge_design.limits import MAX_DEBUG_LINE_BYTES
+from forge_design.limits import MAX_DEBUG_EVENT_ID_LENGTH
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.debug_detail import find_debug_event
 from forge_design.tools.debug_flow import build_debug_flow
@@ -21,7 +21,9 @@ from forge_design.web.debug_flow_layout import layout_debug_flow
 from forge_design.web.rendering import render_page
 
 
-def debug_event_url(event: DebugError) -> str:
+def debug_event_url(event: DebugError) -> str | None:
+    if not event.id or len(event.id) > MAX_DEBUG_EVENT_ID_LENGTH:
+        return None
     return "/debug/event?" + urlencode({"line": event.line_number, "id": event.id})
 
 
@@ -36,8 +38,8 @@ def parse_debug_detail(request: Request) -> tuple[int, str]:
     # Même politique numérique que /source ; Request élimine les valeurs vides.
     if not line.isascii() or not line.isdigit() or len(line) > 9 or int(line) < 1:
         raise ValueError("Numéro de ligne invalide.")
-    # Borne textuelle existante du Bridge, sans regex ni normalisation de l’id.
-    if not event_id or len(event_id) > MAX_DEBUG_LINE_BYTES:
+    # Borne Web en caractères, sans regex ni normalisation de l’id.
+    if not event_id or len(event_id) > MAX_DEBUG_EVENT_ID_LENGTH:
         raise ValueError("Identifiant absent ou trop long.")
     return int(line), event_id
 
@@ -65,8 +67,8 @@ def show_debug_detail(
                 ProjectRootResolutionError,
                 NotForgeProjectError,
             ) as exc:
-                # Même politique d’erreur de projet que la liste, jamais une 404 métier.
-                error = str(exc)
+                # Contexte projet devenu inutilisable, comme pour la liste.
+                error, status = str(exc), 409
             else:
                 if not isinstance(result, DebugErrorsResult):
                     raise TypeError("debug-center doit retourner DebugErrorsResult.")
