@@ -1245,7 +1245,8 @@ L'inventaire ancre les dossiers via `forge/filesystem.open_directory`, vérifie
 leur identité et celle des fichiers ordinaires ouverts sans en lire le contenu.
 Les métadonnées du détail proviennent du descripteur courant ; une modification
 size/mtime/ctime pendant la lecture est refusée. Toutes les sources sont échappées,
-y compris HTML et Jinja hostiles. Aucun parsing ou rendu du contenu cible.
+y compris HTML et Jinja hostiles. La lecture brute ne parse ni ne rend le contenu
+cible ; la projection structurelle ci-dessous intervient ensuite en mémoire.
 
 Les limites centrales sont 512 fichiers, 4096 entrées globales (exclusions incluses)
 et 32 niveaux sous views ; elles sont distinctes du suivi de références de Route
@@ -1259,3 +1260,32 @@ navigation `templates`. Projet devenu invalide : 409 ; chemin refusé : 400 ;
 template absent : 404 ; source devenue illisible/liée/remplacée : 409. Le parser
 utilise les valeurs non vides de Request comme les autres nouvelles pages.
 Voir [Template Viewer](tools/template-viewer.md) pour les bornes, APIs et limites.
+
+
+### Analyse structurelle des templates
+
+```text
+TemplateSource.text → analyze_template_structure → TemplateStructure
+                                                   ├─ syntax
+                                                   ├─ dependencies
+                                                   ├─ blocks
+                                                   └─ html_elements
+```
+
+`forge/template_structure.py` est pur, sans filesystem, source reader, routes,
+contrôleurs ou Web. Ses primitives de parsing Jinja sans loader et de références
+sont partagées avec `forge/routes.py`, qui conserve ses modèles publics,
+présence/syntaxe, caches locaux, graphe transitif, cycles et limites historiques.
+Seuls les adaptateurs des primitives changent côté Routes.
+
+Le Viewer ajoute un précontrôle lexical (32768 tokens), relève 512 références et
+512 blocks maximum, puis masque lexicalement Jinja pour HTMLParser. Le relevé HTML
+plat tag/line/depth est borné à 4096 éléments. Éléments vides, fermetures tolérantes,
+raw, chaînes et commentaires sont pris en compte sans rendu. Source invalide ou
+limites donnent des issues explicites et un résultat partiel, jamais un verdict
+HTML. Les modèles sont immuables ; le texte brut reste intact et visible.
+
+La page détail effectue une lecture sécurisée puis une analyse mémoire. Elle
+présente syntaxe, dépendances, blocks et liste HTML indentée, sans navigation de
+références ni UI arbre. Toujours cinq Tools, aucun nouvel endpoint, JavaScript ou
+accès aux fichiers dépendants. Voir les limites du [Template Viewer](tools/template-viewer.md).

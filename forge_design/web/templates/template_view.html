@@ -12,5 +12,29 @@
 </dl>
 <p>Contenu brut en lecture seule, sans interprétation HTML ou Jinja.</p>
 <pre class="source-code"><code>{{ source.text }}</code></pre>
+{% if structure %}
+<section aria-labelledby="structure-title">
+<h2 id="structure-title">Structure détectée</h2>
+{% if structure.syntax.status == 'valid' %}<p>Syntaxe Jinja analysable.</p>
+{% elif structure.syntax.status == 'invalid' %}<p>Syntaxe Jinja invalide à la ligne {{ structure.syntax.line }}.</p>
+{% else %}<p>Syntaxe Jinja non analysée : limite de complexité.</p>{% endif %}
+{% if structure.partial %}<p>Analyse partielle.</p>{% endif %}
+{% if structure.issues %}<ul>{% for issue in structure.issues %}<li><code>{{ issue.code }}</code> : {{ issue.message }}</li>{% endfor %}</ul>{% endif %}
+<h3>Dépendances déclarées</h3>
+{% if structure.dependencies %}
+<table><thead><tr><th scope="col">Type</th><th scope="col">Template</th><th scope="col">Ligne</th></tr></thead><tbody>
+{% for reference in structure.dependencies %}<tr><td>{{ reference.kind }}</td><td>{% if reference.dynamic %}Référence dynamique{% else %}{{ reference.path }}{% endif %}</td><td>{{ reference.line }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Aucune dépendance relevée.</p>{% endif %}
+<h3>Blocks</h3>
+{% if structure.blocks %}<ul>{% for block in structure.blocks %}<li>{{ block.name }} — ligne {{ block.line }}</li>{% endfor %}</ul>
+{% else %}<p>Aucun block relevé.</p>{% endif %}
+<h3>Structure HTML légère</h3>
+<p>Balises déclarées, sans validation HTML ni exécution des branches Jinja. Indentation visuelle limitée à 32 niveaux ; profondeur exacte indiquée.</p>
+<pre class="source-code">{% for element in structure.html_elements %}{{ '  ' * ([element.depth, 32]|min) }}{{ element.tag }} — ligne {{ element.line }}, profondeur {{ element.depth }}
+{% else %}Aucune balise relevée.
+{% endfor %}</pre>
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}

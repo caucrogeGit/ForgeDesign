@@ -14,6 +14,7 @@ from forge_design.forge.project_root import (
 )
 from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.forge.source import SourceReadError, source_parts
+from forge_design.forge.template_structure import analyze_template_structure
 from forge_design.forge.templates import TemplatesResult, read_template_source
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.web.rendering import render_page
@@ -101,6 +102,9 @@ def show_template(request: Request, context: CurrentProjectContext) -> Response:
             "active_page": "templates",
             "current_project": context.inspection,
             "source": source,
+            "structure": analyze_template_structure(source.text)
+            if source is not None
+            else None,
             "error": error,
             "modified_date": modified_date,
         },

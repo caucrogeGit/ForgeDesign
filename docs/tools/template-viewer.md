@@ -1,9 +1,10 @@
 # Template Viewer
 
-Template Viewer v1 liste uniquement les fichiers physiques de `mvc/views/` du
+Template Viewer liste uniquement les fichiers physiques de `mvc/views/` du
 projet Forge ouvert. Il expose leur chemin relatif, taille en octets et date de
-modification, puis leur contenu brut en lecture seule. Aucun import du projet,
-parsing HTML/Jinja, rendu, prévisualisation, édition ou génération n'est effectué.
+modification, puis leur contenu brut et une analyse structurelle légère en lecture
+seule. Aucun import du projet, rendu, prévisualisation, édition ou génération
+n'est effectué.
 La coloration est reportée ; aucun JavaScript ni dépendance n'est ajouté.
 
 ## Utilisation
@@ -102,3 +103,80 @@ Les templates fournis exclusivement par les loaders d'opt-in ne sont pas inclus.
 Aucun loader d'opt-in n'est instancié ou exécuté. Un template local surchargeant un
 opt-in apparaît normalement parce qu'il existe dans `mvc/views/`, sans analyse de
 cette relation. `mvc/templates/` n'est pas une source canonique Forge actuelle.
+
+
+## Structure détectée (FD-TEMPLATE-002)
+
+Le détail conserve la source intégrale et affiche en dessous une projection pure :
+`TemplateSource.text → analyze_template_structure(source) → TemplateStructure`.
+Une seule lecture de fichier par GET, puis analyse en mémoire. Aucun changement
+au Tool d'inventaire, au registre de cinq Tools ou aux URLs.
+
+`TemplateStructure` expose syntax, dependencies, blocks, html_elements, issues,
+partial et truncated. Tous les modèles sont gelés et les collections sont des
+tuples. Les numéros de ligne commencent à 1 ; la profondeur HTML commence à 0.
+
+### Jinja
+
+Le parser partagé avec Route Explorer est `Environment(loader=None).parse`.
+Il ne compile ni ne rend le template, ne charge aucun opt-in et ne résout aucun
+fichier. Les états sont `valid` (syntaxe analysable), `invalid` (ligne et message
+borné à 240 caractères), `unreadable` (complexité dépassée). Il ne s'agit jamais
+d'un verdict de validité du template ou du HTML.
+
+Les références extends/include/import/from-import sont conservées par ligne et
+ordre d'apparition. Les listes include entièrement littérales produisent une
+référence par chemin ; liste vide ou mixte produit une seule référence dynamique,
+comme Route Explorer. Variables et expressions ne sont pas évaluées. Un chemin
+référencé absent reste une déclaration syntaxique, sans diagnostic de présence.
+Les blocks imbriqués et doublons sont conservés ; macros et variables ne sont pas
+inventoriées. Les balises écrites dans les macros peuvent apparaître dans le relevé
+HTML, sans prédire où ni combien de fois la macro serait rendue.
+
+### HTML léger
+
+Un masque lexical remplace les zones `{{ ... }}`, `{% ... %}` et `{# ... #}` par
+des espaces en conservant CR/LF et la longueur de la copie. Il reconnaît chaînes,
+échappements et délimiteurs imbriqués ; les marqueurs raw/endraw sont masqués,
+leur contenu reste littéral. Une zone Jinja non terminée masque le reste et donne
+une analyse partielle. La source originale reste intacte.
+
+HTMLParser relève seulement tag/line/depth. Il normalise les noms en minuscules,
+ignore les attributs, commentaires et doctype. Les éléments vides HTML et les
+balises XHTML autofermantes ne poussent pas durablement la pile. Une fermeture
+correspondante dépile jusqu'à son ouverture ; une fermeture inconnue est ignorée.
+Script et style sont des nœuds, leur contenu n'est pas analysé comme HTML.
+
+Ce relevé tolérant n'est pas un DOM HTML5 et ne corrige pas les fermetures implicites.
+Les branches Jinja sont simplement juxtaposées, sans logique métier ou simulation
+du rendu. Les cas ambigus de mélange de langages peuvent donc donner une hiérarchie
+approximative. La liste textuelle est indentée jusqu'à 32 niveaux pour borner sa
+largeur, avec profondeur exacte toujours indiquée. Aucun arbre interactif, graphe,
+pliage, sélection ou lien entre templates.
+
+### Analyse partielle et bornes
+
+| Constante | Valeur |
+|---|---:|
+| MAX_TEMPLATE_STRUCTURE_NODES | 4096 éléments HTML |
+| MAX_TEMPLATE_REFERENCES | 512 références |
+| MAX_TEMPLATE_BLOCKS | 512 blocks |
+| MAX_TEMPLATE_JINJA_TOKENS | 32768 tokens lexicaux avant AST |
+
+La source filesystem reste limitée à 1 Mio. L'API pure refuse également les chaînes
+synthétiques dépassant 1 048 576 caractères. Le précontrôle lexical limite les
+objets AST avant parsing ; il n'est pas un budget exact d'octets Python. Le lexer
+et les valeurs textuelles restent proportionnels à la source. RecursionError et
+les limites de conversion des littéraux numériques sont contrôlés dans le Viewer.
+
+Une limite exactement remplie ne tronque pas ; le premier surplus interrompt
+l'accumulation concernée et produit `template.structure_truncated`. Les autres
+volets peuvent rester disponibles. Jinja invalide produit `template.syntax_invalid`
+et un relevé HTML indépendant marqué `template.html_partial`. Un masque inachevé
+ou une erreur HTML contrôlée marque également ce relevé partiel. `partial=True`
+accompagne tout résultat incomplet. Les messages ne constituent pas une validation
+HTML et aucun diagnostic de dépendance absente n'est produit.
+
+Un fichier lisible avec Jinja invalide garde HTTP 200 et sa source brute visible.
+Les valeurs de structure sont échappées dans l'UI. Aucun rendu, accès fichier
+supplémentaire, écriture, cache, loader ou JavaScript n'est ajouté.

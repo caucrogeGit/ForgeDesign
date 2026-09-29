@@ -10,7 +10,7 @@ from pathlib import Path
 from stat import S_ISDIR, S_ISREG
 from typing import Literal
 
-from jinja2 import Environment, TemplateSyntaxError, nodes
+from jinja2 import nodes
 
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
@@ -22,10 +22,13 @@ from forge_design.forge.source import (
     template_source,
 )
 from forge_design.forge.template_cycles import TemplateCycle, detect_template_cycles
+from forge_design.forge.template_structure import (
+    iter_template_references,
+    parse_template,
+)
 from forge_design.limits import (
     MAX_ROUTE_BRANCHES,
     MAX_SOURCE_BYTES,
-    MAX_SYNTAX_MESSAGE_LENGTH,
     MAX_TEMPLATE_DEPTH,
     MAX_VISITED_TEMPLATES,
 )
@@ -344,45 +347,10 @@ def _template_presence(root: Path, reference: str) -> TemplatePresenceStatus:
 
 
 def _template_dependencies(tree: nodes.Template) -> tuple[TemplateDependency, ...]:
-    dependencies: list[TemplateDependency] = []
-    pending: list[nodes.Node] = [tree]
-    while pending:
-        node = pending.pop()
-        kind: TemplateDependencyKind | None = None
-        if isinstance(node, nodes.Extends):
-            kind = "extends"
-        elif isinstance(node, nodes.Include):
-            kind = "include"
-        elif isinstance(node, nodes.Import):
-            kind = "import"
-        elif isinstance(node, nodes.FromImport):
-            kind = "from-import"
-        if kind is not None and isinstance(
-            node, (nodes.Extends, nodes.Include, nodes.Import, nodes.FromImport)
-        ):
-            expression = node.template
-            candidates = (
-                expression.items
-                if isinstance(node, nodes.Include)
-                and isinstance(expression, nodes.List)
-                else [expression]
-            )
-            paths: list[str] = []
-            for candidate in candidates:
-                if not isinstance(candidate, nodes.Const) or not isinstance(
-                    candidate.value, str
-                ):
-                    break
-                paths.append(candidate.value)
-            if paths and len(paths) == len(candidates):
-                dependencies.extend(
-                    TemplateDependency(kind, path, False, node.lineno) for path in paths
-                )
-            else:
-                dependencies.append(TemplateDependency(kind, None, True, node.lineno))
-        pending.extend(reversed(list(node.iter_child_nodes())))
-    # Tri stable : ordre lexical, y compris branches et occurrences sur une même ligne.
-    return tuple(sorted(dependencies, key=lambda dependency: dependency.line))
+    return tuple(
+        TemplateDependency(item.kind, item.path, item.dynamic, item.line)
+        for item in sorted(iter_template_references(tree), key=lambda item: item.line)
+    )
 
 
 def _template_syntax(
@@ -393,21 +361,11 @@ def _template_syntax(
         source = _read_source(root / "mvc/views" / template.path)
     except (RoutesSourceMissingError, RoutesSourceUnreadableError):
         return replace(template, syntax="unreadable"), None
-    try:
-        # Pas de loader, extension, compilation, contexte ou rendu.
-        tree = Environment(loader=None).parse(source)
-    except TemplateSyntaxError as error:
-        return replace(
-            template,
-            syntax="invalid",
-            syntax_line=error.lineno,
-            syntax_message=" ".join(
-                (error.message or "Syntaxe Jinja invalide.").split()
-            )[:MAX_SYNTAX_MESSAGE_LENGTH],
-        ), None
-    except RecursionError:
-        return replace(template, syntax="unreadable"), None
-    return replace(template, syntax="valid"), tree
+    syntax, tree = parse_template(source)
+    return replace(
+        template, syntax=syntax.status, syntax_line=syntax.line,
+        syntax_message=syntax.message,
+    ), tree
 
 
 def _with_template_presence(
