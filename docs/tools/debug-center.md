@@ -81,7 +81,7 @@ Aucun instantané global n’est garanti : un fichier ouvert peut encore être m
 par un autre processus. `/source` n’autorise pas le journal.
 
 La page utilise uniquement le modèle masqué, échappé par Jinja. Elle n’affiche ni
-JSON brut, requête détaillée, SQL, traceback ou détail. Aucun JS,
+JSONL original brut. Le détail explicite les propriétés du modèle masqué. Aucun JS,
 polling, surveillance filesystem, SSE ou WebSocket. Une modification externe est
 visible lors du prochain GET, dans les bornes ci-dessus.
 
@@ -134,4 +134,47 @@ texte est absent ou vide. Messages complets, niveaux textuels et labels explicit
 réutilisent le style existant. Les lignes portent data-event-id et data-event-line,
 échappés par Jinja. L’id peut être dupliqué ; le numéro physique identifie seulement
 une occurrence dans la lecture courante, sans promesse de stabilité après rotation
-ou réécriture du journal. Aucun lien de détail n’est créé à ce stade.
+ou réécriture du journal. La colonne Détail donne accès à l’occurrence courante.
+
+
+## Détail d’une occurrence (FD-DEBUG-003)
+
+La colonne Détail propose « Voir », avec un libellé accessible comprenant le type
+d’exception. L’URL `/debug/event?line=42&id=...` est construite par urlencode.
+Le serveur relit le journal une seule fois via DebugCenterTool, puis sélectionne
+l’égalité exacte de line_number **et** id dans le résultat. Aucun accès direct au
+JSONL, lecture hors borne, cache ou nouveau Tool. Les doublons d’id sont conservés
+et ouvrables distinctement par leur numéro de ligne.
+
+Le détail présente résumé (identité, niveau, catégorie, type, message, timestamp,
+environment), requête HTTP (méthode/chemin/query masquée, noms POST et headers),
+contexte Forge (route/contrôleur/template/correlation_id), localisation, traceback
+dans l’ordre Forge, piste fournie par Forge et SQL masqué. Les absences sont
+explicites ; aucun conseil n’est généré. safe_for_display est informatif et ne
+masque pas le message développeur. Les propriétés sont rendues explicitement par
+Jinja, sans repr/asdict/JSON original et sans second masquage dans le Web.
+Les chemins restent textuels ; aucune nouvelle navigation source.
+
+Les paramètres sont validés avant le Tool : line est décimal ASCII positif sur
+au plus neuf chiffres, comme /source ; id est non vide, conservé exactement, au
+plus MAX_DEBUG_LINE_BYTES (65536) caractères, réutilisant la borne textuelle
+existante plutôt qu’une regex de format. Les limites de longueur d’URL du serveur
+HTTP ou navigateur peuvent être plus faibles pour des IDs extrêmes ou encodés.
+Un ID vide, accepté historiquement par le Bridge, reste visible dans la liste
+mais n’a pas de lien de détail, puisque l’URL exige un ID non vide.
+
+Clés inconnues présentes et répétitions non vides donnent 400. Les valeurs vides
+sont éliminées par Request, comme pour la liste. Paramètres invalides : 400 sans
+Tool ; paramètres valides sans projet : 409 ; couple absent après lecture : 404.
+Les erreurs de racine/projet suivent la politique existante de la liste (message
+d’erreur sous 200), sans être requalifiées en événement absent. Type de retour
+Tool incorrect : erreur de programmation explicite. 200/400/404/409 sont no-store,
+POST reste 405. Une lecture partielle est signalée même sur une 404 ; le détail
+ne contourne jamais la fenêtre du Bridge pour chercher une ligne plus loin.
+
+Le lien « Retour au Debug Center » revient à /debug, sans conserver les filtres
+et sans return_to client. Aucun formulaire de filtre ou JavaScript dans le détail.
+L’URL est le seul état de sélection. Un append conserve normalement le couple ;
+une rotation/réécriture peut rendre le lien obsolète et produire 404. Si le même
+couple ligne/id est réutilisé, le détail montre les données de la lecture actuelle :
+ce couple n’est pas un identifiant immuable de contenu ou de fichier.

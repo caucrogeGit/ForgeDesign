@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block title %}Détail de l’erreur — Debug Center{% endblock %}
+{% block content %}
+<h1>Détail de l’erreur — Debug Center</h1>
+<p><a href="/debug">Retour au Debug Center</a></p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if truncated %}<p>Lecture partielle du journal.</p>{% endif %}
+{% if event %}
+<article data-event-id="{{ event.id }}" data-event-line="{{ event.line_number }}">
+<section aria-labelledby="debug-summary"><h2 id="debug-summary">Résumé</h2>
+<dl>
+<dt>Niveau</dt><dd>{{ event.level }}</dd>
+<dt>Catégorie</dt><dd>{{ event.category }}</dd>
+<dt>Type d’exception</dt><dd>{{ event.exception_type }}</dd>
+<dt>Message</dt><dd>{{ event.message }}</dd>
+<dt>Timestamp</dt><dd>{{ event.timestamp }}</dd>
+<dt>ID</dt><dd>{{ event.id }}</dd>
+<dt>Ligne du journal</dt><dd>{{ event.line_number }}</dd>
+<dt>Environment</dt><dd>{{ event.environment }}</dd>
+<dt>Affichable côté application</dt><dd>{{ 'Oui' if event.safe_for_display else 'Non' }}</dd>
+</dl>
+<p>Cette propriété appartient au contrat Forge. Forge Design applique malgré tout son masquage défensif.</p>
+</section>
+<section aria-labelledby="debug-request"><h2 id="debug-request">Requête HTTP</h2>
+{% if event.request %}<dl>
+<dt>Méthode</dt><dd>{{ event.request.method or '—' }}</dd>
+<dt>Chemin</dt><dd>{{ event.request.path or '—' }}</dd>
+<dt>Query</dt><dd>{{ event.request.query or '—' }}</dd>
+<dt>Clés POST (noms uniquement)</dt><dd>{% if event.request.post_keys %}<ul>{% for key in event.request.post_keys %}<li>{{ key }}</li>{% endfor %}</ul>{% else %}—{% endif %}</dd>
+<dt>Headers (noms uniquement)</dt><dd>{% if event.request.headers %}<ul>{% for name in event.request.headers %}<li>{{ name }}</li>{% endfor %}</ul>{% else %}—{% endif %}</dd>
+</dl>{% else %}<p>Aucune information de requête disponible.</p>{% endif %}
+</section>
+<section aria-labelledby="debug-context"><h2 id="debug-context">Contexte Forge</h2>
+<dl><dt>Route</dt><dd>{{ event.route or '—' }}</dd>
+<dt>Contrôleur</dt><dd>{{ event.controller or '—' }}</dd>
+<dt>Template</dt><dd>{{ event.template or '—' }}</dd>
+<dt>Correlation ID</dt><dd>{{ event.correlation_id or '—' }}</dd></dl>
+</section>
+<section aria-labelledby="debug-location"><h2 id="debug-location">Localisation</h2>
+{% if event.location %}<dl>
+<dt>Fichier</dt><dd>{{ event.location.file }}</dd>
+<dt>Ligne</dt><dd>{{ event.location.line }}</dd>
+<dt>Fonction</dt><dd>{{ event.location.function }}</dd>
+</dl>{% else %}<p>Aucune localisation disponible.</p>{% endif %}
+</section>
+<section aria-labelledby="debug-traceback"><h2 id="debug-traceback">Traceback</h2>
+{% if event.traceback %}
+<table><thead><tr><th scope="col">#</th><th scope="col">Fichier</th><th scope="col">Ligne</th><th scope="col">Fonction</th></tr></thead>
+<tbody>{% for frame in event.traceback %}<tr><td>{{ loop.index }}</td><td>{{ frame.file }}</td><td>{{ frame.line }}</td><td>{{ frame.function }}</td></tr>{% endfor %}</tbody></table>
+{% else %}<p>Aucune traceback structurée disponible.</p>{% endif %}
+</section>
+{% if event.hint is not none %}<section aria-labelledby="debug-hint"><h2 id="debug-hint">Piste Forge</h2><p>{{ event.hint }}</p></section>{% endif %}
+{% if event.sql is not none %}<section aria-labelledby="debug-sql"><h2 id="debug-sql">SQL</h2><pre class="source-code"><code>{{ event.sql }}</code></pre></section>{% endif %}
+</article>
+{% endif %}
+{% endblock %}

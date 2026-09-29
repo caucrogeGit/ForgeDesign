@@ -19,6 +19,7 @@ from forge_design.tools.debug_filters import (
     DebugFilter,
     filter_debug_events,
 )
+from forge_design.web.debug_detail import debug_event_url
 from forge_design.web.debug_filters import parse_debug_filters
 from forge_design.web.rendering import render_page
 
@@ -56,6 +57,7 @@ def show_debug(
             "filters": filters,
             "levels": LEVELS,
             "categories": CATEGORIES,
+            "debug_event_url": debug_event_url,
             "query_limit": MAX_FILTER_QUERY_LENGTH,
             "view": filter_debug_events(result, filters)
             if result is not None

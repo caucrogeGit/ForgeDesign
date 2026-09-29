@@ -15,6 +15,7 @@ from forge_design.current_project import CurrentProjectContext
 from forge_design.project_selector import ProjectSelector
 from forge_design.recent_projects import RecentProjects
 from forge_design.web.debug import show_debug
+from forge_design.web.debug_detail import show_debug_detail
 from forge_design.web.entities import show_entities
 from forge_design.web.inspector import (
     inspect_submission,
@@ -88,6 +89,9 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     def debug(request: Request) -> Response:
         return show_debug(request, context, registry)
 
+    def debug_detail(request: Request) -> Response:
+        return show_debug_detail(request, context, registry)
+
     def source(request: Request) -> Response:
         return show_source(request, context)
 
@@ -130,6 +134,7 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     router.add("GET", "/routes", routes, public=True, no_store=True)
     router.add("GET", "/entities", entities, public=True, no_store=True)
     router.add("GET", "/debug", debug, public=True, no_store=True)
+    router.add("GET", "/debug/event", debug_detail, public=True, no_store=True)
     router.add("GET", "/source", source, public=True, no_store=True)
     return Application(router, api_routes_module=None)
 

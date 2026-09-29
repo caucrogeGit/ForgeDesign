@@ -1170,4 +1170,20 @@ recherche sur les textes masqués sélectionnés, filtres niveau/catégorie exac
 Les issues restent intégrales et les totaux portent sur le résultat lu.
 Le Bridge conserve l’ordre physique, le Tool ne reçoit aucun filtre et le contexte
 n’en conserve aucun. Le template serveur réutilise les styles de formulaires et
-prépare id + ligne dans le DOM sans route de détail ni JavaScript.
+expose id + ligne dans le DOM, sans JavaScript.
+
+
+### Détail Debug Center
+
+`GET /debug/event` valide line/id avant le Tool, puis effectue un seul appel
+`registry.get("debug-center").run(root)`. `tools/debug_detail.find_debug_event`
+sélectionne purement le couple exact dans DebugErrorsResult ; coût O(n), aucun
+filesystem, JSON ou état persistant. La route ne cherche jamais au-delà du résultat
+borné du Bridge. Absence de couple : 404 ; absence de projet : 409.
+
+Le template debug_detail.html énumère explicitement les propriétés publiques déjà
+masquées : résumé, requête, contexte, localisation, traceback ordonnée, hint et SQL.
+Il n’expose pas de JSONL original ni de représentation automatique de l’objet.
+Les liens de liste sont construits par urlencode ; les chemins de frames restent
+du texte. Navigation Debug Center active, no-store, retour fixe /debug, aucun JS.
+Bridge, redaction, filtres et Tool demeurent inchangés ; quatre Tools seulement.

@@ -160,7 +160,7 @@ def test_dom_xss_partial_and_reread(
         document = SvgDocument()
         document.feed(html)
         assert any(a.get("data-event-id") == hostile for _, a in document.tags)
-        assert html.count("&lt;script&gt;") == 4
+        assert html.count("&lt;script&gt;") == 5
         html = call(
             app,
             "/debug?"

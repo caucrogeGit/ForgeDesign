@@ -15,8 +15,8 @@
 {% if result.truncated %}<p>Lecture partielle du journal.</p>{% endif %}
 {% if view.events %}
 <table>
-  <thead><tr><th scope="col">Date</th><th scope="col">Niveau</th><th scope="col">Catégorie</th><th scope="col">Type</th><th scope="col">Route</th><th scope="col">Message</th></tr></thead>
-  <tbody>{% for event in view.events %}<tr data-event-id="{{ event.id }}" data-event-line="{{ event.line_number }}"><td>{{ event.timestamp }}</td><td>{{ event.level }}</td><td>{{ event.category }}</td><td>{{ event.exception_type }}</td><td>{{ event.route or (event.request.path if event.request else none) or '—' }}</td><td>{{ event.message }}</td></tr>{% endfor %}</tbody>
+  <thead><tr><th scope="col">Date</th><th scope="col">Niveau</th><th scope="col">Catégorie</th><th scope="col">Type</th><th scope="col">Route</th><th scope="col">Message</th><th scope="col">Détail</th></tr></thead>
+  <tbody>{% for event in view.events %}<tr data-event-id="{{ event.id }}" data-event-line="{{ event.line_number }}"><td>{{ event.timestamp }}</td><td>{{ event.level }}</td><td>{{ event.category }}</td><td>{{ event.exception_type }}</td><td>{{ event.route or (event.request.path if event.request else none) or '—' }}</td><td>{{ event.message }}</td><td>{% if event.id %}<a href="{{ debug_event_url(event) }}" aria-label="Voir le détail de {{ event.exception_type }}">Voir</a>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
 </table>
 {% elif view.total_events %}<p>Aucun événement ne correspond aux filtres.</p>
 {% elif not view.issues %}<p>Aucune erreur runtime enregistrée.</p>{% endif %}
