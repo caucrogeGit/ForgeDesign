@@ -177,6 +177,7 @@ def test_package_declaration_and_unchanged_tools() -> None:
         "packaging>=24.0",
         "forge-mvc==1.0.0rc9",
         "jinja2==3.1.6",
+        "pydantic>=2,<3",
     ]
     assert [tool.id for tool in create_tool_registry().list()] == [
         "project-inspector",

@@ -1382,3 +1382,24 @@ La suite prévue est JSON Schema → Pydantic (FD-CONTRACT-002) → lecteur file
 et actions → Route Explorer restent des perspectives, sans implémentation ici.
 Aucun nouveau Tool, route Web ou accès projet ; cinq Tools inchangés.
 Voir le [contrat de vue](contracts/view-contract.md), ses exemples et limites.
+
+
+### Modèles de contrats — FD-CONTRACT-002
+
+```text
+JSON Schema normatif inchangé
+        ↓ contraintes concordantes
+Modèles Pydantic v2 stricts (dict / JSON en mémoire)
+        ↓
+FD-CONTRACT-003 : lecteur filesystem futur
+```
+
+`contracts/models.py` expose ViewContract, ViewContextVariable, ViewAction et
+ViewValueType via le package contracts. Types stricts et extra=forbid, attributs
+frozen ; dicts imbriqués ordinaires, sans garantie d'immuabilité profonde.
+Absence représentée par None interne, null fourni refusé ; export conforme avec
+exclude_unset=True. Le schéma généré est comparé au normatif sans annotations
+éditoriales ; aucune modification du format pour faciliter les modèles.
+Pydantic est déclaré en dépendance runtime, sans jsonschema. Validation en mémoire
+seulement, erreurs Pydantic localisées, aucune lecture projet ou validation croisée.
+Cinq Tools inchangés ; aucun Web, JavaScript ou comportement d'explorateur modifié.

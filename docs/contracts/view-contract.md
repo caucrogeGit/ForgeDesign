@@ -154,8 +154,61 @@ Modèles Pydantic — FD-CONTRACT-002
 Lecteur filesystem sécurisé — FD-CONTRACT-003
 ```
 
-La validation complète des instances sera exercée avec les modèles au ticket 002.
+La validation des instances en mémoire est maintenant assurée par les modèles
+du ticket 002 décrits ci-dessous.
 Le scan des contrats et les garanties filesystem appartiennent au ticket 003.
 L'affichage, la comparaison aux templates, les croisements template/entités/actions,
 le rendu et la génération restent futurs. Aucun contrat n'est chargé comme tel par
 l'application actuelle ; Template Viewer garde son inventaire générique de fichiers.
+
+
+## Modèles Python — FD-CONTRACT-002
+
+Pydantic v2 (`pydantic>=2,<3`) fournit la validation en mémoire. Le schéma JSON
+packagé reste normatif et inchangé ; les modèles ne lisent aucun fichier projet.
+API exportée : `ViewContract`, `ViewContextVariable`, `ViewAction`, `ViewValueType`.
+Le vocabulaire Literal reste string/boolean/integer/number/object/list.
+
+```python
+from forge_design.contracts import ViewContract
+
+data = {"name": "home/index", "template": "mvc/views/home/index.html", "context": {}}
+contract = ViewContract.model_validate(data)
+contract = ViewContract.model_validate_json(text)  # JSON déjà disponible en mémoire
+payload = contract.model_dump(exclude_unset=True)
+text = contract.model_dump_json(exclude_unset=True)
+```
+
+Mode strict, propriétés inconnues refusées, aucune coercition volontaire : `1`
+ou `"true"` ne deviennent pas un booléen CSRF, et un nombre ne devient pas un label.
+Noms, espaces, Unicode et chemins ne sont ni normalisés ni nettoyés. Les clés des
+objets context/actions/fields et les valeurs de fields doivent être des chaînes
+non vides ; espace, tiret ou emoji sont permis. Aucun contrôle croisé métier.
+
+Les attributs facultatifs absents valent `None` dans l'API Python, mais un `null`
+explicitement fourni est refusé pour label/entity/fields/actions/csrf. Un validator
+avant validation distingue les valeurs fournies du défaut interne non validé.
+`model_fields_set` conserve les présences. La personnalisation du schéma généré
+retire la branche null et le défaut interne, sans changer le schéma normatif.
+Cette technique utilise les [validators Pydantic v2](https://docs.pydantic.dev/latest/concepts/validators/)
+et la [personnalisation du schéma](https://docs.pydantic.dev/latest/concepts/json_schema/).
+
+Utiliser **exclude_unset=True** pour exporter un contrat : aucun null artificiel,
+label vide et actions vide préservés, structure revalidable. Un dump sans cette
+option peut contenir les None internes et n'est pas un document conforme à exporter.
+`ValidationError.errors()` fournit les chemins (`context.contacts.type`,
+`actions.save.csrf`) et codes d'erreur ; aucun texte anglais complet n'est figé.
+Un JSON mal formé produit également ValidationError.
+
+Les attributs des trois modèles sont frozen. Les mappings restent des dicts Python
+mutables, copiés lors de la validation de dictionnaires : ce n'est pas une immutabilité
+profonde. Une mutation de dict n'est pas validée automatiquement ; revalider le dump
+après modification. Les API Pydantic de confiance `model_construct`, `model_copy(update=...)`
+ou les options qui désactivent la validation stricte ne sont pas des entrées de
+validation du format. Revalider une instance déjà construite n'assure pas non plus
+le contrôle des mutations internes : revalider ses données sérialisées.
+
+Les types number/integer décrivent les données backend, sans valider leur valeur
+réelle ici. Le template `mvc/views/../secret.html` peut être structurellement admis :
+le lecteur sécurisé FD-CONTRACT-003 devra appliquer sa politique avant toute ouverture.
+Aucune résolution filesystem, Entity/Route, vérification CSRF effective, UI ou Tool.
