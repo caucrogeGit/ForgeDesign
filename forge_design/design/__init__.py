@@ -1,5 +1,17 @@
-"""Format normatif et modèles design, sans lecture ou écriture projet."""
+"""Format design, validation et I/O explicites, sans génération de template."""
 
+from forge_design.design.io import (
+    DesignIssue,
+    DesignReadResult,
+    DesignRevision,
+    DesignWriteConflictError,
+    DesignWriteError,
+    DesignWriteResult,
+    InvalidDesignForWriteError,
+    design_source,
+    read_design,
+    write_design,
+)
 from forge_design.design.models import (
     DesignFile,
     DesignNode,
@@ -17,6 +29,16 @@ from forge_design.design.nesting import (
 )
 
 __all__ = [
+    "DesignIssue",
+    "DesignReadResult",
+    "DesignRevision",
+    "DesignWriteConflictError",
+    "DesignWriteError",
+    "DesignWriteResult",
+    "InvalidDesignForWriteError",
+    "design_source",
+    "read_design",
+    "write_design",
     "DesignFile",
     "DesignNode",
     "DesignNodeType",

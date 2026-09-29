@@ -1,6 +1,5 @@
 """Inventaire et lecture confinée de contrats, sans résolution de leurs références."""
 
-import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +18,7 @@ from forge_design.forge.source import (
     read_project_source_details,
     template_source,
 )
+from forge_design.json_strict import loads_strict_json
 from forge_design.limits import (
     MAX_VIEW_CONTRACT_DIRECTORY_ENTRIES,
     MAX_VIEW_CONTRACT_FILES,
@@ -177,19 +177,6 @@ def read_view_contracts(root: Path) -> ViewContractsResult:
     )
 
 
-def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("Clé JSON dupliquée.")
-        result[key] = value
-    return result
-
-
-def _reject_constant(value: str) -> object:
-    raise ValueError("Constante JSON non standard.")
-
-
 def read_view_contract(root: Path, contract_path: str) -> ViewContractReadResult:
     """Lire un seul fichier ; refus lexical/projet et absence restent des exceptions.
 
@@ -218,11 +205,7 @@ def read_view_contract(root: Path, contract_path: str) -> ViewContractReadResult
     contract = None
     issues: tuple[ViewContractIssue, ...] = ()
     try:
-        data = json.loads(
-            content.text,
-            parse_constant=_reject_constant,
-            object_pairs_hook=_unique_object,
-        )
+        data = loads_strict_json(content.text)
     except (ValueError, RecursionError):
         issues = (
             ViewContractIssue(

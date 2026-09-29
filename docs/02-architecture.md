@@ -1507,3 +1507,28 @@ plusieurs erreurs conservées dans l'ordre source. Bornes dans limits.py :
 terminal compris. Une analyse tronquée ne conclut jamais à la validité.
 Les propriétés, bindings et colonnes n'interviennent pas dans l'imbrication.
 Voir la matrice et ses décisions conservatrices dans le [format design](design/design-json.md).
+
+### I/O design — FD-DESIGN-004
+
+```text
+mvc/views/**/*.design.json (un chemin explicite)
+   ↓ read_design : ouverture confinée, octets + révision
+JSON strict partagé avec Contracts
+   ↓ Pydantic
+DesignFile
+   ↓ nesting (modèle conservé si imbrication invalide)
+DesignReadResult → édition future
+   ↓ write_design : dump puis revalidation Pydantic/nesting
+UTF-8 canonique borné → temporaire synchronisé
+   ↓ dernier contrôle de révision
+Publication atomique du seul .design.json → relecture → DesignWriteResult
+```
+
+`design/io.py` réutilise reconnaissance projet, politique source et ouverture de
+parents sans liens. `json_strict.py` extrait les règles existantes des contrats,
+sans changement de leurs diagnostics. Le lecteur source partage sa lecture brute
+bornée ; SourceContent et read_project_source_details restent compatibles.
+Révision : taille, mtime, SHA-256, device/inode/ctime. Création exclusive par link,
+update optimiste par replace. Pas de verrou global : fenêtre TOCTOU documentée.
+Aucun scanner, dossier créé, contrat/template modifié, génération, Web, Tool,
+contexte courant ou préférence persistante. Schéma, modèles et nesting inchangés.

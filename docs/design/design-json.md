@@ -331,3 +331,110 @@ valid=True signifie uniquement absence d'erreur d'imbrication et analyse complè
 Aucun accès filesystem, contexte, contrat, Web, génération ou nouveau Tool.
 Les références et contenus des objets sont conservés. Le lecteur/écrivain sécurisé
 reste FD-DESIGN-004 et la validation des bindings appartient à une étape ultérieure.
+
+## Lecture / écriture — FD-DESIGN-004
+
+Les API publiques travaillent sur **un seul fichier**, relatif à `mvc/views/` :
+`contacts/list.design.json`. design_source() combine le suffixe exact avec la
+politique template_source/source_parts. Il faut un nom avant `.design.json` ;
+`design.json`, `.design.json`, variantes de casse et suffixes de sauvegarde sont
+refusés. Préfixe mvc/views, chemins absolus, segments cachés, traversées, antislash,
+deux-points, NUL et noms sensibles sont refusés avant ouverture.
+
+```python
+from forge_design.design import read_design, write_design
+
+read = read_design(root, "contacts/list.design.json")
+# Examiner read.issues ; read.design peut être présent malgré un nesting invalide.
+if read.design is not None and not read.issues:
+    saved = write_design(
+        root, "contacts/list.design.json", read.design,
+        expected_revision=read.revision,
+    )
+# Pour créer un fichier absent : expected_revision=None, obligatoire explicitement.
+```
+
+La racine est résolue et reconnue comme projet Forge, sans importer son code.
+Lecture ancrée par descripteurs, parents O_NOFOLLOW, cible régulière contrôlée par
+stat/fstat/samestat, ouverture O_NONBLOCK et plafond commun de 1 Mio. Les octets
+sont lus une seule fois et contrôlés après lecture (size/mtime/ctime/longueur).
+SourceContent et les API historiques du Source Viewer sont conservés ; une primitive
+commune retourne maintenant aussi les octets et métadonnées sans décodage.
+
+Le JSON doit être UTF-8, avec BOM initial facultatif. Le parseur strict partagé
+avec les contrats refuse clés dupliquées, NaN/Infinity/-Infinity, commentaires et
+virgules finales. Pydantic valide ensuite la structure, puis le validateur
+d'imbrication produit ses diagnostics. Aucun binding, contrat lié ou template
+n'est consulté pour accepter un design.
+
+DesignReadResult et DesignIssue sont des dataclasses gelées. Le résultat expose
+path relatif, size, modified_ns, revision, design et issues tuple. Une lecture sûre
+conserve les métadonnées même si le décodage ou le JSON échoue. Une lecture refusée
+n'a pas de révision. Une cible absente lève FileNotFoundError ; chemin lexical
+invalide : SourceReadError ; projet invalide : exceptions projet historiques.
+
+| Code | Sens |
+|---|---|
+| design.unreadable | Lecture refusée ou encodage non UTF-8 |
+| design.json_invalid | Syntaxe JSON stricte invalide |
+| design.validation_error | Structure Pydantic invalide |
+| design.nesting_error | Relation parent/enfant invalide |
+| design.analysis_truncated | Diagnostics ou analyse d'imbrication plafonnés |
+
+Si seul le nesting échoue, le DesignFile reste présent pour permettre une réparation
+future. location conserve le chemin Pydantic/nesting ; parent_type et child_type
+conservent les informations d'imbrication. Le nombre de diagnostics Pydantic est
+également plafonné à MAX_DESIGN_ISSUES, marqueur terminal compris.
+
+DesignRevision contient size, modified_ns et SHA-256 des octets réellement lus,
+ainsi que device/inode/changed_ns. Ces trois derniers champs détectent aussi un
+remplacement à contenu et mtime identiques. La révision est une métadonnée runtime,
+jamais ajoutée au JSON. Conserver l'objet retourné par read_design/write_design.
+
+Avant toute I/O d'écriture, le writer sérialise avec exclude_unset=True et revalide
+les données avec DesignFile.model_validate : le gel superficiel n'est pas une
+frontière de confiance. Les mutations invalides, NaN, cycles, nesting invalide ou
+tronqué et sortie supérieure à 1 Mio sont refusés par InvalidDesignForWriteError,
+qui expose issues. Aucune correction automatique. Sérialisation UTF-8 sans BOM,
+ensure_ascii=False, indent=2, allow_nan=False, sans sort_keys et avec un unique
+newline final. Ordre des champs produit par les modèles ; mêmes données, mêmes octets.
+
+Deux modes de sauvegarde :
+
+- expected_revision=None : création seulement si le chemin est absent.
+- Révision fournie : mise à jour seulement si tous ses champs correspondent au
+  fichier courant. Mtime modifié seul, disparition, remplacement, lien symbolique,
+  contenu différent même de taille identique : DesignWriteConflictError.
+
+Il n'existe aucune option force. Les autres échecs d'écriture sont transformés en
+DesignWriteError. Aucun dossier parent n'est créé ; aucun backup ou historique.
+Aucun template, contrat, fichier de configuration XDG ou autre fichier projet
+n'est modifié. Seuls la cible design et son temporaire interne sont manipulés.
+
+Le temporaire `.forge-design-write-<aléatoire>` est créé dans le dossier cible par
+O_CREAT|O_EXCL|O_NOFOLLOW, manipulé par dirfd et synchronisé avec fsync. Les écritures
+partielles sont complétées. Après contrôle d'identité du temporaire et dernier
+contrôle de révision, l'update utilise os.replace. Pour une création, link puis
+unlink du temporaire publient atomiquement **sans écrasement**, même si une cible
+apparaît après le dernier contrôle. Le système doit supporter ces primitives POSIX ;
+aucun fallback moins sûr. Une collision de temporaire est refusée sans suivre ni
+supprimer le fichier préexistant. Les temporaires créés sont nettoyés à la sortie.
+
+Le dossier est synchronisé puis la cible relue pour retourner DesignWriteResult
+(path, created, size, modified_ns, revision) correspondant aux octets finaux.
+Un échec après publication (fsync du dossier, relecture ou nettoyage) peut laisser
+le nouveau fichier en place : **relire avant de réessayer**, pas de rollback annoncé.
+Une erreur de nettoyage liée aux permissions ou une interruption brutale peut
+laisser un temporaire ; aucune garantie de récupération après crash n'est promise.
+
+Mode de création 0o666 soumis à l'umask ; update préserve les bits &0o777. ACL,
+xattrs, propriétaire particulier et liens physiques ne sont pas préservés : le
+remplacement crée un nouvel inode et laisse les autres hard links sur l'ancien.
+
+Il n'y a pas de verrou interprocessus ni de transaction filesystem complète. Une
+fenêtre de race résiduelle existe entre le dernier contrôle et replace : un autre
+processus peut alors modifier/remplacer la cible. Même limite entre contrôle et
+publication du nom temporaire face à un acteur pouvant écrire dans le même dossier.
+Les descripteurs empêchent le suivi des liens, mais un dossier ouvert peut être
+renommé ; il n'existe pas d'instantané global de l'arborescence. Ces limites ne
+permettent pas de promettre un compare-and-swap face à un adversaire concurrent.

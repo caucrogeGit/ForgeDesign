@@ -138,21 +138,34 @@ def inspect_project_source(root: Path, path: str) -> SourceMetadata:
         return SourceMetadata(opened.st_size, opened.st_mtime_ns)
 
 
+def read_source_bytes(descriptor: int, opened: os.stat_result) -> bytes:
+    """Lire un descripteur régulier déjà contrôlé, en vérifiant sa stabilité."""
+    with os.fdopen(os.dup(descriptor), "rb") as stream:
+        data = stream.read(MAX_SOURCE_BYTES + 1)
+    if len(data) > MAX_SOURCE_BYTES:
+        raise SourceReadError("Source supérieure à 1 Mio.")
+    current = os.fstat(descriptor)
+    if (
+        current.st_size != opened.st_size
+        or current.st_mtime_ns != opened.st_mtime_ns
+        or current.st_ctime_ns != opened.st_ctime_ns
+        or len(data) != opened.st_size
+    ):
+        raise SourceReadError("Source modifiée pendant la lecture.")
+    return data
+
+
+def read_project_source_bytes(root: Path, path: str) -> tuple[bytes, os.stat_result]:
+    """Octets et métadonnées issus de la même lecture confinée."""
+    with _open_project_source(root, path) as (descriptor, opened):
+        return read_source_bytes(descriptor, opened), opened
+
+
 def read_project_source_details(root: Path, path: str) -> SourceContent:
     """Lire au plus 1 Mio UTF-8 via l'ouverture sécurisée commune."""
-    with _open_project_source(root, path) as (descriptor, opened):
-        with os.fdopen(os.dup(descriptor), "rb") as stream:
-            data = stream.read(MAX_SOURCE_BYTES + 1)
-        if len(data) > MAX_SOURCE_BYTES:
-            raise SourceReadError("Source supérieure à 1 Mio.")
-        current = os.fstat(descriptor)
-        if (
-            current.st_size != opened.st_size
-            or current.st_mtime_ns != opened.st_mtime_ns
-            or current.st_ctime_ns != opened.st_ctime_ns
-            or len(data) != opened.st_size
-        ):
-            raise SourceReadError("Source modifiée pendant la lecture.")
-        return SourceContent(
-            data.decode("utf-8-sig"), opened.st_size, opened.st_mtime_ns
-        )
+    data, opened = read_project_source_bytes(root, path)
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeError as error:
+        raise SourceReadError("Source inaccessible, liée ou non UTF-8.") from error
+    return SourceContent(text, opened.st_size, opened.st_mtime_ns)
