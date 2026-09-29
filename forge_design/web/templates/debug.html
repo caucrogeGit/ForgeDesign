@@ -3,17 +3,26 @@
 {% block content %}
 <h1>Debug Center</h1>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<form method="get" action="/debug" class="route-filters" aria-label="Filtres des événements">
+<div><label for="debug-query">Recherche</label><input type="search" id="debug-query" name="q" maxlength="{{ query_limit }}" value="{{ filters.query or '' }}"></div>
+<div><label for="debug-level">Niveau</label><select id="debug-level" name="level">{% for value in levels %}<option value="{{ value }}"{% if filters.level == value %} selected{% endif %}>{{ 'Tous' if value == 'all' else value }}</option>{% endfor %}</select></div>
+<div><label for="debug-category">Catégorie</label><select id="debug-category" name="category">{% for value in categories %}<option value="{{ value }}"{% if filters.category == value %} selected{% endif %}>{{ 'Toutes' if value == 'all' else value }}</option>{% endfor %}</select></div>
+<div><label for="debug-order">Ordre</label><select id="debug-order" name="order">{% for value, label in [('newest', 'Plus récentes d’abord'), ('oldest', 'Plus anciennes d’abord')] %}<option value="{{ value }}"{% if filters.order == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<div class="filter-actions"><button type="submit">Filtrer</button> <a href="/debug">Réinitialiser</a></div>
+</form>
 {% if result %}
-<p>{{ result.events|length }} événements lus · {{ result.issues|length }} anomalies de lecture</p>
-{% if result.events %}
+<p>{{ view.events|length }} événements affichés sur {{ view.total_events }} · {{ view.issues|length }} anomalies de lecture</p>
+{% if result.truncated %}<p>Lecture partielle du journal.</p>{% endif %}
+{% if view.events %}
 <table>
-  <thead><tr><th scope="col">Date</th><th scope="col">Niveau</th><th scope="col">Catégorie</th><th scope="col">Type</th><th scope="col">Message</th></tr></thead>
-  <tbody>{% for event in result.events %}<tr><td>{{ event.timestamp }}</td><td>{{ event.level }}</td><td>{{ event.category }}</td><td>{{ event.exception_type }}</td><td>{{ event.message }}</td></tr>{% endfor %}</tbody>
+  <thead><tr><th scope="col">Date</th><th scope="col">Niveau</th><th scope="col">Catégorie</th><th scope="col">Type</th><th scope="col">Route</th><th scope="col">Message</th></tr></thead>
+  <tbody>{% for event in view.events %}<tr data-event-id="{{ event.id }}" data-event-line="{{ event.line_number }}"><td>{{ event.timestamp }}</td><td>{{ event.level }}</td><td>{{ event.category }}</td><td>{{ event.exception_type }}</td><td>{{ event.route or (event.request.path if event.request else none) or '—' }}</td><td>{{ event.message }}</td></tr>{% endfor %}</tbody>
 </table>
-{% elif not result.issues %}<p>Aucune erreur runtime enregistrée.</p>{% endif %}
-{% if result.issues %}
+{% elif view.total_events %}<p>Aucun événement ne correspond aux filtres.</p>
+{% elif not view.issues %}<p>Aucune erreur runtime enregistrée.</p>{% endif %}
+{% if view.issues %}
 <section aria-labelledby="debug-issues"><h2 id="debug-issues">Anomalies de lecture</h2>
-<ul>{% for issue in result.issues %}<li><code>{{ issue.code }}</code> — {{ issue.message }}{% if issue.line_number %} (ligne {{ issue.line_number }}){% endif %}</li>{% endfor %}</ul>
+<ul>{% for issue in view.issues %}<li><code>{{ issue.code }}</code> — {{ issue.message }}{% if issue.line_number %} (ligne {{ issue.line_number }}){% endif %}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% endif %}

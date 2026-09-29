@@ -1157,3 +1157,17 @@ Aucune valeur brute parallèle, exécution projet, DB ou écriture. La page serv
 minimale utilise Jinja et no-store, sans JavaScript ni rafraîchissement automatique.
 Voir [Debug Center](tools/debug-center.md) pour le contrat, les codes, bornes et
 limites du masquage et de la lecture concurrente.
+
+
+### Projection de la liste Debug Center
+
+`Request` → `web/debug_filters.parse_debug_filters` → `DebugFilter` gelé,
+puis `DebugErrorsResult` → `tools/debug_filters.filter_debug_events` →
+`DebugFilteredView` gelée. Le parsing précède le seul appel du Tool par GET.
+La projection ne dépend que des modèles acquis et de datetime : aucun filesystem,
+JSON, registre ou contexte. Tri stable des dates zonées puis dates invalides,
+recherche sur les textes masqués sélectionnés, filtres niveau/catégorie exacts.
+Les issues restent intégrales et les totaux portent sur le résultat lu.
+Le Bridge conserve l’ordre physique, le Tool ne reçoit aucun filtre et le contexte
+n’en conserve aucun. Le template serveur réutilise les styles de formulaires et
+prépare id + ligne dans le DOM sans route de détail ni JavaScript.

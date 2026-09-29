@@ -36,7 +36,9 @@ def test_debug_http(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         before = (path.read_bytes(), path.stat().st_size, path.stat().st_mtime_ns)
         status, html, headers = call(app, "/debug")
         assert status == 200 and len(calls) == 2
-        assert "2 événements lus" in html and "1 anomalies de lecture" in html
+        assert (
+            "2 événements affichés sur 2" in html and "1 anomalies de lecture" in html
+        )
         assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
         assert "very-secret" not in html and "[masqué]" in html
         assert "debug.json_invalid" in html and "ligne 2" in html
@@ -48,6 +50,6 @@ def test_debug_http(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             path.stat().st_mtime_ns,
         )
         path.write_bytes(path.read_bytes() + encoded())
-        assert "3 événements lus" in call(app, "/debug")[1]
+        assert "3 événements affichés sur 3" in call(app, "/debug")[1]
         assert call(app, "/debug", method="POST")[0] == 405
         assert call(app, "/source?path=storage/logs/errors.dev.jsonl")[0] == 400

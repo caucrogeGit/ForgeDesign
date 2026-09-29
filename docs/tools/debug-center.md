@@ -1,7 +1,7 @@
 # Debug Center
 
 `GET /debug` présente les erreurs runtime du projet ouvert : date, niveau,
-catégorie Forge, type et message. Sans projet, aucun Tool n’est exécuté.
+catégorie Forge, type, route et message. Sans projet, aucun Tool n’est exécuté.
 Chaque consultation appelle une fois `debug-center`, sans cache (`no-store`).
 
 ## Source et contrat
@@ -81,6 +81,57 @@ Aucun instantané global n’est garanti : un fichier ouvert peut encore être m
 par un autre processus. `/source` n’autorise pas le journal.
 
 La page utilise uniquement le modèle masqué, échappé par Jinja. Elle n’affiche ni
-JSON brut, requête, SQL, traceback, détail, filtre, ni tri utilisateur. Aucun JS,
+JSON brut, requête détaillée, SQL, traceback ou détail. Aucun JS,
 polling, surveillance filesystem, SSE ou WebSocket. Une modification externe est
 visible lors du prochain GET, dans les bornes ci-dessus.
+
+
+## Liste filtrable (FD-DEBUG-002)
+
+Le formulaire GET conserve les valeurs actives et propose Réinitialiser vers
+`/debug`. L’URL est le seul état : aucune session, cookie, persistance dans le
+contexte ou stockage navigateur. Chaque GET valide avec projet relit le journal
+par un seul appel Tool ; une query invalide retourne 400 avant cet appel.
+Les réponses 200 et 400 conservent no-store. POST reste refusé.
+
+| Paramètre | Valeurs | Défaut |
+|---|---|---|
+| q | Sous-chaîne simple, 256 caractères maximum | Absente |
+| level | all, ERROR, WARNING, INFO, CRITICAL | all |
+| category | all et les huit catégories Forge ci-dessus | all |
+| order | newest, oldest | newest |
+
+Les filtres actifs sont combinés par AND. Niveau et catégorie utilisent l’égalité
+exacte, sans hiérarchie implicite entre ERROR et CRITICAL. Clés inconnues présentes,
+valeurs invalides et répétitions non vides retournent 400. Comme Entity Explorer,
+le parsing Forge élimine les valeurs vides : `q=&q=users` équivaut à `q=users`,
+`q=&q=` équivaut à l’absence. Une clé inconnue avec seulement une valeur vide est
+également éliminée avant validation ; aucune modification du parseur Forge.
+
+La recherche applique strip puis casefold. La limite est vérifiée avant et après
+normalisation (128 ß deviennent 256 caractères ; 129 sont refusés). Elle examine
+uniquement les textes déjà masqués : id, exception_type, message, route, controller,
+template, request.method, request.path, hint et correlation_id. Elle ne recherche
+ni niveau/catégorie, ni SQL, traceback, request.query, headers ou post_keys.
+Aucune regex utilisateur, nouvelle lecture ou restauration des secrets masqués.
+
+Le tri est une projection pure, indépendante du Bridge et du Tool. Les timestamps
+sont interprétés par datetime.fromisoformat ; seules les dates munies d’un fuseau
+sont comparées. Les offsets sont pris en compte pour comparer les instants réels.
+newest trie du plus récent au plus ancien ; oldest fait l’inverse. Les égalités
+conservent l’ordre physique dans les deux sens. Les dates invalides ou sans fuseau
+viennent ensuite dans leur ordre physique, sans nouvelle anomalie Bridge.
+Les chaînes originales restent affichées, sans conversion de présentation.
+
+Le compteur indique les événements affichés sur le total acquis par le Bridge,
+qui peut être partiel : « Lecture partielle du journal. » reste alors visible.
+Les anomalies de lecture ne sont jamais filtrées. Aucun résultat avec un journal
+contenant des événements affiche « Aucun événement ne correspond aux filtres. ».
+Un journal absent ou vide conserve « Aucune erreur runtime enregistrée. ».
+
+La colonne Route préfère event.route, puis request.path, puis « — » lorsque le
+texte est absent ou vide. Messages complets, niveaux textuels et labels explicites
+réutilisent le style existant. Les lignes portent data-event-id et data-event-line,
+échappés par Jinja. L’id peut être dupliqué ; le numéro physique identifie seulement
+une occurrence dans la lecture courante, sans promesse de stabilité après rotation
+ou réécriture du journal. Aucun lien de détail n’est créé à ce stade.
