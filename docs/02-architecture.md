@@ -1358,3 +1358,27 @@ ni garantie atomique. Inspection légère puis lecture au clic : `available` ne
 certifie ni UTF-8 ni syntaxe. Unicode n'est pas normalisé. Les bornes, les différences
 entre structure détectée et DOM rendu et les limites filesystem sont détaillées
 au [contrat Template Viewer](tools/template-viewer.md#contrats-stabilisés-fd-template-005).
+
+
+### Contrat de vue minimal — FD-CONTRACT-001
+
+```text
+Backend Forge
+    ↓ données préparées
+View Contract (.view.json)
+    ↓ description
+Forge Design / Template
+```
+
+`forge_design/contracts/view_contract.schema.json` est le schéma normatif Draft
+2020-12 packagé. Il définit name, template, context et actions optionnelles, sans
+lecture projet, validation runtime ou logique métier. Convention future :
+`mvc/views/<vue>.view.json`, associé explicitement à `mvc/views/<vue>.html`.
+Le contrôleur produit les données ; le contrat les décrit ; le template les utilise.
+Le design graphique reste du ressort du futur .design.json.
+
+La suite prévue est JSON Schema → Pydantic (FD-CONTRACT-002) → lecteur filesystem
+(FD-CONTRACT-003). Les liens template → Template Viewer, entity → Entity Explorer
+et actions → Route Explorer restent des perspectives, sans implémentation ici.
+Aucun nouveau Tool, route Web ou accès projet ; cinq Tools inchangés.
+Voir le [contrat de vue](contracts/view-contract.md), ses exemples et limites.

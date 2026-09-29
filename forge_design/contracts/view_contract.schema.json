@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Forge Design View Contract",
+  "description": "Contrat déclaratif des données disponibles pour une vue Forge, sans logique métier ni configuration du contrôleur.",
+  "type": "object",
+  "required": ["name", "template", "context"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {"type": "string", "minLength": 1, "maxLength": 256},
+    "template": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^mvc/views/.+",
+      "description": "Chemin relatif au projet sous mvc/views/. Aucune garantie de sécurité filesystem ou d'existence."
+    },
+    "context": {
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {"$ref": "#/$defs/ContextVariable"}
+    },
+    "actions": {
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {"$ref": "#/$defs/ViewAction"}
+    }
+  },
+  "$defs": {
+    "ContextVariable": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"type": "string", "enum": ["string", "boolean", "integer", "number", "object", "list"]},
+        "label": {"type": "string"},
+        "entity": {"type": "string", "minLength": 1},
+        "fields": {
+          "type": "object",
+          "propertyNames": {"minLength": 1},
+          "additionalProperties": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "ViewAction": {
+      "type": "object",
+      "required": ["method", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {"type": "string", "minLength": 1, "pattern": "^[A-Z]+$"},
+        "path": {"type": "string", "minLength": 1},
+        "csrf": {"type": "boolean"}
+      }
+    }
+  }
+}

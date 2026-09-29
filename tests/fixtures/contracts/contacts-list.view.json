@@ -1,0 +1,17 @@
+{
+  "name": "contacts/list",
+  "template": "mvc/views/contacts/list.html",
+  "context": {
+    "page_title": {"type": "string", "label": "Titre de page"},
+    "contacts": {
+      "type": "list",
+      "entity": "Contact",
+      "fields": {"nom": "string", "email": "email", "telephone": "string"}
+    },
+    "can_create": {"type": "boolean", "label": "Peut créer un contact"}
+  },
+  "actions": {
+    "create": {"method": "GET", "path": "/contacts/create"},
+    "save": {"method": "POST", "path": "/contacts", "csrf": true}
+  }
+}
