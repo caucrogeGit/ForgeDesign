@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block title %}Debug Center — Forge Design{% endblock %}
+{% block content %}
+<h1>Debug Center</h1>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if result %}
+<p>{{ result.events|length }} événements lus · {{ result.issues|length }} anomalies de lecture</p>
+{% if result.events %}
+<table>
+  <thead><tr><th scope="col">Date</th><th scope="col">Niveau</th><th scope="col">Catégorie</th><th scope="col">Type</th><th scope="col">Message</th></tr></thead>
+  <tbody>{% for event in result.events %}<tr><td>{{ event.timestamp }}</td><td>{{ event.level }}</td><td>{{ event.category }}</td><td>{{ event.exception_type }}</td><td>{{ event.message }}</td></tr>{% endfor %}</tbody>
+</table>
+{% elif not result.issues %}<p>Aucune erreur runtime enregistrée.</p>{% endif %}
+{% if result.issues %}
+<section aria-labelledby="debug-issues"><h2 id="debug-issues">Anomalies de lecture</h2>
+<ul>{% for issue in result.issues %}<li><code>{{ issue.code }}</code> — {{ issue.message }}{% if issue.line_number %} (ligne {{ issue.line_number }}){% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -258,7 +258,7 @@ Cela garde les dépendances visibles et facilite les tests.
 Chaque appel crée un nouveau `ToolRegistry` et une nouvelle instance de
 `ProjectInspectorTool`, enregistrée explicitement sous `project-inspector`.
 `RouteExplorerTool` est enregistré sous `route-explorer` et `EntityExplorerTool`
-sous `entity-explorer`. Ces trois Tools sont
+sous `entity-explorer`, puis `DebugCenterTool` sous `debug-center`. Ces quatre Tools sont
 les seuls Tools intégrés, dans cet ordre. La fonction retourne le registre sans
 exécuter le Tool ni accéder à un projet.
 
@@ -1136,3 +1136,24 @@ verrouillées par tests ; les dataclasses existantes restent gelées et inchang�
 La recherche refuse également une longueur >256 après casefold, pour garantir
 qu’une valeur normalisée affichée soit soumissible à nouveau. Les contrats source,
 retours, stateless, CSP, no-store et JS restent inchangés.
+
+
+## Debug Center : lecteur runtime statique
+
+`storage/logs/errors.dev.jsonl` → `forge/debug_errors.py` → `DebugCenterTool`
+→ `web/debug.py` → `debug.html` constitue la quatrième verticale explicite.
+Le registre n’exécute aucun Tool à sa construction. Un GET /debug avec projet
+appelle une seule fois le Tool ; le contexte ne stocke ni journal ni événement.
+
+Le Bridge valide la racine, ouvre le chemin fixe sans lien, puis lit des lignes
+binaires sous les trois plafonds centralisés dans limits.py. La primitive
+`forge/filesystem.open_directory` est extraite à comportement inchangé du Bridge
+entités et partagée avec ce lecteur. `/source` garde sa politique existante.
+Les comparaisons stat/fstat protègent les dossiers découverts et le fichier ouvert.
+
+Les dataclasses gelées représentent le schéma Forge 1.0, dans l’ordre physique,
+avec diagnostics locaux et masquage pur avant exposition publique des textes.
+Aucune valeur brute parallèle, exécution projet, DB ou écriture. La page serveur
+minimale utilise Jinja et no-store, sans JavaScript ni rafraîchissement automatique.
+Voir [Debug Center](tools/debug-center.md) pour le contrat, les codes, bornes et
+limites du masquage et de la lecture concurrente.

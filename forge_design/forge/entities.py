@@ -3,15 +3,13 @@
 import json
 import os
 from collections import Counter
-from collections.abc import Generator
-from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from itertools import islice
 from os import PathLike
-from pathlib import Path
 from stat import S_ISDIR, S_ISREG
 from typing import Literal, cast
 
+from forge_design.forge.filesystem import open_directory as _directory
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
@@ -162,26 +160,6 @@ def _entity(data: dict[str, object], source: SourceLocation) -> EntityInfo:
     )
 
 
-@contextmanager
-def _directory(name: str, parent: int | None = None) -> Generator[int, None, None]:
-    if parent is None:
-        with ExitStack() as stack:
-            parts = Path(name).absolute().parts
-            descriptor = os.open(parts[0], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-            stack.callback(os.close, descriptor)
-            for part in parts[1:]:
-                if part == "..":
-                    raise OSError("Racine non canonique.")
-                descriptor = stack.enter_context(_directory(part, descriptor))
-            yield descriptor
-        return
-    descriptor = os.open(
-        name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent
-    )
-    try:
-        yield descriptor
-    finally:
-        os.close(descriptor)
 
 
 def _read(parent: int, name: str) -> str:
