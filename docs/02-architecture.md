@@ -1403,3 +1403,24 @@ exclude_unset=True. Le schéma généré est comparé au normatif sans annotatio
 Pydantic est déclaré en dépendance runtime, sans jsonschema. Validation en mémoire
 seulement, erreurs Pydantic localisées, aucune lecture projet ou validation croisée.
 Cinq Tools inchangés ; aucun Web, JavaScript ou comportement d'explorateur modifié.
+
+
+### Lecture des contrats — FD-CONTRACT-003
+
+```text
+mvc/views/**/*.view.json
+        ↓ lecteur ancré et borné
+UTF-8 → JSON strict (clés uniques, constantes standard)
+        ↓ Pydantic strict
+ViewContract + métadonnées / diagnostics structurés
+```
+
+`contracts/reader.py` sépare read_view_contracts (métadonnées sans parsing) de
+read_view_contract (un fichier, sans scan). Résultats gelés et tuples d'issues ;
+exceptions projet/absence distinctes des erreurs locales structurées. Les bornes
+propres aux contrats ne dépendent pas de Template Viewer. Les listes de diagnostics
+réservent un marqueur terminal en cas de dépassement.
+Le lecteur réutilise open_directory et read_project_source_details ; suffixe
+spécialisé ajouté à la politique source commune, sans la dupliquer ni l'élargir.
+Aucune interprétation de template/entity/actions, aucun Tool ou Web. Le schéma et
+les modèles du format restent inchangés. Voir les [garanties et limites du lecteur](contracts/view-contract.md#lecteur-projet--fd-contract-003).

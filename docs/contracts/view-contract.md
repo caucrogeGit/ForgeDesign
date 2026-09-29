@@ -156,10 +156,11 @@ Lecteur filesystem sécurisé — FD-CONTRACT-003
 
 La validation des instances en mémoire est maintenant assurée par les modèles
 du ticket 002 décrits ci-dessous.
-Le scan des contrats et les garanties filesystem appartiennent au ticket 003.
+Le scan et la lecture sécurisée sont maintenant disponibles au ticket 003, décrit
+ci-dessous.
 L'affichage, la comparaison aux templates, les croisements template/entités/actions,
-le rendu et la génération restent futurs. Aucun contrat n'est chargé comme tel par
-l'application actuelle ; Template Viewer garde son inventaire générique de fichiers.
+le rendu et la génération restent futurs. Aucune interface ne charge encore les contrats ; Template Viewer garde son
+inventaire générique de fichiers.
 
 
 ## Modèles Python — FD-CONTRACT-002
@@ -212,3 +213,92 @@ Les types number/integer décrivent les données backend, sans valider leur vale
 réelle ici. Le template `mvc/views/../secret.html` peut être structurellement admis :
 le lecteur sécurisé FD-CONTRACT-003 devra appliquer sa politique avant toute ouverture.
 Aucune résolution filesystem, Entity/Route, vérification CSRF effective, UI ou Tool.
+
+
+## Lecteur projet — FD-CONTRACT-003
+
+Les API exportées depuis `forge_design.contracts` sont :
+
+```python
+inventory = read_view_contracts(root)
+result = read_view_contract(root, "contacts/list.view.json")
+```
+
+La racine Path est résolue et reconnue comme projet Forge. L'inventaire parcourt
+uniquement `mvc/views/`, sans suivre de symlinks, et retient les fichiers réguliers
+dont le nom finit exactement par `.view.json`. `.view.json` seul et les fichiers
+cachés sont exclus ; `.view.JSON`, `.view.json.bak`, `.design.json` ne sont pas des
+contrats. Aucun scan de mvc/templates ou d'un dossier contracts spécial.
+
+`ViewContractsResult` contient les tuples contracts/issues, source_present et
+truncated. `ViewContractInfo` expose path relatif à views, size et modified_ns.
+L'inventaire ouvre pour vérifier identité et métadonnées, sans lire ou parser le
+contenu ; un fichier trop gros ou non UTF-8 peut donc être inventorié.
+source_present est faux si views est absent, vrai dès que son entrée est observée,
+même vide ou inaccessible. Si ses parents ne peuvent pas être inspectés, il reste
+faux et une issue l'explique ; les erreurs de reconnaissance du projet lèvent une
+exception de niveau projet.
+
+Le détail lit un seul fichier, sans scan. `ViewContractReadResult` contient path,
+size, modified_ns, contract et un tuple issues. Les métadonnées viennent de la
+lecture sûre courante ; elles valent None si celle-ci échoue, jamais une taille
+fictive de zéro. JSON ou modèle invalide conserve les métadonnées lues mais ne
+produit aucun contrat partiel. Tous ces résultats et issues sont des dataclasses
+gelées ; le contrat Pydantic conserve sa limite de mutabilité interne décrite plus haut.
+
+`view_contract_source(reference)` combine suffixe exact et politique source commune.
+Un chemin lexical refusé lève SourceReadError avant accès au projet ; une absence
+lève FileNotFoundError. Erreurs de racine : exceptions projet historiques. Les autres
+échecs individuels de lecture donnent contract.unreadable, sans ValidationError brute.
+La politique ne suit pas les symlinks, refuse traversal, segments cachés et noms
+sensibles ; elle n'ajoute pas de règle spéciale sur les sous-chaînes :
+`foo.key.view.json` reste admissible, `private.key/a.view.json` est refusé.
+
+Ouverture ancrée par descripteurs, O_NOFOLLOW/O_NONBLOCK, fichier régulier,
+stat/fstat/samestat ; après lecture, size/mtime/ctime/longueur sont contrôlés par
+le lecteur source commun. UTF-8 strict, BOM initial accepté, aucune autodétection
+UTF-16/32. FIFO/socket/device exclus. Un dossier nommé *.view.json peut être parcouru
+comme dossier, mais n'est jamais un contrat.
+
+JSON standard via json.loads : commentaires, virgule finale, NaN/Infinity/-Infinity,
+clés dupliquées à tous les niveaux, entier excessif et profondeur excessive refusés.
+Un object_pairs_hook impose l'unicité, sans stratégie « dernière valeur gagnante ».
+Ensuite seulement ViewContract.model_validate applique le modèle strict inchangé.
+Aucun nettoyage, réparation, model_construct ou validation de référence métier.
+
+| Code | Signification |
+|---|---|
+| contract.unreadable | Source/dossier inaccessible, lié, remplacé, trop gros ou non UTF-8 |
+| contract.json_invalid | JSON invalide ou parsing interrompu par une limite Python |
+| contract.validation_error | Document parsé mais non conforme au modèle |
+| contract.analysis_truncated | Collecte ou liste de diagnostics réduite par une borne |
+
+Chaque issue comporte message court, path éventuel et location tuple de clés/indices.
+Les erreurs Pydantic gardent leur ordre et leur loc ; aucun input ou contexte brut
+n'est recopié dans les messages. Le code et la location sont les identifiants fiables.
+
+| Borne | Valeur |
+|---|---:|
+| MAX_VIEW_CONTRACT_FILES | 512 fichiers retenus |
+| MAX_VIEW_CONTRACT_DIRECTORY_ENTRIES | 4096 noms, même exclus |
+| MAX_VIEW_CONTRACT_SCAN_DEPTH | 32, views à zéro |
+| MAX_VIEW_CONTRACT_ISSUES | 512 issues d'inventaire, marqueur compris |
+| MAX_VIEW_CONTRACT_VALIDATION_ISSUES | 256 issues de détail, marqueur compris |
+| MAX_SOURCE_BYTES | 1 Mio par lecture |
+
+Exactement la limite à EOF ne tronque pas. Surplus de noms : une entrée sentinelle
+supplémentaire ; au-delà de la profondeur, le dossier n'est pas parcouru même vide.
+Le marqueur de troncature est unique et terminal ; si la liste est pleine, il
+remplace sa dernière issue. Les contrats collectés restent disponibles.
+Tri lexical Unicode du résultat ; au-delà du budget de découverte le sous-ensemble
+dépend de l'ordre filesystem avant tri. Aucun cache : ajout, modification et suppression
+sont visibles à l'appel suivant. Pas d'instantané atomique ni de verrou filesystem.
+
+Inventaire O(D log D) avec tris, lecture O(taille), JSON et Pydantic linéaires attendus
+dans les données traitées. La borne de diagnostics limite les résultats exposés,
+pas les erreurs que Pydantic construit avant leur réduction. Mémoire du JSON décodé
+et des erreurs supérieure au fichier brut ; MemoryError n'est pas intercepté.
+Aucune association automatique au fichier .html voisin : template, entity et actions
+restent déclaratifs, sans ouverture de ces cibles. Aucune exécution, écriture, UI ou
+Tool nouveau. Template Viewer continue à montrer les fichiers physiques admissibles,
+y compris les .view.json, et /source garde sa politique actuelle.
