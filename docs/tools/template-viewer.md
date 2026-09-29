@@ -180,3 +180,55 @@ HTML et aucun diagnostic de dépendance absente n'est produit.
 Un fichier lisible avec Jinja invalide garde HTTP 200 et sa source brute visible.
 Les valeurs de structure sont échappées dans l'UI. Aucun rendu, accès fichier
 supplémentaire, écriture, cache, loader ou JavaScript n'est ajouté.
+
+## Vue arbre (FD-TEMPLATE-003)
+
+Depuis le fichier brut, **Voir l’arbre** ouvre `/templates/tree?path=...`.
+**Voir le fichier brut** revient au même template et **Retour à Template Viewer**
+revient à l'inventaire. La liste conserve son action Voir vers le brut. Les URLs
+utilisent urlencode et le parser path commun ; aucune nouvelle politique de chemin.
+
+La vue serveur distingue trois structures :
+
+- **Dépendances Jinja** : déclarations en ordre source, type et ligne, puis chemin
+  complet ou « Référence dynamique ». Les chemins restent du texte, sans lien ou
+  vérification de présence, y compris extends/include/import/from-import.
+- **Blocks Jinja** : liste à un seul niveau, noms complets, lignes et doublons
+  conservés. Aucune relation de parenté entre blocks ou avec les balises n'est
+  déduite des seules lignes.
+- **Structure HTML** : plusieurs racines possibles, hiérarchie reconstruite depuis
+  l'ordre et depth des HtmlElement, sans relire le texte ni appliquer de règle HTML.
+
+`build_template_tree(structure) -> TemplateTree` est une projection pure O(n).
+TemplateTree conserve les tuples de références et blocks existants, des racines
+TemplateHtmlNode(tag, line, children), partial et truncated. Tous les modèles sont
+gelés et les enfants sont des tuples. Le modèle est construit de bas en haut sans
+récursion. Une pile de profondeurs originales rattache un saut au parent disponible
+le plus proche ; deux nœuds de même profondeur restent frères même après un saut.
+Un premier nœud de profondeur positive devient une racine. Une profondeur négative
+lève ValueError. Aucun faux nœud intermédiaire n'est fabriqué.
+
+`flatten_template_tree(tree)` produit des TemplateTreeRow (tag, line, depth,
+has_children, close_levels) par parcours itératif. Le template serveur émet ses
+ul/li à partir des lignes et des nombres de fermetures, sans macro récursive ni
+HTML assemblé depuis des valeurs source. La hiérarchie sémantique reste présente
+sans CSS ; marges et bordures facilitent sa lecture, la zone HTML peut défiler.
+
+La profondeur n'est pas plafonnée une seconde fois dans la projection : les bornes
+restent celles de FD-TEMPLATE-002. Les arbres extrêmement profonds peuvent être
+peu pratiques et soumis aux limites de correction/affichage propres au navigateur ;
+le serveur ne dépend pas de la récursion pour les construire ou les émettre.
+Tests serveur jusqu'à 4096 niveaux, projection synthétique jusqu'à 10000 niveaux.
+Aucun essai navigateur réel ou lecteur d'écran n'est revendiqué.
+
+Les états partial/truncated sont propagés tels quels et annoncés explicitement.
+Jinja invalide garde HTTP 200 si la source est lisible ; l'arbre utilise les seules
+informations disponibles. Les trois sections vides ont chacune un message explicite.
+La page rappelle qu'il s'agit de structure source détectée, pas de DOM rendu/corrigé.
+
+Une requête arbre effectue exactement une lecture de source, une analyse existante
+et une projection. Pas de scan d'inventaire ou d'appel TemplateViewerTool.run, aucun
+nouveau parsing. Métadonnées de la même source courante, sans cache. Les statuts
+400/404/409, no-store et POST 405 sont ceux du détail brut. La navigation principale
+reste Template Viewer et le registre conserve cinq Tools. Aucun rendu cible,
+JavaScript, édition, résolution transitive, cycle ou écriture.

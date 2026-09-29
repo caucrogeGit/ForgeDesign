@@ -6,6 +6,7 @@
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if source %}
 <h2>{{ source.path }}</h2>
+<p><a href="{{ template_tree_url(source.path) }}">Voir l’arbre</a></p>
 <dl data-size="{{ source.size }}" data-modified-ns="{{ source.modified_ns }}">
   <dt>Taille</dt><dd>{{ source.size }} octets</dd>
   <dt>Modification</dt><dd>{{ modified_date(source.modified_ns) }}</dd>

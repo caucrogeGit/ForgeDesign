@@ -20,7 +20,7 @@ dev = ["pytest>=8", "ruff>=0.9", "pyright>=1.1.390"]
 packages = ["forge_design", "forge_design.forge", "forge_design.tools", "forge_design.platform", "forge_design.web"]
 
 [tool.setuptools.package-data]
-"forge_design.web" = ["templates/templates.html", "templates/template_view.html", "templates/debug_detail.html", "templates/debug.html", "templates/entities.html", "templates/routes.html", "templates/source.html", "templates/layout.html", "templates/index.html", "templates/inspector.html", "static/shell.css", "static/route-graph.js", "static/entity-graph.js"]
+"forge_design.web" = ["templates/template_tree.html", "templates/templates.html", "templates/template_view.html", "templates/debug_detail.html", "templates/debug.html", "templates/entities.html", "templates/routes.html", "templates/source.html", "templates/layout.html", "templates/index.html", "templates/inspector.html", "static/shell.css", "static/route-graph.js", "static/entity-graph.js"]
 
 [tool.setuptools.dynamic]
 version = {attr = "forge_design.__version__"}

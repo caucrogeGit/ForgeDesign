@@ -17,6 +17,7 @@ from forge_design.forge.source import SourceReadError, source_parts
 from forge_design.forge.template_structure import analyze_template_structure
 from forge_design.forge.templates import TemplatesResult, read_template_source
 from forge_design.platform.tool_registry import ToolRegistry
+from forge_design.tools.template_tree import build_template_tree, flatten_template_tree
 from forge_design.web.rendering import render_page
 
 _PROJECT_ERRORS = (
@@ -29,6 +30,10 @@ _PROJECT_ERRORS = (
 
 def template_url(path: str) -> str:
     return "/templates/view?" + urlencode({"path": path})
+
+
+def template_tree_url(path: str) -> str:
+    return "/templates/tree?" + urlencode({"path": path})
 
 
 def modified_date(modified_ns: int) -> str:
@@ -77,6 +82,16 @@ def show_templates(
 
 
 def show_template(request: Request, context: CurrentProjectContext) -> Response:
+    return _show_detail(request, context, tree_view=False)
+
+
+def show_template_tree(request: Request, context: CurrentProjectContext) -> Response:
+    return _show_detail(request, context, tree_view=True)
+
+
+def _show_detail(
+    request: Request, context: CurrentProjectContext, *, tree_view: bool
+) -> Response:
     source = None
     error = None
     status = 200
@@ -96,15 +111,21 @@ def show_template(request: Request, context: CurrentProjectContext) -> Response:
                 error, status = "Template absent.", 404
             except SourceReadError as exc:
                 error, status = str(exc), 409
+    structure = analyze_template_structure(source.text) if source is not None else None
+    tree = (
+        build_template_tree(structure) if tree_view and structure is not None else None
+    )
     return render_page(
-        "template_view.html",
+        "template_tree.html" if tree_view else "template_view.html",
         {
             "active_page": "templates",
             "current_project": context.inspection,
             "source": source,
-            "structure": analyze_template_structure(source.text)
-            if source is not None
-            else None,
+            "structure": structure,
+            "tree": tree,
+            "tree_rows": flatten_template_tree(tree) if tree is not None else (),
+            "template_url": template_url,
+            "template_tree_url": template_tree_url,
             "error": error,
             "modified_date": modified_date,
         },

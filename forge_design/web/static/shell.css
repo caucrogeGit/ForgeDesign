@@ -93,3 +93,8 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .debug-flow-node .debug-flow-detail { font: 12px monospace; }
 .debug-flow-edge { fill: none; stroke: #526477; stroke-width: 2; }
 .debug-flow marker path { fill: #526477; }
+
+.template-tree-scroll { overflow: auto; }
+.template-tree, .template-tree ul { padding-inline-start: 1.5rem; }
+.template-tree ul { border-inline-start: 1px solid currentColor; }
+.template-tree li { overflow-wrap: anywhere; }

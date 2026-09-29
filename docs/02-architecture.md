@@ -1289,3 +1289,32 @@ La page détail effectue une lecture sécurisée puis une analyse mémoire. Elle
 présente syntaxe, dépendances, blocks et liste HTML indentée, sans navigation de
 références ni UI arbre. Toujours cinq Tools, aucun nouvel endpoint, JavaScript ou
 accès aux fichiers dépendants. Voir les limites du [Template Viewer](tools/template-viewer.md).
+
+
+### Projection arbre du Template Viewer
+
+```text
+TemplateSource → TemplateStructure → build_template_tree → TemplateTree
+                                                               ↓
+                                       flatten_template_tree → vue serveur
+```
+
+`tools/template_tree.py` n'utilise que les modèles de structure déjà analysés.
+Dépendances et blocks restent deux listes distinctes, sans relation inventée avec
+HTML. Les profondeurs HTML reconstruisent une forêt de TemplateHtmlNode immuables.
+Une pile de profondeurs originales choisit les parents disponibles, puis les enfants
+sont gelés de bas en haut. Construction O(n), sans récursion ni nouveaux plafonds.
+Profondeur négative : ValueError ; saut : rattachement au parent disponible le plus
+proche. Ordres, doublons, partial et truncated sont conservés.
+
+Le rendu itératif des lignes aplaties conserve de véritables ul/li imbriqués, sans
+macro récursive, Markup ou chaînes HTML provenant du modèle. La page arbre sépare
+Dépendances Jinja, Blocks Jinja et Structure HTML, en rappelant les limites de
+l'analyse source. Dépendances textuelles uniquement, aucune navigation/résolution.
+
+GET /templates/tree réutilise le détail commun : parse_template_path, une lecture,
+une analyse, puis une projection. Statuts et no-store sont partagés avec le brut.
+Brut ↔ arbre par liens encodés, retour inventaire fixe ; cinq Tools toujours.
+Aucune modification des parsers, du lecteur source, du Tool d'inventaire, de Route
+Explorer ou des scripts. Les très grandes profondeurs restent une limite pratique
+côté navigateur, distincte de la construction/rendu itératifs serveur.
