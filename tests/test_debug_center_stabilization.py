@@ -51,6 +51,7 @@ def test_public_contract() -> None:
         "route-explorer",
         "entity-explorer",
         "debug-center",
+        "template-viewer",
     ]
     for function, params in (
         (bridge.read_debug_errors, ("root",)),

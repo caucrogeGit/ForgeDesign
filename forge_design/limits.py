@@ -26,3 +26,8 @@ MAX_DEBUG_POST_KEYS = 256
 MAX_DEBUG_HEADERS = 128
 # Caractères Unicode ; jusqu’à 3072 octets de percent-encoding pour 256 emoji.
 MAX_DEBUG_EVENT_ID_LENGTH = 256
+
+# Inventaire physique, distinct du suivi des références de Route Explorer.
+MAX_TEMPLATE_FILES = 512
+MAX_TEMPLATE_DIRECTORY_ENTRIES = 4096
+MAX_TEMPLATE_SCAN_DEPTH = 32

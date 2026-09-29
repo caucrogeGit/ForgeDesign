@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block title %}Template brut — Forge Design{% endblock %}
+{% block content %}
+<h1>Template brut</h1>
+<p><a href="/templates">Retour à Template Viewer</a></p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if source %}
+<h2>{{ source.path }}</h2>
+<dl data-size="{{ source.size }}" data-modified-ns="{{ source.modified_ns }}">
+  <dt>Taille</dt><dd>{{ source.size }} octets</dd>
+  <dt>Modification</dt><dd>{{ modified_date(source.modified_ns) }}</dd>
+</dl>
+<p>Contenu brut en lecture seule, sans interprétation HTML ou Jinja.</p>
+<pre class="source-code"><code>{{ source.text }}</code></pre>
+{% endif %}
+{% endblock %}

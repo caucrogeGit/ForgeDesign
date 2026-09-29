@@ -13,7 +13,7 @@ from forge_design.tools.project_inspector import ProjectInspection, ProjectInspe
 from forge_design.tools.route_explorer import RouteExplorerTool
 
 
-def test_registry_contains_four_tools() -> None:
+def test_registry_contains_five_tools() -> None:
     registry = create_tool_registry()
     assert isinstance(registry, ToolRegistry)
     assert tuple(tool.id for tool in registry.list()) == (
@@ -21,6 +21,7 @@ def test_registry_contains_four_tools() -> None:
         "route-explorer",
         "entity-explorer",
         "debug-center",
+        "template-viewer",
     )
     tool = registry.get("project-inspector")
     assert isinstance(tool, ProjectInspectorTool)
@@ -60,6 +61,7 @@ def test_compositions_are_independent() -> None:
         "route-explorer",
         "entity-explorer",
         "debug-center",
+        "template-viewer",
         "test-tool",
     )
     assert tuple(tool.id for tool in second.list()) == (
@@ -67,6 +69,7 @@ def test_compositions_are_independent() -> None:
         "route-explorer",
         "entity-explorer",
         "debug-center",
+        "template-viewer",
     )
     with pytest.raises(UnknownToolError):
         second.get("test-tool")
@@ -76,6 +79,7 @@ def test_compositions_are_independent() -> None:
         "route-explorer",
         "entity-explorer",
         "debug-center",
+        "template-viewer",
     )
 
 
@@ -89,4 +93,4 @@ def test_composition_does_not_execute_inspector(
     monkeypatch.setattr(RouteExplorerTool, "run", forbidden)
     monkeypatch.setattr(ProjectInspectorTool, "run", forbidden)
     monkeypatch.setattr(project_inspector, "inspect_project", forbidden)
-    assert len(create_tool_registry().list()) == 4
+    assert len(create_tool_registry().list()) == 5

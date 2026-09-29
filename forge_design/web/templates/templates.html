@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+{% block title %}Template Viewer — Forge Design{% endblock %}
+{% block content %}
+<h1>Template Viewer</h1>
+<p>Templates physiques de mvc/views/, en lecture seule. Les templates fournis exclusivement par les loaders d’opt-in ne sont pas inclus.</p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
+{% if result %}
+{% if not result.source_present %}<p>Source mvc/views/ absente ou inaccessible.</p>{% endif %}
+{% if result.issues %}
+<ul>{% for issue in result.issues %}<li><code>{{ issue.code }}</code> : {{ issue.message }}{% if issue.path %} — {{ issue.path }}{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% if result.templates %}
+<table>
+  <caption>Templates locaux</caption>
+  <thead><tr><th scope="col">Template</th><th scope="col">Taille</th><th scope="col">Modification</th><th scope="col">Action</th></tr></thead>
+  <tbody>
+  {% for template in result.templates %}
+  <tr data-template-path="{{ template.path }}" data-size="{{ template.size }}" data-modified-ns="{{ template.modified_ns }}">
+    <td>{{ template.path }}</td><td>{{ template.size }} octets</td><td>{{ modified_date(template.modified_ns) }}</td>
+    <td><a href="{{ template_url(template.path) }}" aria-label="Voir {{ template.path }}">Voir</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p>Aucun template disponible.</p>{% endif %}
+{% endif %}
+{% endblock %}

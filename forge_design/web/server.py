@@ -26,6 +26,7 @@ from forge_design.web.recent_projects import recent_action, show_home
 from forge_design.web.routes import show_routes
 from forge_design.web.security import is_local_action
 from forge_design.web.source import show_source
+from forge_design.web.template_viewer import show_template, show_templates
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -92,6 +93,12 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     def debug_detail(request: Request) -> Response:
         return show_debug_detail(request, context, registry)
 
+    def templates(request: Request) -> Response:
+        return show_templates(request, context, registry)
+
+    def template(request: Request) -> Response:
+        return show_template(request, context)
+
     def source(request: Request) -> Response:
         return show_source(request, context)
 
@@ -136,6 +143,8 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     router.add("GET", "/debug", debug, public=True, no_store=True)
     router.add("GET", "/debug/event", debug_detail, public=True, no_store=True)
     router.add("GET", "/source", source, public=True, no_store=True)
+    router.add("GET", "/templates", templates, public=True, no_store=True)
+    router.add("GET", "/templates/view", template, public=True, no_store=True)
     return Application(router, api_routes_module=None)
 
 

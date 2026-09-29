@@ -64,7 +64,19 @@ def template_source(reference: str) -> SourceLocation | None:
     return SourceLocation(path)
 
 
+@dataclass(frozen=True)
+class SourceContent:
+    text: str
+    size: int
+    modified_ns: int
+
+
 def read_project_source(root: Path, path: str) -> str:
+    """Contrat historique : retourner exclusivement le texte source."""
+    return read_project_source_details(root, path).text
+
+
+def read_project_source_details(root: Path, path: str) -> SourceContent:
     """Lire au plus 1 Mio via descripteurs de dossiers, sans suivre de symlink.
 
     Le support openat/O_NOFOLLOW est exigé : aucun repli moins strict.
@@ -107,7 +119,17 @@ def read_project_source(root: Path, path: str) -> str:
             data = stream.read(MAX_SOURCE_BYTES + 1)
         if len(data) > MAX_SOURCE_BYTES:
             raise SourceReadError("Source supérieure à 1 Mio.")
-        return data.decode("utf-8-sig")
+        current = os.fstat(descriptor)
+        if (
+            current.st_size != opened.st_size
+            or current.st_mtime_ns != opened.st_mtime_ns
+            or current.st_ctime_ns != opened.st_ctime_ns
+            or len(data) != opened.st_size
+        ):
+            raise SourceReadError("Source modifiée pendant la lecture.")
+        return SourceContent(
+            data.decode("utf-8-sig"), opened.st_size, opened.st_mtime_ns
+        )
     except FileNotFoundError:
         raise
     except (OSError, UnicodeError) as error:

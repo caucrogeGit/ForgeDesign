@@ -1,12 +1,12 @@
-"""Délégation explicite du quatrième Tool."""
+"""Cinquième Tool explicite, sans lecture au démarrage."""
 
 from pathlib import Path
 
 import pytest
 
 from forge_design.app import create_tool_registry
-from forge_design.forge.debug_errors import DebugErrorsResult
-from forge_design.tools import debug_center
+from forge_design.forge.templates import TemplatesResult
+from forge_design.tools import template_viewer
 from forge_design.web.server import create_application
 
 
@@ -14,14 +14,14 @@ def test_contract_and_delegation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[Path] = []
-    result = DebugErrorsResult()
+    result = TemplatesResult((), (), False, False)
 
-    def read(root: Path) -> DebugErrorsResult:
+    def read(root: Path) -> TemplatesResult:
         calls.append(root)
         return result
 
-    monkeypatch.setattr(debug_center, "read_debug_errors", read)
-    tool = debug_center.DebugCenterTool()
+    monkeypatch.setattr(template_viewer, "read_templates", read)
+    tool = template_viewer.TemplateViewerTool()
     create_application()
     assert not calls
     assert [t.id for t in create_tool_registry().list()] == [
@@ -31,9 +31,6 @@ def test_contract_and_delegation(
         "debug-center",
         "template-viewer",
     ]
-    assert tool.id == "debug-center" and tool.name == "Debug Center"
-    assert (
-        tool.description
-        == "Lire les erreurs runtime de développement d’un projet Forge."
-    )
+    assert tool.id == "template-viewer" and tool.name == "Template Viewer"
+    assert tool.description == "Lire les templates locaux d’un projet Forge."
     assert tool.run(tmp_path) is result and calls == [tmp_path]

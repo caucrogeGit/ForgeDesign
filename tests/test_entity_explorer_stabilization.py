@@ -42,6 +42,7 @@ def test_public_api_and_startup(monkeypatch: pytest.MonkeyPatch) -> None:
         "route-explorer",
         "entity-explorer",
         "debug-center",
+        "template-viewer",
     ]
     assert EntityExplorerTool().id == "entity-explorer"
     for function, parameters in (

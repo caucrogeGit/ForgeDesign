@@ -258,7 +258,8 @@ Cela garde les dépendances visibles et facilite les tests.
 Chaque appel crée un nouveau `ToolRegistry` et une nouvelle instance de
 `ProjectInspectorTool`, enregistrée explicitement sous `project-inspector`.
 `RouteExplorerTool` est enregistré sous `route-explorer` et `EntityExplorerTool`
-sous `entity-explorer`, puis `DebugCenterTool` sous `debug-center`. Ces quatre Tools sont
+sous `entity-explorer`, puis `DebugCenterTool` sous `debug-center` et
+`TemplateViewerTool` sous `template-viewer`. Ces cinq Tools sont
 les seuls Tools intégrés, dans cet ordre. La fonction retourne le registre sans
 exécuter le Tool ni accéder à un projet.
 
@@ -1186,7 +1187,7 @@ masquées : résumé, requête, contexte, localisation, traceback ordonnée, hin
 Il n’expose pas de JSONL original ni de représentation automatique de l’objet.
 Les liens de liste sont construits par urlencode ; les chemins de frames restent
 du texte. Navigation Debug Center active, no-store, retour fixe /debug, aucun JS.
-Bridge, redaction, filtres et Tool demeurent inchangés ; quatre Tools seulement.
+Bridge, redaction, filtres et Tool demeurent inchangés par cette étape Debug Center.
 
 ### Flux runtime du détail Debug Center
 
@@ -1222,3 +1223,39 @@ non vide dans la borne Web. Erreurs projet : 409 sur liste et détail ; absence 
 projet : liste 200, détail 409 ; occurrence absente après lecture : 404. La politique
 no-store des routes reste inchangée. La redaction traite également les headers avec
 = et les valeurs citées non refermées ; elle reste défensive et non exhaustive.
+
+
+## Template Viewer — inventaire et lecture brute
+
+```text
+mvc/views/ → Template Bridge → TemplateViewerTool → /templates
+                                                       ↓
+                             /templates/view → lecture brute commune
+```
+
+Le cinquième Tool `template-viewer` est enregistré explicitement, sans lecture au
+démarrage. `forge/templates.read_templates` inventorie uniquement les fichiers
+physiques locaux du projet reconnu ; aucun loader Jinja ou opt-in n'est exécuté.
+`TemplateInfo`, `TemplateIssue`, `TemplatesResult` et `TemplateSource` sont gelés.
+La liste Web appelle le Tool une fois, le détail appelle `read_template_source`,
+qui réutilise `source_parts` et le lecteur sécurisé `read_project_source_details`.
+L'API historique `read_project_source` conserve son retour texte et sa politique.
+
+L'inventaire ancre les dossiers via `forge/filesystem.open_directory`, vérifie
+leur identité et celle des fichiers ordinaires ouverts sans en lire le contenu.
+Les métadonnées du détail proviennent du descripteur courant ; une modification
+size/mtime/ctime pendant la lecture est refusée. Toutes les sources sont échappées,
+y compris HTML et Jinja hostiles. Aucun parsing ou rendu du contenu cible.
+
+Les limites centrales sont 512 fichiers, 4096 entrées globales (exclusions incluses)
+et 32 niveaux sous views ; elles sont distinctes du suivi de références de Route
+Explorer. Un surplus donne `template.analysis_truncated`, une erreur locale
+`template.unreadable`. La lecture brute reste limitée à 1 Mio UTF-8 avec BOM admis.
+Le résultat est trié ; au-delà du budget de découverte, le sous-ensemble dépend du
+filesystem. Aucun instantané global, stockage XDG, cache de résultat ou JavaScript.
+
+Les routes GET `/templates` et `/templates/view` conservent `no-store` et la
+navigation `templates`. Projet devenu invalide : 409 ; chemin refusé : 400 ;
+template absent : 404 ; source devenue illisible/liée/remplacée : 409. Le parser
+utilise les valeurs non vides de Request comme les autres nouvelles pages.
+Voir [Template Viewer](tools/template-viewer.md) pour les bornes, APIs et limites.

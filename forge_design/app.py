@@ -5,6 +5,7 @@ from forge_design.tools.debug_center import DebugCenterTool
 from forge_design.tools.entity_explorer import EntityExplorerTool
 from forge_design.tools.project_inspector import ProjectInspectorTool
 from forge_design.tools.route_explorer import RouteExplorerTool
+from forge_design.tools.template_viewer import TemplateViewerTool
 
 
 def create_tool_registry() -> ToolRegistry:
@@ -14,4 +15,5 @@ def create_tool_registry() -> ToolRegistry:
     registry.register(RouteExplorerTool())
     registry.register(EntityExplorerTool())
     registry.register(DebugCenterTool())
+    registry.register(TemplateViewerTool())
     return registry
