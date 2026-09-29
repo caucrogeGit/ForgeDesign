@@ -1447,3 +1447,25 @@ avec marqueur terminal. Cibles vérifiées hors inventaire ajoutées ; observati
 directe d'absence/inaccessibilité prioritaire sur une ancienne ligne d'inventaire.
 Pas de transaction filesystem, d'état global, de Tool ou Web. Voir le
 [contrat de liaison](contracts/view-contract.md#liaison-template--contrat--fd-contract-004).
+
+### Format design — FD-DESIGN-001
+
+```text
+ViewContract + Design JSON
+            ↓
+futurs bindings / générateur
+            ↓
+template Jinja → diff → écriture contrôlée
+```
+
+`forge_design/design/design.schema.json` définit la source graphique v0.1,
+strictement déclarative et packagée. Racine unique page, blocs récursifs, props
+scalaires, bindings et colonnes descriptifs. Le contrat expose les données ; le
+design décrit leur composition ; le template reste utilisable indépendamment.
+La suppression du .design.json ne doit pas casser l'application Forge.
+Convention mvc/views/<vue>.design.json, source_contract relatif à mvc/views.
+
+Pas de modèles de blocs, imbrication métier, lecteur/écrivain, binding évalué,
+interface ou Tool dans ce ticket. Aucun changement de la phase Contrats ou du
+Template Viewer, aucune dépendance supplémentaire. Voir le
+[format design](design/design-json.md) et ses responsabilités reportées.

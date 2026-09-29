@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Forge Design Design File",
+  "description": "Source graphique structurée et supprimable de Forge Design, indépendante de l’exécution du template Forge.",
+  "type": "object",
+  "required": [
+    "version",
+    "view",
+    "source_contract",
+    "root"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "view": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_contract": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "description": "Chemin relatif à mvc/views, suffixe .view.json ; la sécurité filesystem relève du futur lecteur.",
+      "pattern": "^[^/\\\\:\\r\\n]+(?:/[^/\\\\:\\r\\n]+)*\\.view\\.json$",
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "(^|/)\\.{1,2}(/|$)"
+          },
+          {
+            "pattern": "^mvc/views/"
+          },
+          {
+            "pattern": "(^|/)\\.view\\.json$"
+          },
+          {
+            "pattern": "[\\r\\n]"
+          }
+        ]
+      }
+    },
+    "root": {
+      "$ref": "#/$defs/PageRoot"
+    }
+  },
+  "$defs": {
+    "DesignNode": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "page",
+            "section",
+            "container",
+            "grid",
+            "card",
+            "title",
+            "text",
+            "button",
+            "table",
+            "form",
+            "field",
+            "alert",
+            "empty_state"
+          ]
+        },
+        "binding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "props": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/PropValue"
+          }
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DesignNode"
+          }
+        }
+      }
+    },
+    "PageRoot": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/DesignNode"
+        },
+        {
+          "type": "object",
+          "required": [
+            "children"
+          ],
+          "properties": {
+            "type": {
+              "const": "page"
+            }
+          }
+        }
+      ]
+    },
+    "TableColumn": {
+      "type": "object",
+      "required": [
+        "label",
+        "binding"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "binding": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "PropValue": {
+      "type": [
+        "string",
+        "boolean",
+        "integer",
+        "number"
+      ]
+    }
+  }
+}

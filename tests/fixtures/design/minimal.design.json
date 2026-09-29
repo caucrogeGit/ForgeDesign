@@ -1,0 +1,9 @@
+{
+  "version": "0.1",
+  "view": "home/index",
+  "source_contract": "home/index.view.json",
+  "root": {
+    "type": "page",
+    "children": []
+  }
+}

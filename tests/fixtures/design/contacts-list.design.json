@@ -1,0 +1,48 @@
+{
+  "version": "0.1",
+  "view": "contacts/list",
+  "source_contract": "contacts/list.view.json",
+  "root": {
+    "type": "page",
+    "children": [
+      {
+        "type": "section",
+        "props": {
+          "tag": "header",
+          "class": "max-w-5xl mx-auto py-8"
+        },
+        "children": [
+          {
+            "type": "text",
+            "binding": "page_title",
+            "props": {
+              "tag": "h1",
+              "class": "text-3xl font-bold"
+            }
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "binding": "contacts",
+        "props": {
+          "class": "w-full border border-slate-200"
+        },
+        "columns": [
+          {
+            "label": "Nom",
+            "binding": "nom"
+          },
+          {
+            "label": "Email",
+            "binding": "email"
+          },
+          {
+            "label": "Téléphone",
+            "binding": "telephone"
+          }
+        ]
+      }
+    ]
+  }
+}
