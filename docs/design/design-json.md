@@ -246,3 +246,88 @@ pas des frontières de validation. Aucune garantie d'immuabilité profonde.
 
 Aucun changement des contrats, Tools, Web, générateur ou dépendances. Les étapes
 suivantes restent FD-DESIGN-003 (imbrication), FD-DESIGN-004 (I/O) et les bindings.
+
+## Règles d’imbrication — FD-DESIGN-003
+
+La validation d'imbrication est une étape pure distincte de Pydantic. Le schéma,
+les modèles et les deux fixtures officielles restent inchangés. Un DesignFile
+peut être structurellement valide et contenir des relations parent/enfant invalides.
+
+```python
+from forge_design.design import DesignFile, can_contain, validate_design_nesting
+
+design = DesignFile.model_validate(data)
+result = validate_design_nesting(design)
+assert can_contain("section", "text")
+# result.valid, result.issues, result.truncated
+```
+
+| Parent | Enfants autorisés v0.1 |
+|---|---|
+| page | section, table |
+| section | container, grid, card, form, table, alert, text |
+| container | grid, card, form, table, text, button |
+| card | title, text, form, button, grid |
+| form | field, button, alert |
+| table | empty_state |
+| grid | aucun |
+| title | aucun |
+| text | aucun |
+| button | aucun |
+| field | aucun |
+| alert | aucun |
+| empty_state | aucun |
+
+La fixture contacts-list contient également une table directement sous page.
+Le ticket exige simultanément sa validité sans modification et page → section
+uniquement. Pour préserver la fixture livrée, **page → table** est ajouté
+explicitement à la matrice, sans exception fondée sur le nom du fichier ou le binding.
+Il s'agit d'une seconde correction de cohérence des sources, distincte de section → text.
+
+ALLOWED_CHILDREN est un mapping non modifiable de frozenset, typé avec
+DesignNodeType. DesignNestingIssue et DesignNestingResult sont des dataclasses
+gelées ; issues est un tuple. La règle dépend seulement des types parent/enfant :
+props, binding et columns sont ignorés. TableColumn n'est pas un bloc enfant.
+Aucune présence obligatoire de columns, props ou binding n'est ajoutée.
+
+La relation section → text complète explicitement la réduction du cadrage au
+vocabulaire existant : l'exemple normatif contacts-list utilise déjà text/tag=h1
+sous section. Cela n'autorise pas section → title. Grid, title, text, button,
+field, alert et empty_state sont feuilles selon une **politique v0.1 conservatrice**.
+Le cadrage et le vocabulaire actuel ne fournissent pas de règle Grid fiable ;
+cette décision ne préjuge pas des versions futures. Header, main, footer, image,
+hidden_field et actions ne sont pas ajoutés. Aucune page descendante n'est permise.
+
+Chaque mauvaise relation produit design.nesting.child_not_allowed, avec message
+humain, parent_type, child_type et path tuple, par exemple
+("root", "children", 0, "children", 2). Les diagnostics suivent le parcours préfixe,
+profondeur d'abord et ordre source, même sous un parent déjà signalé. Aucun tri
+ou dédoublonnage des occurrences.
+
+Les bornes d'analyse sont centralisées dans limits.py :
+
+| Borne | Valeur | Sémantique |
+|---|---:|---|
+| MAX_DESIGN_NODES | 4096 | Racine comprise ; occurrences inspectées |
+| MAX_DESIGN_DEPTH | 128 | Racine à profondeur 0 ; 128 admis |
+| MAX_DESIGN_ISSUES | 512 | Marqueur terminal compris |
+
+Une limite exactement atteinte sans surplus ne tronque pas. Au premier surplus,
+l'analyse entière s'arrête avec truncated=True et valid=False. Un unique diagnostic
+terminal design.nesting.analysis_truncated identifie le nœud qui déclenche l'arrêt.
+Si 512 diagnostics existent déjà, le dernier est remplacé par le marqueur : les
+511 premières erreurs sont préservées. À 512 erreurs sans surplus, les 512 restent
+présentes et truncated=False. Le message précise la borne atteinte ; le code et
+le path constituent le contrat machine.
+
+Parcours itératif par pile d'itérateurs, sans model_dump ni copie des listes
+d'enfants. La largeur ne gonfle pas la pile ; les chemins et la pile sont bornés
+par la profondeur. Coût linéaire dans les occurrences inspectées à profondeur
+plafonnée. Un cycle introduit par mutation des listes s'arrête à la borne de
+profondeur. L'entrée doit conserver ses types Pydantic ; aucune réparation ou
+revalidation générale des modèles mutés arbitrairement n'est réalisée.
+
+valid=True signifie uniquement absence d'erreur d'imbrication et analyse complète.
+Aucun accès filesystem, contexte, contrat, Web, génération ou nouveau Tool.
+Les références et contenus des objets sont conservés. Le lecteur/écrivain sécurisé
+reste FD-DESIGN-004 et la validation des bindings appartient à une étape ultérieure.

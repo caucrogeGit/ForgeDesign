@@ -1488,3 +1488,22 @@ ses propriétés mais impose page/children. Absence interne distincte de null fo
 export fidèle avec exclude_unset=True, props scalaires préservant leur type.
 source_contract applique le motif et les exclusions du schéma inchangé sans I/O.
 Aucun accès projet, imbrication métier, binding évalué, génération, Web ou nouveau Tool.
+
+### Validation d'imbrication — FD-DESIGN-003
+
+```text
+Design JSON en mémoire
+   ↓ Pydantic (structure)
+DesignFile / DesignNode
+   ↓ validate_design_nesting() (relations parent → enfant)
+DesignNestingResult : valid, issues, truncated
+```
+
+`design/nesting.py` applique une matrice v0.1 publique immuable, indépendamment
+des modèles et du schéma inchangés. Parcours préfixe itératif par itérateurs,
+aucune mutation, copie complète ou dépendance projet. Diagnostics localisés,
+plusieurs erreurs conservées dans l'ordre source. Bornes dans limits.py :
+4096 nœuds racine comprise, profondeur 128 racine à zéro, 512 issues marqueur
+terminal compris. Une analyse tronquée ne conclut jamais à la validité.
+Les propriétés, bindings et colonnes n'interviennent pas dans l'imbrication.
+Voir la matrice et ses décisions conservatrices dans le [format design](design/design-json.md).

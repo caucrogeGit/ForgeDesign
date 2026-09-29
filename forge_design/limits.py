@@ -47,3 +47,8 @@ MAX_VIEW_CONTRACT_ISSUES = 512
 MAX_VIEW_CONTRACT_VALIDATION_ISSUES = 256
 # Plusieurs anomalies possibles par contrat ; marqueur de troncature inclus.
 MAX_VIEW_CONTRACT_LINK_ISSUES = 512
+
+# Imbrication design : racine incluse, profondeur racine zéro, marqueur inclus.
+MAX_DESIGN_NODES = 4096
+MAX_DESIGN_DEPTH = 128
+MAX_DESIGN_ISSUES = 512

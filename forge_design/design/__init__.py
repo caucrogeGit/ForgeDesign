@@ -8,6 +8,13 @@ from forge_design.design.models import (
     PropValue,
     TableColumn,
 )
+from forge_design.design.nesting import (
+    ALLOWED_CHILDREN,
+    DesignNestingIssue,
+    DesignNestingResult,
+    can_contain,
+    validate_design_nesting,
+)
 
 __all__ = [
     "DesignFile",
@@ -16,4 +23,9 @@ __all__ = [
     "PageRoot",
     "PropValue",
     "TableColumn",
+    "ALLOWED_CHILDREN",
+    "DesignNestingIssue",
+    "DesignNestingResult",
+    "can_contain",
+    "validate_design_nesting",
 ]
