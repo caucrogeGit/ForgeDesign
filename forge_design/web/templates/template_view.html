@@ -23,8 +23,8 @@
 {% if structure.issues %}<ul>{% for issue in structure.issues %}<li><code>{{ issue.code }}</code> : {{ issue.message }}</li>{% endfor %}</ul>{% endif %}
 <h3>Dépendances déclarées</h3>
 {% if structure.dependencies %}
-<table><thead><tr><th scope="col">Type</th><th scope="col">Template</th><th scope="col">Ligne</th></tr></thead><tbody>
-{% for reference in structure.dependencies %}<tr><td>{{ reference.kind }}</td><td>{% if reference.dynamic %}Référence dynamique{% else %}{{ reference.path }}{% endif %}</td><td>{{ reference.line }}</td></tr>{% endfor %}
+<table><thead><tr><th scope="col">Type</th><th scope="col">Template</th><th scope="col">Ligne</th><th scope="col">État local</th><th scope="col">Action</th></tr></thead><tbody>
+{% for item in navigation %}<tr data-navigation-status="{{ item.status }}"><td>{{ item.reference.kind }}</td><td>{% if item.status == 'dynamic' %}Référence dynamique{% else %}{{ item.reference.path }}{% endif %}</td><td>{{ item.reference.line }}</td><td>{{ navigation_labels[item.status] }}</td><td>{% if item.status == 'available' %}<a href="{{ template_url(item.target_path) }}" aria-label="Voir le template {{ item.target_path }}">Voir</a>{% endif %}</td></tr>{% endfor %}
 </tbody></table>
 {% else %}<p>Aucune dépendance relevée.</p>{% endif %}
 <h3>Blocks</h3>

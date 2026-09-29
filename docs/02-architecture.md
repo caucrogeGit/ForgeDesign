@@ -1318,3 +1318,26 @@ Brut ↔ arbre par liens encodés, retour inventaire fixe ; cinq Tools toujours.
 Aucune modification des parsers, du lecteur source, du Tool d'inventaire, de Route
 Explorer ou des scripts. Les très grandes profondeurs restent une limite pratique
 côté navigateur, distincte de la construction/rendu itératifs serveur.
+
+
+### Navigation locale des références de templates
+
+```text
+TemplateReference → validation lexicale → inspection locale mvc/views
+                                                  ↓
+                             TemplateNavigation → lien /templates/view
+```
+
+`tools/template_navigation.py` classe d'abord les références dynamiques ou refusées
+sans I/O, puis appelle `inspect_project_source` pour les chemins autorisés. Une
+petite extraction de l'ouverture du lecteur source évite de dupliquer ancrage,
+O_NOFOLLOW, contrôle régulier, identité et taille. L'inspection ne lit pas le
+contenu, ne valide pas UTF-8/Jinja et ne résout aucun opt-in. Lecture brute et
+handler /source gardent leurs contrats.
+
+Les cinq états available/dynamic/invalid-path/missing/unreadable alimentent les
+deux templates d'interface depuis le détail Web commun. Seul available fournit
+un target_path et un lien encodé vers le brut. Doublons conservés, cache local à
+l'appel, maximum existant de 512 références vérifié avant I/O. Aucun cache global,
+transitivité, cycle, nouveau Tool, route ou script. Observation limitée au GET,
+possibilité de 404/409 au clic si la source disparaît ou devient illisible.

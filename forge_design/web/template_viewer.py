@@ -17,6 +17,7 @@ from forge_design.forge.source import SourceReadError, source_parts
 from forge_design.forge.template_structure import analyze_template_structure
 from forge_design.forge.templates import TemplatesResult, read_template_source
 from forge_design.platform.tool_registry import ToolRegistry
+from forge_design.tools.template_navigation import resolve_template_references
 from forge_design.tools.template_tree import build_template_tree, flatten_template_tree
 from forge_design.web.rendering import render_page
 
@@ -123,6 +124,18 @@ def _show_detail(
             "source": source,
             "structure": structure,
             "tree": tree,
+            "navigation": resolve_template_references(
+                context.root, structure.dependencies
+            )
+            if context.root is not None and structure is not None
+            else (),
+            "navigation_labels": {
+                "available": "Local",
+                "dynamic": "Non résolue statiquement",
+                "invalid-path": "Chemin refusé",
+                "missing": "Non disponible dans mvc/views/",
+                "unreadable": "Source locale inaccessible",
+            },
             "tree_rows": flatten_template_tree(tree) if tree is not None else (),
             "template_url": template_url,
             "template_tree_url": template_tree_url,

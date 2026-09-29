@@ -2,6 +2,8 @@
 
 import os
 import re
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from stat import S_ISDIR, S_ISREG
@@ -76,12 +78,17 @@ def read_project_source(root: Path, path: str) -> str:
     return read_project_source_details(root, path).text
 
 
-def read_project_source_details(root: Path, path: str) -> SourceContent:
-    """Lire au plus 1 Mio via descripteurs de dossiers, sans suivre de symlink.
+@dataclass(frozen=True)
+class SourceMetadata:
+    size: int
+    modified_ns: int
 
-    Le support openat/O_NOFOLLOW est exigé : aucun repli moins strict.
-    root est la racine canonique fournie par le contexte projet.
-    """
+
+@contextmanager
+def _open_project_source(
+    root: Path, path: str
+) -> Generator[tuple[int, os.stat_result], None, None]:
+    """Ouverture confinée commune, sans lecture ; root doit être canonique."""
     parts = source_parts(path)
     if os.open not in os.supports_dir_fd or not hasattr(os, "O_NOFOLLOW"):
         raise SourceReadError("Lecture source sécurisée indisponible sur ce système.")
@@ -115,6 +122,25 @@ def read_project_source_details(root: Path, path: str) -> SourceContent:
             raise SourceReadError("Source remplacée pendant l’ouverture.")
         if opened.st_size > MAX_SOURCE_BYTES:
             raise SourceReadError("Source supérieure à 1 Mio.")
+        yield descriptor, opened
+    except FileNotFoundError:
+        raise
+    except (OSError, UnicodeError) as error:
+        raise SourceReadError("Source inaccessible, liée ou non UTF-8.") from error
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+def inspect_project_source(root: Path, path: str) -> SourceMetadata:
+    """Vérifier ouverture/identité/taille sans lire ou décoder le contenu."""
+    with _open_project_source(root, path) as (_, opened):
+        return SourceMetadata(opened.st_size, opened.st_mtime_ns)
+
+
+def read_project_source_details(root: Path, path: str) -> SourceContent:
+    """Lire au plus 1 Mio UTF-8 via l'ouverture sécurisée commune."""
+    with _open_project_source(root, path) as (descriptor, opened):
         with os.fdopen(os.dup(descriptor), "rb") as stream:
             data = stream.read(MAX_SOURCE_BYTES + 1)
         if len(data) > MAX_SOURCE_BYTES:
@@ -130,10 +156,3 @@ def read_project_source_details(root: Path, path: str) -> SourceContent:
         return SourceContent(
             data.decode("utf-8-sig"), opened.st_size, opened.st_mtime_ns
         )
-    except FileNotFoundError:
-        raise
-    except (OSError, UnicodeError) as error:
-        raise SourceReadError("Source inaccessible, liée ou non UTF-8.") from error
-    finally:
-        for descriptor in reversed(descriptors):
-            os.close(descriptor)

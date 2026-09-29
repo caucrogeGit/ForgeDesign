@@ -11,15 +11,17 @@
   <dt>Taille</dt><dd>{{ source.size }} octets</dd>
   <dt>Modification</dt><dd>{{ modified_date(source.modified_ns) }}</dd>
 </dl>
-<p>Arbre de la structure détectée dans le source, pas un DOM rendu ou corrigé. Les dépendances sont des déclarations non résolues ; les blocks ne sont pas associés aux balises HTML.</p>
+<p>Arbre de la structure détectée dans le source, pas un DOM rendu ou corrigé. Les liens concernent uniquement les sources locales observées pendant cette consultation. Les blocks ne sont pas associés aux balises HTML.</p>
 {% if tree.partial %}<p>Arbre construit à partir d’une analyse partielle.</p>{% endif %}
 {% if tree.truncated %}<p>Structure tronquée par les limites d’analyse.</p>{% endif %}
 {% if structure.syntax.status == 'invalid' %}<p>Syntaxe Jinja invalide à la ligne {{ structure.syntax.line }} : {{ structure.syntax.message }}</p>{% elif structure.syntax.status == 'unreadable' %}<p>Syntaxe Jinja non analysée : limite de complexité.</p>{% endif %}
 <section aria-labelledby="dependencies-title">
 <h2 id="dependencies-title">Dépendances Jinja</h2>
 {% if tree.dependencies %}<ul class="template-tree">
-{% for reference in tree.dependencies %}<li>{{ reference.kind }} — ligne {{ reference.line }}
-<ul><li>{% if reference.dynamic %}Référence dynamique{% else %}{{ reference.path }}{% endif %}</li></ul></li>{% endfor %}
+{% for item in navigation %}<li data-navigation-status="{{ item.status }}">{{ item.reference.kind }} — ligne {{ item.reference.line }}
+<ul><li>{% if item.status == 'dynamic' %}Référence dynamique{% else %}{{ item.reference.path }}{% endif %}
+— {{ navigation_labels[item.status] }}
+{% if item.status == 'available' %}<a href="{{ template_url(item.target_path) }}" aria-label="Voir le template {{ item.target_path }}">Voir</a>{% endif %}</li></ul></li>{% endfor %}
 </ul>{% else %}<p>Aucune dépendance Jinja détectée.</p>{% endif %}
 </section>
 <section aria-labelledby="blocks-title">

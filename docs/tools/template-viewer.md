@@ -191,8 +191,8 @@ utilisent urlencode et le parser path commun ; aucune nouvelle politique de chem
 La vue serveur distingue trois structures :
 
 - **Dépendances Jinja** : déclarations en ordre source, type et ligne, puis chemin
-  complet ou « Référence dynamique ». Les chemins restent du texte, sans lien ou
-  vérification de présence, y compris extends/include/import/from-import.
+  complet ou « Référence dynamique ». Depuis FD-TEMPLATE-004, les références
+  statiques locales autorisées peuvent proposer Voir selon les états ci-dessous.
 - **Blocks Jinja** : liste à un seul niveau, noms complets, lignes et doublons
   conservés. Aucune relation de parenté entre blocks ou avec les balises n'est
   déduite des seules lignes.
@@ -232,3 +232,61 @@ nouveau parsing. Métadonnées de la même source courante, sans cache. Les stat
 400/404/409, no-store et POST 405 sont ceux du détail brut. La navigation principale
 reste Template Viewer et le registre conserve cinq Tools. Aucun rendu cible,
 JavaScript, édition, résolution transitive, cycle ou écriture.
+
+
+## Navigation locale des dépendances (FD-TEMPLATE-004)
+
+La vue brute et l'arbre utilisent le même résultat `TemplateNavigation`, calculé
+une fois par GET depuis `TemplateStructure.dependencies`. Aucun nouveau parsing.
+Les références statiques extends/include/import/from-import peuvent proposer
+**Voir**, avec un nom accessible précisant la cible, vers le fichier brut local.
+Le fichier cible permet ensuite d'ouvrir son propre arbre. Le retour à l'arbre
+précédent utilise le navigateur, sans paramètre return_to/next/from ni pile stockée.
+
+| État | Texte affiché | Navigation |
+|---|---|---|
+| available | Local | Voir vers /templates/view |
+| dynamic | Non résolue statiquement | Aucune |
+| invalid-path | Chemin refusé | Aucune |
+| missing | Non disponible dans mvc/views/ | Aucune |
+| unreadable | Source locale inaccessible | Aucune |
+
+`resolve_template_references(root, references)` prend la racine canonique courante
+et les références déjà analysées. Le modèle gelé conserve reference, status et
+un target_path seulement pour available ; le résultat est un tuple. Une référence
+sans path est classée dynamic, même dans un modèle synthétique. Les rejets
+lexicaux/dynamiques sont séparés du contrôle filesystem et n'ouvrent rien.
+
+La politique commune template_source/source_parts refuse notamment traversal,
+absolus, segments cachés, noms sensibles, backslash, deux-points et NUL, sans
+normalisation permissive. L'inspection ouvre seulement mvc/views/<path> : ancrage
+segment par segment, O_NOFOLLOW/O_NONBLOCK, fichier ordinaire, stat/fstat/samestat,
+taille historique maximale de 1 Mio. `inspect_project_source` et la lecture brute
+partagent la même primitive d'ouverture. Aucune lecture/décodage du contenu cible,
+aucun parsing, loader ou recherche dans les opt-ins/packages.
+
+available signifie ouverture locale permise au moment du contrôle. La syntaxe
+Jinja n'est pas vérifiée : un template cassé reste navigable. L'UTF-8 n'est pas
+prévalidé non plus ; un fichier non UTF-8 peut proposer Voir puis retourner 409
+lors de sa lecture. Cette distinction permet de ne pas précharger les dépendances.
+Un fichier trop gros, spécial, lié, remplacé ou inaccessible est unreadable.
+Seul FileNotFoundError donne missing ; une absence locale ne prouve rien sur un
+éventuel template fourni par un opt-in.
+
+Les doublons gardent leurs occurrences/lignes. Un dictionnaire local à l'appel
+évite les ouvertures répétées d'un même chemin ; aucun cache inter-requêtes. Au plus
+512 références, limite déjà centralisée ; un appel synthétique dépassant ce contrat
+lève ValueError avant I/O. Coût O(références) hors filesystem, sans transitivité.
+Les listes include sont traitées selon le modèle existant ; une liste mixte reste
+une référence dynamique, sans récupération de ses parties littérales.
+
+L'état affiché est une observation du GET courant, pas une garantie persistante.
+Ajout, suppression ou remplacement externe sont visibles au prochain GET. Un lien
+peut devenir 404 si la cible disparaît avant le clic, ou 409 si elle devient liée
+ou illisible. Aucune cohérence atomique entre toutes les cibles n'est revendiquée.
+Les URL passent par template_url/urlencode, sans décodage manuel ni retour fourni
+par le client. Espaces, accents, emoji, &, + et % sont conservés par ce parcours.
+
+Une lecture/analyse de la source principale demeure, plus les inspections locales
+directes. Aucun contenu cible dans la page appelante, aucun graphe/cycle Viewer,
+Tool, route, JavaScript ou écriture supplémentaire. Le handler /source est inchangé.
