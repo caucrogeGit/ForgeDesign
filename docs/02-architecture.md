@@ -1424,3 +1424,26 @@ Le lecteur réutilise open_directory et read_project_source_details ; suffixe
 spécialisé ajouté à la politique source commune, sans la dupliquer ni l'élargir.
 Aucune interprétation de template/entity/actions, aucun Tool ou Web. Le schéma et
 les modèles du format restent inchangés. Voir les [garanties et limites du lecteur](contracts/view-contract.md#lecteur-projet--fd-contract-003).
+
+### Liaison template–contrat — FD-CONTRACT-004
+
+```text
+Templates physiques ─────┐
+                        ├─→ observations sécurisées → projection des liens
+.view.json validés ──────┘
+```
+
+`contracts/linkage.py` compose les deux inventaires et le détail existants ; aucun
+scanner ajouté. Le champ contract.template est validé par la politique source puis
+inspecté directement, une fois par cible et appel. Aucune lecture du template cible.
+Une fonction de projection pure indexe noms et cibles pour conserver les doublons
+et signaler séparément les ambiguïtés. Les métadonnées .view.json/.design.json sont
+exclues localement des candidats, sans modifier Template Viewer ni le schéma.
+
+Résultats gelés, issues lecteur préservées dans des collections distinctes des issues
+de liaison. Inventaire contractuel incomplet : statut unknown au lieu de conclure
+à une absence ou une unicité. Troncatures propagées, issues de liaison plafonnées
+avec marqueur terminal. Cibles vérifiées hors inventaire ajoutées ; observation
+directe d'absence/inaccessibilité prioritaire sur une ancienne ligne d'inventaire.
+Pas de transaction filesystem, d'état global, de Tool ou Web. Voir le
+[contrat de liaison](contracts/view-contract.md#liaison-template--contrat--fd-contract-004).

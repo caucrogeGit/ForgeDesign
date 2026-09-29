@@ -302,3 +302,89 @@ Aucune association automatique au fichier .html voisin : template, entity et act
 restent déclaratifs, sans ouverture de ces cibles. Aucune exécution, écriture, UI ou
 Tool nouveau. Template Viewer continue à montrer les fichiers physiques admissibles,
 y compris les .view.json, et /source garde sa politique actuelle.
+
+## Liaison template ↔ contrat — FD-CONTRACT-004
+
+`analyze_view_contract_links(root: Path) -> ViewContractLinksResult` compose
+read_templates, read_view_contracts, puis une lecture par contrat inventorié et
+une inspection sécurisée par cible distincte. Aucun troisième scanner, aucun
+parsing Jinja ou lecture du contenu cible. Un fichier binaire ou Jinja invalide
+peut donc être une cible physique liée ; la lecture de son contenu reste séparée.
+
+La **seule source de vérité est `ViewContract.template`**. Ni le nom du fichier
+.view.json, ni name, ni le voisinage ne déduisent une association. Un contrat
+invalide n'est jamais partiellement exploité. Il peut coexister avec un template
+voisin sans contrat valide : aucune association par filename n'est supposée.
+
+`is_view_template_path(path)` est une primitive pure sur les chemins relatifs à
+views : politique source commune et exclusion exacte des suffixes `.view.json`
+et `.design.json`. Tout autre fichier régulier admissible est candidat, sans
+restriction .html. Cette exclusion est locale à la liaison : Template Viewer
+continue à inventorier tous les fichiers admissibles, métadonnées comprises.
+Les cibles contractuelles portant ces suffixes sont refusées, sans modifier le schéma.
+
+Les chemins déclarés passent par source_parts, avec contrôle explicite de mvc/views,
+avant conversion relative. Traversal, noms sensibles et sortie de views sont refusés.
+Une inspection directe courante distingue linked, template-missing et
+ template-unreadable (lien, dossier, spécial, taille excessive, accès refusé).
+`template-invalid-path` ne déclenche aucune inspection ; `contract-invalid`
+conserve les diagnostics du lecteur, sans récupération du texte JSON.
+
+### Résultats et ambiguïtés
+
+Dataclasses gelées, collections en tuples :
+
+- ViewContractLink : contract_path, contract_name, declared_template, template_path,
+  status. Les noms/cibles restent None pour un contrat invalide.
+- TemplateContractStatus : template_path, contract_paths, status.
+- ViewContractLinkIssue : code, message, contract_path et template_path éventuels.
+- ViewContractLinksResult : templates, contracts, issues de liaison,
+  contract_issues originales, template_issues originales, truncated, contracts_complete.
+
+Le statut principal d'un contrat décrit sa cible physique, pas l'unicité de son
+nom ou de la liaison. Les deux ambiguïtés sont des issues indépendantes, pouvant
+coexister : `contract.link.duplicate-name` et `contract.link.multiple-contracts`.
+Une issue par déclaration concernée, aucune occurrence fusionnée, aucun gagnant.
+Même name vers deux cibles donne duplicate-name ; deux names vers une cible donnent
+multiple-contracts ; mêmes name et cible donnent les deux. Les déclarations de
+cible lexicalement admises sont comptées même si cette cible est absente/inaccessible.
+
+Côté template : zéro contrat valide observé donne without-contract (légitime,
+sans issue automatique), un donne linked, plusieurs donnent ambiguous. Si la
+collecte des contrats est incomplète, zéro ou un donne **unknown**, car ni l'absence
+ni l'unicité ne sont certaines ; une ambiguïté déjà observée reste certaine.
+contracts_complete est faux après inventaire contractuel tronqué/avec issues ou
+lecture impossible/disparition d'un contrat. Un JSON ou modèle définitivement
+invalide ne crée pas à lui seul cette incertitude.
+
+Autres codes : contract.link.invalid-template-path, contract.link.template-missing,
+contract.link.template-unreadable et contract.link.analysis-truncated.
+Les diagnostics originaux contract.json_invalid/validation_error/unreadable et
+leurs locations ne sont pas remplacés par une erreur vague de liaison.
+
+### Bornes et observation courante
+
+Aucune limite MAX_LINKS : jusqu'à 512 contrats et 512 templates inventoriés, plus
+au plus une cible vérifiée par contrat hors inventaire (donc 1024 lignes templates).
+MAX_VIEW_CONTRACT_LINK_ISSUES vaut 512, marqueur terminal compris, car chaque contrat
+peut produire plusieurs anomalies. À la limite exacte sans surplus, aucune troncature.
+Tout dépassement ou troncature amont (y compris diagnostics du détail) propage
+truncated et le marqueur terminal. Les issues originales restent distinctes et
+bornées par leurs lecteurs : jusqu'à 512 + 512 × 256 issues contractuelles.
+
+Une cible présente hors inventaire est ajoutée après inspection directe réussie.
+Une cible inventoriée puis constatée absente/inaccessible est retirée des lignes
+templates ; sa déclaration et l'issue restent visibles côté contrats. Les templates
+sans déclaration ne sont pas réinspectés. Cache d'observation par cible limité à
+l'appel, sans fusion des déclarations ni garantie de stabilité entre deux appels.
+Une suppression contractuelle entre scan et lecture devient contract-invalid avec
+contract.unreadable et contracts_complete=False, sans exception d'absence propagée.
+Les exceptions de niveau projet restent celles des lecteurs.
+
+Observation cohérente au mieux pendant l'appel, **pas snapshot atomique**. Les
+inventaires peuvent déjà être partiels à cause des budgets de noms/fichiers.
+Une inspection directe évite de déduire missing de la seule absence dans l'inventaire.
+Les index locaux nom/cible coûtent O(T+C), hors I/O, tri final et diagnostics ;
+présentation triée lexicalement, aucun cache global. La projection interne est pure.
+Aucune résolution d'entités, fields, routes, contrôleurs, actions ou dépendances Jinja.
+Aucune exécution, écriture, interface, nouveau Tool ou dépendance.

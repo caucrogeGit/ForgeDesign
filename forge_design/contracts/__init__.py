@@ -1,5 +1,15 @@
 """Schéma normatif et modèles de contrats de vue, lecture projet sécurisée."""
 
+from forge_design.contracts.linkage import (
+    TemplateContractStatus,
+    TemplateLinkStatus,
+    ViewContractLink,
+    ViewContractLinkIssue,
+    ViewContractLinksResult,
+    ViewContractLinkStatus,
+    analyze_view_contract_links,
+    is_view_template_path,
+)
 from forge_design.contracts.models import (
     ViewAction,
     ViewContextVariable,
@@ -17,6 +27,14 @@ from forge_design.contracts.reader import (
 )
 
 __all__ = [
+    "TemplateContractStatus",
+    "TemplateLinkStatus",
+    "ViewContractLink",
+    "ViewContractLinkIssue",
+    "ViewContractLinksResult",
+    "ViewContractLinkStatus",
+    "analyze_view_contract_links",
+    "is_view_template_path",
     "ViewAction",
     "ViewContextVariable",
     "ViewContract",
