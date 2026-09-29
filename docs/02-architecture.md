@@ -1286,9 +1286,9 @@ limites donnent des issues explicites et un résultat partiel, jamais un verdict
 HTML. Les modèles sont immuables ; le texte brut reste intact et visible.
 
 La page détail effectue une lecture sécurisée puis une analyse mémoire. Elle
-présente syntaxe, dépendances, blocks et liste HTML indentée, sans navigation de
-références ni UI arbre. Toujours cinq Tools, aucun nouvel endpoint, JavaScript ou
-accès aux fichiers dépendants. Voir les limites du [Template Viewer](tools/template-viewer.md).
+présente syntaxe, dépendances, blocks et liste HTML indentée. Les projections arbre
+et navigation locale décrites ci-dessous complètent ce socle. Toujours cinq Tools,
+aucun rendu cible ou JavaScript. Voir les limites du [Template Viewer](tools/template-viewer.md).
 
 
 ### Projection arbre du Template Viewer
@@ -1310,7 +1310,7 @@ proche. Ordres, doublons, partial et truncated sont conservés.
 Le rendu itératif des lignes aplaties conserve de véritables ul/li imbriqués, sans
 macro récursive, Markup ou chaînes HTML provenant du modèle. La page arbre sépare
 Dépendances Jinja, Blocks Jinja et Structure HTML, en rappelant les limites de
-l'analyse source. Dépendances textuelles uniquement, aucune navigation/résolution.
+l'analyse source. La navigation locale des dépendances est décrite ci-dessous.
 
 GET /templates/tree réutilise le détail commun : parse_template_path, une lecture,
 une analyse, puis une projection. Statuts et no-store sont partagés avec le brut.
@@ -1341,3 +1341,20 @@ un target_path et un lien encodé vers le brut. Doublons conservés, cache local
 l'appel, maximum existant de 512 références vérifié avant I/O. Aucun cache global,
 transitivité, cycle, nouveau Tool, route ou script. Observation limitée au GET,
 possibilité de 404/409 au clic si la source disparaît ou devient illisible.
+
+
+### Stabilisation du Template Viewer
+
+Les API et modèles de la verticale restent inchangés. L'analyse pure distingue
+`MAX_TEMPLATE_STRUCTURE_CHARS` des octets `MAX_SOURCE_BYTES` du lecteur. `partial`
+dérive des états incomplets/incertains, sans dépendre de la présence d'une issue ;
+`truncated` marque les interruptions par les limites configurées ou du parser.
+La copie HTML normalise CR/CRLF comme Jinja, sans modifier la source ni son masque.
+Un index des positions ouvertes évite le parcours de toute la pile pour chaque
+fermeture inconnue ; les dépilements sont amortis sur les ouvertures.
+
+Le cache de navigation reste local au GET et au chemin, sans fusion d'occurrences
+ni garantie atomique. Inspection légère puis lecture au clic : `available` ne
+certifie ni UTF-8 ni syntaxe. Unicode n'est pas normalisé. Les bornes, les différences
+entre structure détectée et DOM rendu et les limites filesystem sont détaillées
+au [contrat Template Viewer](tools/template-viewer.md#contrats-stabilisés-fd-template-005).

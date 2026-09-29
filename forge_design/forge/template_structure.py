@@ -9,11 +9,11 @@ from typing import Literal
 from jinja2 import Environment, TemplateSyntaxError, nodes
 
 from forge_design.limits import (
-    MAX_SOURCE_BYTES,
     MAX_SYNTAX_MESSAGE_LENGTH,
     MAX_TEMPLATE_BLOCKS,
     MAX_TEMPLATE_JINJA_TOKENS,
     MAX_TEMPLATE_REFERENCES,
+    MAX_TEMPLATE_STRUCTURE_CHARS,
     MAX_TEMPLATE_STRUCTURE_NODES,
 )
 
@@ -204,6 +204,7 @@ class _HtmlStructure(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.elements: list[HtmlElement] = []
         self.stack: list[str] = []
+        self.positions: dict[str, list[int]] = {}
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if len(self.elements) >= MAX_TEMPLATE_STRUCTURE_NODES:
@@ -225,18 +226,25 @@ class _HtmlStructure(HTMLParser):
             "track",
             "wbr",
         }:
+            self.positions.setdefault(tag, []).append(len(self.stack))
             self.stack.append(tag)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         depth = len(self.stack)
         self.handle_starttag(tag, attrs)
-        del self.stack[depth:]
+        self._pop_to(depth)
+
+    def _pop_to(self, depth: int) -> None:
+        while len(self.stack) > depth:
+            tag = self.stack.pop()
+            self.positions[tag].pop()
+            if not self.positions[tag]:
+                del self.positions[tag]
 
     def handle_endtag(self, tag: str) -> None:
-        for index in range(len(self.stack) - 1, -1, -1):
-            if self.stack[index] == tag:
-                del self.stack[index:]
-                break
+        positions = self.positions.get(tag)
+        if positions:
+            self._pop_to(positions[-1])
 
 
 def analyze_template_structure(source: str) -> TemplateStructure:
@@ -244,7 +252,7 @@ def analyze_template_structure(source: str) -> TemplateStructure:
     issues: list[TemplateStructureIssue] = []
     truncated = False
     # Garde en caractères pour les appels synthétiques ; le lecteur borne les octets.
-    if len(source) > MAX_SOURCE_BYTES:
+    if len(source) > MAX_TEMPLATE_STRUCTURE_CHARS:
         return TemplateStructure(
             TemplateSyntaxInfo("unreadable"),
             issues=(
@@ -298,7 +306,8 @@ def analyze_template_structure(source: str) -> TemplateStructure:
     masked, mask_partial = mask_jinja(source)
     html = _HtmlStructure()
     try:
-        html.feed(masked)
+        # Même convention de lignes que Jinja, y compris les CR seuls.
+        html.feed(masked.replace("\r\n", "\n").replace("\r", "\n"))
         html.close()
     except _HtmlLimit:
         truncated = True
@@ -324,6 +333,6 @@ def analyze_template_structure(source: str) -> TemplateStructure:
         tuple(sorted(blocks, key=lambda item: item.line)),
         tuple(html.elements),
         tuple(issues),
-        bool(issues),
+        syntax.status != "valid" or mask_partial or truncated,
         truncated,
     )

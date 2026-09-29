@@ -152,12 +152,13 @@ Les branches Jinja sont simplement juxtaposées, sans logique métier ou simulat
 du rendu. Les cas ambigus de mélange de langages peuvent donc donner une hiérarchie
 approximative. La liste textuelle est indentée jusqu'à 32 niveaux pour borner sa
 largeur, avec profondeur exacte toujours indiquée. Aucun arbre interactif, graphe,
-pliage, sélection ou lien entre templates.
+pliage ou sélection. La navigation locale est décrite plus bas.
 
 ### Analyse partielle et bornes
 
 | Constante | Valeur |
 |---|---:|
+| MAX_TEMPLATE_STRUCTURE_CHARS | 1 048 576 caractères Python |
 | MAX_TEMPLATE_STRUCTURE_NODES | 4096 éléments HTML |
 | MAX_TEMPLATE_REFERENCES | 512 références |
 | MAX_TEMPLATE_BLOCKS | 512 blocks |
@@ -290,3 +291,39 @@ par le client. Espaces, accents, emoji, &, + et % sont conservés par ce parcour
 Une lecture/analyse de la source principale demeure, plus les inspections locales
 directes. Aucun contenu cible dans la page appelante, aucun graphe/cycle Viewer,
 Tool, route, JavaScript ou écriture supplémentaire. Le handler /source est inchangé.
+
+## Contrats stabilisés (FD-TEMPLATE-005)
+
+Les sept API publiques de lecture, analyse, arbre et navigation gardent leurs
+signatures ; `reference_rejection(reference)` reste le contrôle lexical pur.
+Les quatorze modèles restent gelés, avec collections en tuples, sans état caché.
+La limite en caractères de l'analyse pure est distincte de `MAX_SOURCE_BYTES`,
+qui compte les octets du fichier. `MAX_SYNTAX_MESSAGE_LENGTH` compte 240 caractères.
+Les issues d'inventaire sont bornées par les 4096 entrées découvertes, plus les
+éventuels diagnostics globaux ; aucune collecte illimitée séparée.
+
+`partial` signifie résultat incomplet ou incertain ; il dérive des états de
+l'analyse, indépendamment de la liste des issues. `truncated` signale une collecte
+interrompue par une limite : volume configuré ou limite de ressources du parser
+(récursion/conversion numérique Python). La syntaxe `unreadable` après interruption
+Jinja s'accompagne de `template.html_partial` et `template.structure_truncated` ;
+le refus initial de longueur donne seulement `template.structure_truncated`.
+Une erreur syntaxique ou HTML contrôlée peut être partielle sans troncature.
+
+Le masque garde les caractères CR/LF ; la copie transmise à HTMLParser normalise
+CRLF et CR en LF pour partager les numéros de ligne Jinja. Les fermetures HTML
+inconnues utilisent un index, sans parcourir la profondeur ; chaque ouverture
+est empilée et dépilée au plus une fois. L'arbre et son rendu restent itératifs.
+Une profondeur négative synthétique est une violation du contrat pur, impossible
+avec le parser réel. Aucune égalité ou représentation récursive d'arbre profond
+n'est utilisée dans le parcours Web.
+
+Le cache de navigation représente un instantané logique du contrôle par chemin
+pendant le GET, pas un instantané atomique du filesystem. Les occurrences restent
+visibles. Les noms Unicode NFC/NFD restent distincts si le filesystem les distingue ;
+aucune normalisation, aucun second décodage des séquences comme `%2e%2e`.
+
+L'inventaire parcourt un nombre borné d'entrées et les trie : O(D log D) au pire,
+et non O(D) strict. Masque et projection HTML évitent les recherches répétées dans
+la pile ; arbre O(n), navigation O(références) hors coût filesystem. Le coût interne
+du lexer/parser Jinja reste celui de cette dépendance, sous les bornes d'entrée.
