@@ -1469,3 +1469,22 @@ Pas de modèles de blocs, imbrication métier, lecteur/écrivain, binding évalu
 interface ou Tool dans ce ticket. Aucun changement de la phase Contrats ou du
 Template Viewer, aucune dépendance supplémentaire. Voir le
 [format design](design/design-json.md) et ses responsabilités reportées.
+
+### Modèles design — FD-DESIGN-002
+
+```text
+design.schema.json normatif
+       ↓ contraintes concordantes
+DesignFile / PageRoot / DesignNode / TableColumn
+       ↓
+FD-DESIGN-003 : règles d'imbrication
+       ↓
+FD-DESIGN-004 : I/O
+```
+
+`design/models.py` valide des dicts/JSON en mémoire avec Pydantic v2 strict,
+extra interdit et gel superficiel. DesignNode générique récursif ; PageRoot partage
+ses propriétés mais impose page/children. Absence interne distincte de null fourni,
+export fidèle avec exclude_unset=True, props scalaires préservant leur type.
+source_contract applique le motif et les exclusions du schéma inchangé sans I/O.
+Aucun accès projet, imbrication métier, binding évalué, génération, Web ou nouveau Tool.

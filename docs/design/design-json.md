@@ -190,3 +190,59 @@ structurelles et tests ciblés de motifs ne prouvent pas une validation complèt
 d'instances. Aucun scan projet, UI, drag-and-drop, Tool ou helper runtime.
 Les contrats et Template Viewer restent inchangés : ce dernier peut afficher les
 .design.json comme fichiers génériques ; la liaison contractuelle les exclut localement.
+
+## Modèles Python — FD-DESIGN-002
+
+Pydantic v2 valide maintenant le document déjà disponible en mémoire. API exportée
+par `forge_design.design` : DesignFile, DesignNode, PageRoot, TableColumn,
+DesignNodeType et PropValue. Aucune lecture/écriture de fichier ni helper load/read.
+Le schéma normatif v0.1 reste inchangé.
+
+```python
+from forge_design.design import DesignFile
+
+design = DesignFile.model_validate(data)
+design = DesignFile.model_validate_json(text)
+payload = design.model_dump(exclude_unset=True)
+text = design.model_dump_json(exclude_unset=True)
+```
+
+DesignNode reste générique et récursif, avec les treize types existants. PageRoot
+est la seule spécialisation : type page et children obligatoires, sans défauts
+implicites, avec binding/props/columns toujours possibles. Des propriétés communes
+internes évitent un override incompatible de children ; aucune classe par bloc.
+Page descendant, button avec children et columns sur section restent admis à cette
+étape structurelle. Aucune validation d'imbrication ou de binding.
+
+Types stricts, extra interdit, attributs frozen. PropValue conserve str/bool/int/float :
+`"true"` reste une chaîne, 12 reste int, true reste bool, 0.5 reste float. Chaîne vide
+admise dans props ; null, objets et listes refusés. NaN/Infinity ne sont pas des
+nombres JSON et sont refusés via allow_inf_nan=False. Aucune interprétation d'intention.
+Clés props non vides, sans normalisation, même Unicode ; aucune conversion de bytes.
+
+Les attributs facultatifs absents valent None dans l'API Python ; BeforeValidator
+refuse un None/null fourni explicitement. Le schéma généré retire la branche null
+et le défaut interne. `model_fields_set` conserve la présence et
+**exclude_unset=True** préserve l'omission, les objets/listes vides explicitement
+fournis et le round-trip. Un dump sans cette option peut ajouter les None internes
+et ne représente pas l'export conforme recommandé.
+
+source_contract combine les bornes et motif normatifs avec un validator ciblé
+pour les quatre exclusions `not.anyOf`. Aucun accès au schéma pendant la validation,
+aucun appel source_parts. Les contraintes générées restent comparées au normatif.
+Un nom sensible ou caché admis structurellement ne devient pas autorisé en lecture :
+le confinement filesystem appartient toujours à FD-DESIGN-004.
+
+ValidationError.errors() fournit les loc/codes, notamment root.children.0.type et
+root.children.1.columns.0.binding. JSON mal formé : json_invalid ; une boucle Python
+récursive : recursion_loop contrôlé. Arbre de 30 niveaux testé. Aucune borne métier
+MAX_DESIGN_DEPTH ajoutée ; les limites internes du parser/validateur subsistent.
+
+Le gel est superficiel : children/columns sont des listes, props un dictionnaire,
+modifiables sans nouvelle validation automatique. Après mutation, revalider les
+données sérialisées, pas seulement une instance existante. Les API de confiance
+Pydantic (model_construct, model_copy avec update) et overrides permissifs ne sont
+pas des frontières de validation. Aucune garantie d'immuabilité profonde.
+
+Aucun changement des contrats, Tools, Web, générateur ou dépendances. Les étapes
+suivantes restent FD-DESIGN-003 (imbrication), FD-DESIGN-004 (I/O) et les bindings.

@@ -1,1 +1,19 @@
-"""Schéma déclaratif du design, sans modèle de blocs ni accès projet."""
+"""Format normatif et modèles design, sans lecture ou écriture projet."""
+
+from forge_design.design.models import (
+    DesignFile,
+    DesignNode,
+    DesignNodeType,
+    PageRoot,
+    PropValue,
+    TableColumn,
+)
+
+__all__ = [
+    "DesignFile",
+    "DesignNode",
+    "DesignNodeType",
+    "PageRoot",
+    "PropValue",
+    "TableColumn",
+]
