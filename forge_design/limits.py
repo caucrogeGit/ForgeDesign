@@ -55,3 +55,6 @@ MAX_DESIGN_ISSUES = 512
 
 # Projection/validation des colonnes configurées, par occurrence de table.
 MAX_TABLE_COLUMNS = 512
+
+# Fragment HTML de preview, caractères après échappement.
+MAX_PREVIEW_HTML_CHARS = 1_000_000

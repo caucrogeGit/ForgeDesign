@@ -1597,7 +1597,7 @@ ViewContract déjà validé
    ↓ generate_preview_data()
 PreviewDataResult : contexte JSON-like, issues, complete
    ↓ FD-PREVIEW-002
-Renderer local futur
+Renderer local (voir FD-PREVIEW-002 ci-dessous)
 ```
 
 `preview/data.py` produit des valeurs fixes à partir de context et fields seulement.
@@ -1606,3 +1606,29 @@ omis avec un diagnostic par définition. Trois objets par liste, boolean=True,
 date fixe ; aucune dépendance aux valeurs backend ou au Design. Pas de hasard,
 I/O, génération HTML/Jinja, Web ou Tool. Complexité proportionnelle au contrat,
 sans récursion ou limite supplémentaire. Voir la [preview statique](preview/static-preview.md).
+
+### Rendu HTML local — FD-PREVIEW-002
+
+```text
+ViewContract
+   ↓ generate_preview_data()
+contexte fictif + DesignFile
+   ↓ render_preview()
+PreviewRenderResult : fragment HTML, issues, complete
+```
+
+`preview/render.py` consomme seulement l'arbre et un Mapping en mémoire.
+Le pipeline est composé par l'appelant : aucun appel automatique aux validateurs,
+au générateur de données ou aux lecteurs. Les deux résultats de preview conservent
+leurs diagnostics distincts. Les API sont exportées depuis `forge_design.preview`.
+
+Mapping explicite des 13 blocs, props tag/class restreintes, échappement standard
+des textes et attributs, conditions booléennes strictes et tableaux ordonnés.
+Les états vides sont placés après la table. Formulaires structurels seulement,
+boutons type=button. Aucune génération Jinja, ressource, I/O, route ou Tool ajouté.
+
+Parcours récursif borné par les limites Design, colonnes limitées, budget HTML de
+1 000 000 caractères après échappement. Un dépassement remplace toute la sortie
+par un fragment d'erreur valide ; toute issue implique complete=False. Aucun
+Design ni contexte n'est modifié. Contrats détaillés et limites dans la
+[preview statique](preview/static-preview.md#rendu-html-local--fd-preview-002).
