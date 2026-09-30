@@ -1532,3 +1532,23 @@ Révision : taille, mtime, SHA-256, device/inode/ctime. Création exclusive par 
 update optimiste par replace. Pas de verrou global : fenêtre TOCTOU documentée.
 Aucun scanner, dossier créé, contrat/template modifié, génération, Web, Tool,
 contexte courant ou préférence persistante. Schéma, modèles et nesting inchangés.
+
+### Bindings simples — FD-BINDING-001
+
+```text
+ViewContract + DesignFile
+   ↓ validation structurelle Pydantic des entrées
+   ↓ validation nesting (étape indépendante)
+   ↓ validate_design_bindings(design, contract)
+DesignBindingResult : valid, issues, truncated
+```
+
+`design/bindings.py` consomme uniquement les modèles déjà validés. Les trois étapes
+restent composables : le validateur de bindings ne relance ni Pydantic ni nesting.
+Il résout text/title vers context:string, table vers context:list et button vers
+actions. Noms exacts, recherches dictionnaire, aucun parsing de chemin de champ.
+Parcours préfixe itératif borné par les limites Design existantes, diagnostics sur
+le champ binding ; entrées intactes. Aucun accès filesystem ou résolution de
+source_contract, contrôle HTTP, colonne, condition ou formulaire avancé.
+Voir les [règles de bindings](design/bindings.md), notamment la convention v0.1
+button.binding = nom d'action et les étapes reportées.

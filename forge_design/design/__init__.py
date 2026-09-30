@@ -1,5 +1,10 @@
 """Format design, validation et I/O explicites, sans génération de template."""
 
+from forge_design.design.bindings import (
+    DesignBindingIssue,
+    DesignBindingResult,
+    validate_design_bindings,
+)
 from forge_design.design.io import (
     DesignIssue,
     DesignReadResult,
@@ -29,6 +34,9 @@ from forge_design.design.nesting import (
 )
 
 __all__ = [
+    "DesignBindingIssue",
+    "DesignBindingResult",
+    "validate_design_bindings",
     "DesignIssue",
     "DesignReadResult",
     "DesignRevision",
