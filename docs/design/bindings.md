@@ -102,3 +102,103 @@ autre validateur, ne lit aucun design/contrat et ne vérifie ni source_contract,
 ni design.view == contract.name. Aucun objet ou conteneur d'entrée n'est modifié.
 Aucun Web, Tool, génération ou accès projet. Le [format Design](design-json.md)
 et le contrat conservent leurs schémas et modèles actuels.
+
+## Bindings de listes et tableaux — FD-BINDING-002
+
+Cette étape complète les bindings simples avec la validation des colonnes. Les deux
+fonctions restent indépendantes et se composent explicitement :
+
+```python
+from forge_design.design import validate_design_bindings, validate_table_bindings
+
+simple = validate_design_bindings(design, contract)
+tables = validate_table_bindings(design, contract)
+# Une validation complète de ces deux étapes exige simple.valid et tables.valid.
+```
+
+Le validateur détaille toutes les occurrences table dans l'ordre préfixe, même si
+le nesting est invalide. Il ne relance aucun autre validateur. Les autres blocs
+sont parcourus uniquement pour trouver des tables et leurs enfants directs.
+Une table sans binding n'est pas une erreur ; une référence inconnue ou non-list
+reste diagnostiquée par FD-BINDING-001, sans cascade d'unknown_field ici.
+Ainsi simple.valid=False et tables.valid=True est possible et intentionnel.
+
+### Résolution et projection
+
+TableBindingResult expose valid, tables, issues et truncated. Chaque TableBindingInfo
+expose location du nœud, binding, entity informative, available_fields, columns,
+status et has_empty_state. Les statuts sont :
+
+| Status | Sens |
+|---|---|
+| no_binding | Aucun binding principal fourni |
+| unresolved_variable | Nom absent du contexte |
+| type_mismatch | Variable présente mais non-list |
+| fields_unavailable | List résolue, structure de champs absente |
+| resolved | List résolue et dictionnaire fields présent, même vide |
+
+Seul ViewContextVariable.fields fournit les champs disponibles. Aucun accès à
+l'entité désignée par entity, à Entity Explorer ou au filesystem. available_fields
+conserve l'ordre du dictionnaire, sans tri. Les colonnes configurées conservent
+index, label, binding, field_type et valid dans l'ordre du Design.
+
+- fields absent : structure non décrite. Sans colonne, aucune erreur ; avec des
+  colonnes, une seule issue design.table.fields_unavailable sur (..., "columns").
+- fields={} : aucun champ déclaré. Chaque colonne configurée est inconnue.
+- Champ présent : valid=True, field_type conserve la chaîne exacte, sans enum cachée.
+- Champ absent du dictionnaire : valid=False, field_type=None et une issue
+  design.table.unknown_field à (..., "columns", index, "binding").
+- Collection non résolue, non-list, binding absent ou fields absent : colonnes
+  projetées avec valid=None/field_type=None, car elles n'ont pas été validées.
+
+Les labels sont visuels, sans effet sur la résolution. Aucun strip/casefold ou
+normalisation Unicode. profile.email est une clé littérale ; aucune navigation.
+Deux colonnes liées au même champ sont permises. Aucun type attendu n'existe dans
+TableColumn : aucune compatibilité colonne/type supplémentaire n'est imposée.
+
+### Suggestions non destructives
+
+```python
+from forge_design.design import suggest_table_columns
+
+suggestions = suggest_table_columns(contract.context["contacts"])
+```
+
+La précondition est type=list ; sinon ValueError. Fields absent ou vide donne ().
+Chaque SuggestedTableColumn gelée contient binding, field_type et label, ce dernier
+égal au nom exact du champ. Ordre de déclaration conservé ; aucun title-case,
+inférence depuis entity, création de TableColumn ou modification de DesignNode.columns.
+Cette projection propose des choix en mémoire ; elle ne génère aucun fichier.
+
+### État vide et bornes
+
+has_empty_state=True si au moins un enfant **direct inspecté** est empty_state.
+Aucun état vide obligatoire, aucune unicité et aucune sémantique de binding/content
+ajoutée. Un état vide indirect ne compte pas. Le repérage utilise le parcours des
+nœuds, pas une recherche indépendante dans tous les descendants.
+
+MAX_DESIGN_NODES, MAX_DESIGN_DEPTH et MAX_DESIGN_ISSUES gardent leurs sémantiques
+(racine comprise, profondeur zéro, marqueur terminal compris). MAX_TABLE_COLUMNS=512
+borne les colonnes projetées/inspectées par occurrence, y compris lorsque la
+collection n'est pas résolue. 512 sans surplus : pas de troncature ; 513 : arrêt
+global avec design.table.analysis_truncated. Les budgets de nœuds/issues sont
+globaux à l'appel ; le budget de colonnes est par table.
+
+Un surplus produit un seul marqueur terminal, truncated=True et valid=False.
+Si le budget de diagnostics est plein, le dernier est remplacé par le marqueur.
+Les tables déjà découvertes, dont la table partiellement analysée, restent exposées.
+En cas de troncature, les colonnes et états vides reflètent uniquement le préfixe
+inspecté : has_empty_state=False ne prouve alors pas l'absence d'un enfant ultérieur.
+Les locations de troncature pointent le nœud ou la colonne qui déclenche l'arrêt.
+
+Parcours itératif par itérateurs, sans copie préalable de toutes les colonnes.
+Coût O(N+C) pour les occurrences et colonnes inspectées, plus O(F) pour matérialiser
+les noms disponibles des dictionnaires fields distincts rencontrés. Ces tuples
+sont réutilisés entre tables partageant le même dictionnaire. Suggestions : O(F),
+retour complet du contrat fourni. MAX_TABLE_COLUMNS borne les colonnes configurées,
+pas les champs disponibles ni les suggestions ; leur taille suit le contrat.
+
+Toutes les dataclasses de résultat sont gelées et leurs collections publiques sont
+des tuples. Entrées inchangées, résultat déterministe sans mutation concurrente.
+Aucun filesystem, route, pagination, filtre, condition, formulaire avancé, Web,
+Tool ou génération HTML. Les bindings simples FD-BINDING-001 restent inchangés.

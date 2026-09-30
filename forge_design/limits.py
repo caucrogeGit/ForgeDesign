@@ -52,3 +52,6 @@ MAX_VIEW_CONTRACT_LINK_ISSUES = 512
 MAX_DESIGN_NODES = 4096
 MAX_DESIGN_DEPTH = 128
 MAX_DESIGN_ISSUES = 512
+
+# Projection/validation des colonnes configurées, par occurrence de table.
+MAX_TABLE_COLUMNS = 512

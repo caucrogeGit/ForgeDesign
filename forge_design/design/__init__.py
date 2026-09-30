@@ -32,8 +32,26 @@ from forge_design.design.nesting import (
     can_contain,
     validate_design_nesting,
 )
+from forge_design.design.table_bindings import (
+    SuggestedTableColumn,
+    TableBindingInfo,
+    TableBindingIssue,
+    TableBindingResult,
+    TableBindingStatus,
+    TableColumnBindingInfo,
+    suggest_table_columns,
+    validate_table_bindings,
+)
 
 __all__ = [
+    "SuggestedTableColumn",
+    "TableBindingInfo",
+    "TableBindingIssue",
+    "TableBindingResult",
+    "TableBindingStatus",
+    "TableColumnBindingInfo",
+    "suggest_table_columns",
+    "validate_table_bindings",
     "DesignBindingIssue",
     "DesignBindingResult",
     "validate_design_bindings",

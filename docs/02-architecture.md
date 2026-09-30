@@ -1552,3 +1552,23 @@ le champ binding ; entrées intactes. Aucun accès filesystem ou résolution de
 source_contract, contrôle HTTP, colonne, condition ou formulaire avancé.
 Voir les [règles de bindings](design/bindings.md), notamment la convention v0.1
 button.binding = nom d'action et les étapes reportées.
+
+### Colonnes de tableaux — FD-BINDING-002
+
+```text
+ViewContract.context[list].fields + DesignNode.table.columns
+                   ↓ validate_table_bindings
+TableBindingResult : tables projetées, colonnes résolues, diagnostics
+
+ViewContextVariable[list].fields
+                   ↓ suggest_table_columns
+Tuple de suggestions non destructives
+```
+
+Le module `design/table_bindings.py` complète les bindings simples sans les relancer
+ni les modifier. Résolution silencieuse de la collection, absence de fields distincte
+d'un dictionnaire vide, noms et types de champs exacts. L'entité déclarée est informative.
+État vide repéré parmi les enfants directs pendant le parcours préfixe borné.
+Budgets Design réutilisés et MAX_TABLE_COLUMNS=512 par occurrence ; résultats
+partiels explicitement tronqués. Propositions de colonnes en mémoire seulement,
+sans modifier Design/Contract, lire d'entité, générer du HTML ou ajouter un Tool.
