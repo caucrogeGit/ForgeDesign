@@ -203,3 +203,90 @@ après validation, mais les mutations structurelles arbitraires/concurrentes et 
 objets Python exécutant des méthodes personnalisées ne constituent pas son contrat.
 Aucun navigateur réel ni rendu visuel responsive n'est testé ici. L'enveloppe de
 preview appartient à FD-PREVIEW-003.
+
+## Aperçu responsive — FD-PREVIEW-003
+
+Les trois presets Forge Design v0.1 sont des conventions indicatives, sans hauteur
+fixe ni prétention à reproduire un appareil ou le CSS final du projet :
+
+| Mode | Largeur cible |
+|---|---:|
+| desktop | 1440 px |
+| tablet | 768 px |
+| mobile | 390 px |
+
+Ces valeurs ne sont pas des normes universelles. Le contenu peut croître
+verticalement ; max-width:100% réduit la largeur si le conteneur disponible est
+plus étroit. Une largeur de div ne simule pas un viewport navigateur : elle ne
+déclenche pas les media queries comme le ferait une iframe ou une fenêtre dédiée.
+
+### API et composition
+
+Exports publics depuis `forge_design.preview` :
+
+- PreviewViewportMode : Literal desktop/tablet/mobile ;
+- PreviewViewport : dataclass gelée, mode et width_px ;
+- PREVIEW_VIEWPORTS : mapping immuable des trois presets gelés ;
+- preview_viewport(mode) : retourne le preset ;
+- wrap_preview_html(html, *, mode) : enveloppe un fragment existant ;
+- render_responsive_preview(design, data, *, mode) : appelle une fois render_preview ;
+- ResponsivePreviewResult : dataclass gelée, mode, width_px, html, issues, complete.
+
+Un mode invalide produit ValueError avec le message stable
+« Mode de preview inconnu : desktop, tablet ou mobile attendu. » avant rendu.
+Aucun mode arbitraire ne devient un attribut HTML.
+
+```python
+from forge_design.preview import (
+    generate_preview_data,
+    render_preview,
+    wrap_preview_html,
+)
+
+data = generate_preview_data(contract)
+rendered = render_preview(design, data.data)
+mobile = wrap_preview_html(rendered.html, mode="mobile")
+tablet = wrap_preview_html(rendered.html, mode="tablet")
+desktop = wrap_preview_html(rendered.html, mode="desktop")
+```
+
+Ce parcours réutilise le même rendu. L'API principale compose les deux étapes
+pour un seul mode, en reprenant exactement le tuple issues et complete du renderer.
+Elle n'appelle pas le générateur de données automatiquement.
+
+### Enveloppe contrôlée
+
+```html
+<div data-forge-design-responsive="mobile" data-forge-design-width="390" style="width:390px;max-width:100%;margin:0 auto;">...fragment...</div>
+```
+
+Le style appartient exclusivement à l'enveloppe de simulation Forge Design.
+Seuls les presets internes fournissent ses nombres ; aucune donnée utilisateur
+ni prop du Design n'est transformée en style. Pas de hauteur, police, fond,
+bordure, ombre, padding ou CSS supplémentaire. Cette exception au principe
+« pas de style généré » du renderer n'est pas du code généré pour le projet.
+
+Le fragment est concaténé exactement, sans parsing, reconstruction ou double
+échappement. Un fragment d'erreur du renderer est également conservé.
+**wrap_preview_html n'est pas un assainisseur** : l'appelant doit fournir le HTML
+contrôlé de render_preview, jamais du HTML utilisateur arbitraire à rendre sûr.
+
+La limite MAX_PREVIEW_HTML_CHARS est inchangée. Le wrapper ajoute seulement
+l'ouverture et la fermeture contrôlées (surcoût fixe pour chaque preset), sans
+second budget. La primitive sur fragment ne vérifie pas elle-même sa taille.
+
+### Portée de la phase statique
+
+Rendu déterministe, aucune mutation du Design, des données ou du résultat initial.
+Aucun filesystem, backend Forge, réseau, navigateur, serveur, route HTTP ou iframe.
+Aucune dépendance supplémentaire. Les renderers data.py et render.py restent
+indépendants de l'enveloppe.
+
+Aucune feuille Tailwind n'est embarquée : md:grid-cols-2 reste dans class, sans
+reproduction de son comportement. Pas de calcul de breakpoint, DPR, orientation,
+touch mode ou user-agent. Ces trois modes montrent une structure dans une largeur
+cible ; ils ne remplacent pas les tests responsive réels. La preview avancée
+devra traiter le rendu navigateur et CSS réel.
+
+FD-PREVIEW-003 clôt la phase Preview statique ; la suite est FD-GENERATE-001,
+génération d'un template simple.

@@ -1632,3 +1632,32 @@ Parcours récursif borné par les limites Design, colonnes limitées, budget HTM
 par un fragment d'erreur valide ; toute issue implique complete=False. Aucun
 Design ni contexte n'est modifié. Contrats détaillés et limites dans la
 [preview statique](preview/static-preview.md#rendu-html-local--fd-preview-002).
+
+### Aperçu responsive indicatif — FD-PREVIEW-003
+
+```text
+ViewContract
+   ↓ generate_preview_data()
+contexte fictif + DesignFile
+   ↓ render_preview()
+fragment HTML
+   ↓ wrap_preview_html()
+   ├── desktop 1440 px
+   ├── tablet   768 px
+   └── mobile   390 px
+```
+
+`preview/responsive.py` ajoute un wrapper de largeur contrôlée par trois presets
+immuables. `render_responsive_preview` compose une fois le renderer et l'enveloppe,
+en conservant exactement issues et complete. La primitive wrap_preview_html permet
+de réutiliser un fragment dans plusieurs modes sans nouveau rendu.
+
+Aucun parsing du fragment, double échappement, mutation ou I/O. Le style inline
+fixe appartient uniquement à l'enveloppe de simulation, jamais au Design ou au
+code généré du projet. Le budget du renderer reste inchangé, avec un petit surcoût
+constant par preset. Les modes invalides sont refusés avant rendu.
+
+Cette présentation reste indicative : un div de largeur cible ne reproduit ni
+un viewport navigateur ni les media queries/Tailwind du projet. Pas de route,
+iframe, browser, hauteur fixe ou nouvelle dépendance. Elle clôt la phase Preview
+statique ; voir les [contrats de preview](preview/static-preview.md).
