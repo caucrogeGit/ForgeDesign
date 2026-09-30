@@ -1589,3 +1589,20 @@ de permission sous forme booléenne ; Forge Design n'implémente aucune autorisa
 Parcours préfixe itératif avec les budgets Design existants ; diagnostics localisés
 sur visible_if. L'I/O conserve la propriété sans changement de logique et sans
 résolution automatique du contrat. Pas de nouvelle route, Tool ou génération.
+
+### Données fictives de preview — FD-PREVIEW-001
+
+```text
+ViewContract déjà validé
+   ↓ generate_preview_data()
+PreviewDataResult : contexte JSON-like, issues, complete
+   ↓ FD-PREVIEW-002
+Renderer local futur
+```
+
+`preview/data.py` produit des valeurs fixes à partir de context et fields seulement.
+Objets/listes construits sans alias mutable, ordre conservé, types de champs inconnus
+omis avec un diagnostic par définition. Trois objets par liste, boolean=True,
+date fixe ; aucune dépendance aux valeurs backend ou au Design. Pas de hasard,
+I/O, génération HTML/Jinja, Web ou Tool. Complexité proportionnelle au contrat,
+sans récursion ou limite supplémentaire. Voir la [preview statique](preview/static-preview.md).
