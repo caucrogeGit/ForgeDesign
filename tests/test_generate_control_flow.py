@@ -128,12 +128,14 @@ def test_condition_syntax(name: str) -> None:
     assert result.issues[0].location == ("root", "children", 0, "visible_if")
 
 
-def test_unsupported_table_remains_omitted() -> None:
+def test_conditional_table_is_generated() -> None:
     result = generate_simple_template(
         design([{"type": "table", "binding": "contacts", "visible_if": "flag"}]),
         contract({"contacts": {"type": "list"}, "flag": {"type": "boolean"}}),
     )
-    assert codes(result) == ["unsupported_block"] and result.template == ""
+    assert result.complete and result.template.startswith("{% if flag %}\n  <table>")
+    assert "{% for item in contacts %}" in result.template
+    Environment().parse(result.template)
 
 
 @pytest.mark.parametrize(

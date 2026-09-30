@@ -23,13 +23,14 @@ fictive injectée ou backend consulté. Le résultat est du code lisible, modifi
 | title | h2 |
 | text | p |
 
-Button, table, form, field, alert et empty_state sont omis avec unsupported_block,
-ainsi que leur sous-arbre. Les autres branches supportées restent générables.
+Button, form, field et alert sont omis avec unsupported_block,
+ainsi que leur sous-arbre. Les autres branches supportées restent générables. Depuis FD-GENERATE-003, table
+et son empty_state sont pris en charge selon la section dédiée ci-dessous.
 Depuis FD-GENERATE-002, visible_if sur un bloc supporté produit une directive
 if validée contre le contrat ; voir la section Conditions et boucles ci-dessous.
 Le comportement historique unsupported_condition de FD-GENERATE-001 est remplacé.
 
-Aucun layout, extends, block, include, formulaire fonctionnel, route, boucle automatique,
+Aucun layout, extends, block, include, formulaire fonctionnel, route,
 attribut data-forge-design-* ou style inline n'est inventé.
 Les règles d'imbrication Design restent applicables : title se place sous card,
 text ne peut pas être enfant direct de page, grid reste une feuille.
@@ -118,7 +119,7 @@ Des choix de tags incompatibles peuvent rester sémantiquement invalides en HTML
 la whitelist protège la syntaxe, elle ne remplace pas une validation navigateur.
 
 FD-GENERATE-002 ajoute les conditions et la primitive de boucle ci-dessous.
-FD-GENERATE-003 traitera les tables et états vides.
+FD-GENERATE-003 ajoute les tables et états vides ci-dessous.
 
 ## Conditions et boucles — FD-GENERATE-002
 
@@ -192,8 +193,102 @@ ni un parseur ni un assainisseur. Aucun moteur Jinja exécuté.
 
 ### Périmètre conservé
 
-Aucun bloc Loop/For/Condition ajouté au Design. Table reste unsupported_block :
-aucune boucle vide ou table partielle n'est générée depuis un nœud table.
-FD-GENERATE-003 pourra utiliser cette primitive pour le corps des tables et les
-états vides. Les modèles, revalidation, nesting, bindings simples, limites,
+Aucun bloc Loop/For/Condition ajouté au Design. FD-GENERATE-002 ne branchait pas
+encore cette primitive sur table ; FD-GENERATE-003 l'utilise désormais comme décrit
+ci-dessous. Les modèles, revalidation, nesting, bindings simples, limites,
 Preview, exports publics et packaging sont inchangés.
+
+## Tables et états vides — FD-GENERATE-003
+
+L'API publique reste generate_simple_template. Le module interne generate/tables.py
+consomme la projection de validate_table_bindings, appelé une fois après les
+validations existantes. Statut de collection, champs validés, ordre des colonnes et
+has_empty_state viennent de cette projection ; aucun accès Forge ou nouvelle
+résolution du contrat.
+
+### Collection et colonnes
+
+Table nécessite un binding de variable list. Sans binding : table_missing_binding.
+Variable inconnue, non list ou fields absents alors que des colonnes sont présentes :
+invalid_table_binding. Colonne non déclarée : invalid_table_column.
+Les chemins de colonnes restent root/.../columns/index/binding. Une table
+incorrecte est entièrement omise, ses autres branches sœurs restent générables.
+Une troncature du validateur annule toute sortie avec analysis_truncated.
+
+Collection et champs doivent être des identifiants Jinja simples selon la règle
+commune. Une collection non générable produit unsupported_binding_syntax ; un champ
+non générable produit unsupported_field_syntax. Pas de bracket access, expression
+ou filtre automatique. Une colonne inconnue n'ajoute pas aussi une erreur de syntaxe.
+
+```jinja
+<table class="w-full">
+  <thead>
+    <tr>
+      <th>Nom</th>
+      <th>Email</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in contacts %}
+      <tr>
+        <td>{{ item.nom }}</td>
+        <td>{{ item.email }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+```
+
+La variable locale est toujours item, sans singularisation ni dérivation d'entity.
+La primitive render_jinja_loop existante produit for/endfor et leur indentation.
+Les colonnes conservent leur ordre ; zéro colonne est permis, avec thead/tr vide
+et tr vide dans la boucle. Une liste sans fields est donc générable sans colonnes.
+Aucun filtre, safe ou formatage de champ n'est ajouté. Le runtime Jinja et ses
+règles d'accès aux attributs restent ceux du consommateur du template.
+
+### État vide et visibilité
+
+Sans enfant empty_state : table et boucle seules. Avec un unique état vide :
+
+```jinja
+{% if contacts %}
+  <table>
+    ...
+  </table>
+{% else %}
+  <div class="py-8 text-center">Aucune donnée</div>
+{% endif %}
+```
+
+has_empty_state de la projection active cette branche. Le texte « Aucune donnée »
+est une convention temporaire v0.1, faute de propriété de contenu éditable.
+Plusieurs états vides : multiple_empty_states, table omise. Visible_if sur cet
+enfant, même inconnu au contrat : unsupported_empty_state_condition et table omise.
+Le validateur conditionnel reste appelé ; ses erreurs sur empty_state sont traitées
+par cette règle dédiée, sans diagnostic conditionnel dupliqué.
+
+Visible_if sur table utilise l'enveloppe conditionnelle existante, à l'extérieur
+du if de collection. Le premier if vise un booléen contractuel ; le second teste
+la présence d'éléments dans la collection. Les niveaux logiques ajoutent deux espaces.
+Un état vide hors table est interdit par nesting et provoque invalid_nesting avant
+rendu ; le moteur interne ne le rend jamais comme un bloc autonome supporté.
+
+### Props, sécurité et budgets
+
+Table conserve la balise table, empty_state la balise div. Seule class string est
+acceptée ; tag et autres props sont ignorées avec unsupported_prop.
+Labels et classes partagent l'échappement existant : HTML, accolades Jinja, CR/LF.
+Le texte HTML décodé est conservé, sans création de script, include ou expression.
+
+MAX_TABLE_COLUMNS est appliqué par le validateur existant. Les budgets Design et
+MAX_GENERATED_TEMPLATE_CHARS restent inchangés et couvrent toutes les nouvelles
+lignes, directives et indentations. Le corps temporaire de boucle est contrôlé
+avant accumulation ; un dépassement annule tout le template avec output_too_large.
+La limite de sortie ne constitue pas une limite mémoire globale des entrées/copies.
+
+Les revalidations Pydantic, nesting et bindings simples sont conservés. Aucune
+mutation, I/O, exécution Jinja, API publique supplémentaire ou dépendance.
+Button, form, field et alert restent reportés. Aucune action CRUD de ligne n'est
+inventée : le modèle ne possède ni row_actions ni table_actions, et table n'accepte
+que des enfants empty_state. Pas de pagination, tri, filtres, layout ou écriture.
+Le ticket suivant est FD-GENERATE-004, diff avant écriture.

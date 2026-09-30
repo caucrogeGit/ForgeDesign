@@ -12,11 +12,13 @@ from forge_design.design.bindings import validate_design_bindings
 from forge_design.design.conditional_bindings import validate_conditional_bindings
 from forge_design.design.models import DesignFile, DesignNode, PageRoot
 from forge_design.design.nesting import validate_design_nesting
+from forge_design.design.table_bindings import TableBindingInfo, validate_table_bindings
 from forge_design.generate.control_flow import (
     indent_line,
     is_safe_jinja_identifier,
     jinja_condition,
 )
+from forge_design.generate.tables import prepare_table, render_table
 from forge_design.limits import (
     MAX_DESIGN_DEPTH,
     MAX_DESIGN_ISSUES,
@@ -76,6 +78,7 @@ class _Generator:
         self.issues: list[TemplateGenerationIssue] = []
         self.lines: list[str] = []
         self.length = 0
+        self.tables: dict[tuple[str | int, ...], TableBindingInfo] = {}
 
     def issue(self, code: str, location: tuple[str | int, ...]) -> None:
         if len(self.issues) >= MAX_DESIGN_ISSUES:
@@ -117,6 +120,20 @@ class _Generator:
             if node.children:
                 stack.append((iter(enumerate(node.children)), path, depth + 1))
 
+    def check_size(self, size: int, path: tuple[str | int, ...]) -> None:
+        if self.length + size > MAX_GENERATED_TEMPLATE_CHARS:
+            self.stop("output_too_large", path)
+
+    def escaped(self, value: str, path: tuple[str | int, ...]) -> str:
+        self.check_size(len(value), path)
+        return (
+            escape(value, quote=True)
+            .replace("{", "&#123;")
+            .replace("}", "&#125;")
+            .replace("\r", "&#13;")
+            .replace("\n", "&#10;")
+        )
+
     def line(self, content: str, depth: int, path: tuple[str | int, ...]) -> None:
         length = depth * 2 + len(content) + 1
         if self.length + length > MAX_GENERATED_TEMPLATE_CHARS:
@@ -127,8 +144,10 @@ class _Generator:
     def node(
         self, node: DesignNode | PageRoot, path: tuple[str | int, ...], depth: int
     ) -> None:
-        if node.type != "page" and node.type not in _TAGS:
+        if node.type not in {"page", "table"} and node.type not in _TAGS:
             self.issue("unsupported_block", path)
+            return
+        if node.type == "table" and not prepare_table(node, self.tables[path], self):
             return
         condition = node.visible_if
         if condition is not None:
@@ -144,6 +163,9 @@ class _Generator:
     def node_content(
         self, node: DesignNode | PageRoot, path: tuple[str | int, ...], depth: int
     ) -> None:
+        if node.type == "table":
+            render_table(node, self.tables[path], depth, self)
+            return
         tag = _TAGS.get(node.type, "")
         classes = ""
         for key, value in (node.props or {}).items():
@@ -156,15 +178,7 @@ class _Generator:
                 else:
                     self.issue("invalid_tag", location)
             elif key == "class" and isinstance(value, str):
-                if len(value) > MAX_GENERATED_TEMPLATE_CHARS - self.length:
-                    self.stop("output_too_large", location)
-                # Neutraliser aussi les délimiteurs Jinja, pas seulement HTML.
-                safe = (
-                    escape(value, quote=True)
-                    .replace("{", "&#123;")
-                    .replace("}", "&#125;")
-                )
-                safe = safe.replace("\r", "&#13;").replace("\n", "&#10;")
+                safe = self.escaped(value, location)
                 classes = ' class="' + safe + '"'
             else:
                 self.issue("unsupported_prop", location)
@@ -226,8 +240,13 @@ def generate_simple_template(
                 generator.issue("invalid_binding", issue.location)
             raise _Stopped
         conditions = validate_conditional_bindings(design, contract)
-        if not conditions.valid:
-            for issue in conditions.issues:
+        if conditions.truncated:
+            generator.stop("analysis_truncated", conditions.issues[-1].location)
+        condition_errors = [
+            issue for issue in conditions.issues if issue.node_type != "empty_state"
+        ]
+        if condition_errors:
+            for issue in condition_errors:
                 generator.issue(
                     "analysis_truncated"
                     if issue.code.endswith("analysis_truncated")
@@ -235,6 +254,10 @@ def generate_simple_template(
                     issue.location,
                 )
             raise _Stopped
+        tables = validate_table_bindings(design, contract)
+        if tables.truncated:
+            generator.stop("analysis_truncated", tables.issues[-1].location)
+        generator.tables = {table.location: table for table in tables.tables}
         generator.node(design.root, ("root",), 0)
     except _Stopped:
         template = ""

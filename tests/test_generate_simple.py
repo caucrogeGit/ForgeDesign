@@ -191,9 +191,7 @@ def test_invalid_binding_is_global(context: dict[str, Any]) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "kind", ["button", "table", "form", "field", "alert", "empty_state"]
-)
+@pytest.mark.parametrize("kind", ["button", "form", "field", "alert"])
 def test_unsupported_branches(kind: str) -> None:
     node: dict[str, Any] = {"type": kind, "binding": "unknown"}
     if kind == "button":

@@ -1709,3 +1709,28 @@ Chaque if ajoute un niveau de deux espaces, racine comprise sans wrapper page.
 Sans condition, sortie identique à FD-GENERATE-001. La primitive de boucle organise
 du code contrôlé sans heuristique, contrat, I/O ou moteur Jinja. Aucun nouveau
 bloc Design ; tables toujours reportées. Budgets et API publique inchangés.
+
+### Tables Jinja et états vides — FD-GENERATE-003
+
+```text
+Table Design + ViewContract
+   ↓ validate_table_bindings
+statut + colonnes validées + has_empty_state
+   ↓ generate/tables.py + render_jinja_loop
+HTML/Jinja table, variable locale item
+
+EmptyState unique
+   ↓
+if collection / table / else / div « Aucune donnée »
+```
+
+generate_simple_template reste l'orchestrateur : revalidation, nesting, bindings
+et conditions inchangés, puis projection des tables. Chaque table est préparée
+avant son enveloppe visible_if pour éviter des directives vides en cas d'erreur.
+Les conditions d'empty_state sont rejetées par une règle de génération dédiée.
+
+Le module tables.py utilise l'émetteur et l'échappement communs ; chaque ligne
+reste soumise au budget de sortie. Pas de nouveau modèle, API publique, résolution
+d'entité, singularisation ou action de ligne. Contrat list/fields et colonnes
+validés par le validateur existant. Les erreurs locales omettent la table ;
+troncature ou dépassement annule toute sortie. Aucun filesystem ou runtime Jinja.
