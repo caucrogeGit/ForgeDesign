@@ -211,15 +211,15 @@ def test_unsupported_branches(kind: str) -> None:
 
 
 @pytest.mark.parametrize("root", [True, False])
-def test_conditions_omitted(root: bool) -> None:
+def test_conditions_generated(root: bool) -> None:
     kwargs = {"visible_if": "show"} if root else {}
     child = section(visible_if="show") if not root else section()
     result = generate_simple_template(
         design([child], **kwargs),
         contract({"show": {"type": "boolean"}}),
     )
-    assert codes(result) == ["unsupported_condition"]
-    assert result.template == "" and not result.complete
+    assert codes(result) == [] and result.complete
+    assert result.template == "{% if show %}\n  <section></section>\n{% endif %}\n"
 
 
 def test_invalid_nesting() -> None:

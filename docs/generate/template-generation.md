@@ -25,12 +25,12 @@ fictive injectée ou backend consulté. Le résultat est du code lisible, modifi
 
 Button, table, form, field, alert et empty_state sont omis avec unsupported_block,
 ainsi que leur sous-arbre. Les autres branches supportées restent générables.
-Une condition visible_if sur un bloc supporté produit unsupported_condition :
-**le bloc et son sous-arbre sont omis**, pour ne pas produire de contenu sans
-la condition demandée. Cela vaut aussi pour la racine.
+Depuis FD-GENERATE-002, visible_if sur un bloc supporté produit une directive
+if validée contre le contrat ; voir la section Conditions et boucles ci-dessous.
+Le comportement historique unsupported_condition de FD-GENERATE-001 est remplacé.
 
-Aucun layout, extends, block, include, formulaire fonctionnel, route, boucle,
-condition, attribut data-forge-design-* ou style inline n'est inventé.
+Aucun layout, extends, block, include, formulaire fonctionnel, route, boucle automatique,
+attribut data-forge-design-* ou style inline n'est inventé.
 Les règles d'imbrication Design restent applicables : title se place sous card,
 text ne peut pas être enfant direct de page, grid reste une feuille.
 
@@ -74,7 +74,8 @@ les autres branches. Une troncature de validation reste bloquante.
 Les codes portent tous le préfixe generate :
 
 - invalid_design, invalid_contract, invalid_nesting, invalid_binding ;
-- unsupported_binding_syntax, unsupported_block, unsupported_condition ;
+- unsupported_binding_syntax, unsupported_block ;
+- invalid_condition, unsupported_condition_syntax ;
 - invalid_tag, unsupported_prop ;
 - analysis_truncated, output_too_large.
 
@@ -116,5 +117,83 @@ d'auto-échappement ; ce ticket génère uniquement le texte du template.
 Des choix de tags incompatibles peuvent rester sémantiquement invalides en HTML :
 la whitelist protège la syntaxe, elle ne remplace pas une validation navigateur.
 
-FD-GENERATE-002 ajoutera conditions et primitive de boucle ;
+FD-GENERATE-002 ajoute les conditions et la primitive de boucle ci-dessous.
 FD-GENERATE-003 traitera les tables et états vides.
+
+## Conditions et boucles — FD-GENERATE-002
+
+### Conditions contractuelles
+
+La source unique est visible_if. Après les validations historiques, le générateur
+appelle validate_conditional_bindings : la clé exacte doit exister dans context
+avec type=boolean. Variable inconnue ou mauvais type : generate.invalid_condition,
+location du validateur conservée, template vide et complete=False. Aucun doublon
+design.condition.* n'est exposé. Une troncature devient analysis_truncated.
+Cette validation porte sur l'arbre entier, y compris les conditions des blocs
+reportés ; une condition valide ne rend pas ces blocs supportés.
+
+Même une clé contractuelle doit respecter l'identifiant ASCII simple générable.
+Une syntaxe refusée (can-create, permission.create, not flag, etc.) produit
+generate.unsupported_condition_syntax et omet le sous-arbre concerné.
+La regex et les exclusions Jinja sont mutualisées avec les bindings texte.
+Ni expression libre, conversion de permission, négation ni truthiness calculée
+par Forge Design. Le backend devra fournir les booléens déclarés.
+
+```jinja
+{% if can_view %}
+  <section>
+    {% if can_create %}
+      <p class="text-xl">{{ page_title }}</p>
+    {% endif %}
+  </section>
+{% endif %}
+```
+
+Un if entoure tout le bloc et ajoute deux espaces à son contenu. Page ne produit
+toujours aucune balise : sa condition entoure tous ses enfants. Les sept types
+supportés peuvent porter une condition ; les conditions imbriquées se composent.
+La sortie sans visible_if reste identique, y compris classes, indentation et LF.
+Le budget HTML/Jinja existant compte également les directives et leur indentation.
+
+### Primitive de boucle interne
+
+Le module interne `forge_design.generate.control_flow` fournit :
+
+```python
+render_jinja_loop(
+    *,
+    collection: str,
+    item: str,
+    body: tuple[str, ...],
+    indent: int = 0,
+) -> tuple[str, ...]
+```
+
+Ces fonctions ne sont pas réexportées par l'API publique du package. Collection
+et item sont deux identifiants simples explicitement fournis. Aucun accès au
+contrat, singularisation, conversion d'Entity ou heuristique de nommage.
+
+```jinja
+{% for contact in contacts %}
+  <p>{{ contact.nom }}</p>
+{% endfor %}
+```
+
+Body contient des lignes de code générées de confiance, sans LF/CR, avec leur
+indentation relative. La primitive ajoute un niveau au corps et conserve son
+texte sans ré-échappement. Indent est un nombre entier de niveaux, positif ou nul,
+hors bool. Corps vide accepté. Les violations sont des ValueError de programmation.
+Dotted collections, filtres, appels et slices sont refusés. Le nom local loop
+est également refusé car réservé par Jinja pour le contexte de boucle.
+
+Le futur appelant reste responsable du code du corps, du choix du nom local,
+des collisions de portée et du budget de sortie ; cette primitive interne n'est
+ni un parseur ni un assainisseur. Aucun moteur Jinja exécuté.
+
+### Périmètre conservé
+
+Aucun bloc Loop/For/Condition ajouté au Design. Table reste unsupported_block :
+aucune boucle vide ou table partielle n'est générée depuis un nœud table.
+FD-GENERATE-003 pourra utiliser cette primitive pour le corps des tables et les
+états vides. Les modèles, revalidation, nesting, bindings simples, limites,
+Preview, exports publics et packaging sont inchangés.

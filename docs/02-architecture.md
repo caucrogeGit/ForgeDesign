@@ -1686,3 +1686,26 @@ Revalidation sans mutation, budgets Design existants et borne de sortie d'un
 million de caractères. Toute issue rend complete=False ; invalidité bloquante
 ou dépassement annule toute sortie. Aucun moteur Jinja exécuté, fichier écrit,
 nouveau Tool ou route. Voir [génération de templates](generate/template-generation.md).
+
+### Contrôles Jinja — FD-GENERATE-002
+
+```text
+Design.visible_if + ViewContract
+   ↓ validate_conditional_bindings
+identifiant sûr → directive if autour du bloc
+
+collection + nom local + lignes générées
+   ↓ primitive interne render_jinja_loop
+lignes for/endfor → futur générateur de tables FD-GENERATE-003
+```
+
+Le module interne generate/control_flow.py mutualise validation d'identifiants,
+directives et indentation. Le générateur simple conserve sa revalidation et ses
+validateurs historiques, puis vérifie les conditions contractuelles. Les erreurs
+deviennent generate.invalid_condition avec locations inchangées ; les clés
+incompatibles avec la syntaxe Jinja sont omises avec diagnostic dédié.
+
+Chaque if ajoute un niveau de deux espaces, racine comprise sans wrapper page.
+Sans condition, sortie identique à FD-GENERATE-001. La primitive de boucle organise
+du code contrôlé sans heuristique, contrat, I/O ou moteur Jinja. Aucun nouveau
+bloc Design ; tables toujours reportées. Budgets et API publique inchangés.

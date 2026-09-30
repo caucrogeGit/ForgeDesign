@@ -1,6 +1,5 @@
 """Génération HTML/Jinja simple après revalidation, sans moteur de templates."""
 
-import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from html import escape
@@ -10,8 +9,14 @@ from pydantic import ValidationError
 
 from forge_design.contracts.models import ViewContract
 from forge_design.design.bindings import validate_design_bindings
+from forge_design.design.conditional_bindings import validate_conditional_bindings
 from forge_design.design.models import DesignFile, DesignNode, PageRoot
 from forge_design.design.nesting import validate_design_nesting
+from forge_design.generate.control_flow import (
+    indent_line,
+    is_safe_jinja_identifier,
+    jinja_condition,
+)
 from forge_design.limits import (
     MAX_DESIGN_DEPTH,
     MAX_DESIGN_ISSUES,
@@ -46,30 +51,6 @@ _SAFE_TAGS = frozenset(
         "h6",
     )
 )
-_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-# Les constantes/opérateurs Jinja ne désignent pas une variable de contexte.
-_RESERVED = frozenset(
-    (
-        "true",
-        "false",
-        "none",
-        "True",
-        "False",
-        "None",
-        "and",
-        "or",
-        "not",
-        "in",
-        "is",
-        "if",
-        "else",
-        "for",
-    )
-)
-
-
-def _is_safe_jinja_identifier(name: str) -> bool:
-    return _IDENTIFIER.fullmatch(name) is not None and name not in _RESERVED
 
 
 @dataclass(frozen=True)
@@ -140,7 +121,7 @@ class _Generator:
         length = depth * 2 + len(content) + 1
         if self.length + length > MAX_GENERATED_TEMPLATE_CHARS:
             self.stop("output_too_large", path)
-        self.lines.append("  " * depth + content + "\n")
+        self.lines.append(indent_line(content, depth) + "\n")
         self.length += length
 
     def node(
@@ -149,9 +130,20 @@ class _Generator:
         if node.type != "page" and node.type not in _TAGS:
             self.issue("unsupported_block", path)
             return
-        if node.visible_if is not None:
-            self.issue("unsupported_condition", (*path, "visible_if"))
-            return
+        condition = node.visible_if
+        if condition is not None:
+            if not is_safe_jinja_identifier(condition):
+                self.issue("unsupported_condition_syntax", (*path, "visible_if"))
+                return
+            self.line(jinja_condition(condition), depth, path)
+            self.node_content(node, path, depth + 1)
+            self.line("{% endif %}", depth, path)
+        else:
+            self.node_content(node, path, depth)
+
+    def node_content(
+        self, node: DesignNode | PageRoot, path: tuple[str | int, ...], depth: int
+    ) -> None:
         tag = _TAGS.get(node.type, "")
         classes = ""
         for key, value in (node.props or {}).items():
@@ -183,7 +175,7 @@ class _Generator:
         if node.type in {"title", "text"}:
             text = ""
             if node.binding is not None:
-                if _is_safe_jinja_identifier(node.binding):
+                if is_safe_jinja_identifier(node.binding):
                     text = "{{ " + node.binding + " }}"
                 else:
                     self.issue("unsupported_binding_syntax", (*path, "binding"))
@@ -232,6 +224,16 @@ def generate_simple_template(
         if invalid:
             for issue in invalid:
                 generator.issue("invalid_binding", issue.location)
+            raise _Stopped
+        conditions = validate_conditional_bindings(design, contract)
+        if not conditions.valid:
+            for issue in conditions.issues:
+                generator.issue(
+                    "analysis_truncated"
+                    if issue.code.endswith("analysis_truncated")
+                    else "invalid_condition",
+                    issue.location,
+                )
             raise _Stopped
         generator.node(design.root, ("root",), 0)
     except _Stopped:
