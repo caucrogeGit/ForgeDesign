@@ -1759,3 +1759,27 @@ Résultat et issues gelés, sortie bornée à un million de caractères ; dépas
 annule seulement le diff, conserve contenus/métriques et marque complete=False.
 Aucun état global mutable, I/O, Web, historique ou écriture. Les API sont exportées
 par forge_design.generate, sans nouvelle dépendance ni package setuptools.
+
+### Journal des succès d'écriture — FD-GENERATE-005
+
+```text
+Génération → Diff → future approbation explicite → future écriture contrôlée
+                                                       ↓ après succès
+                                            append_generation_history()
+                                                       ↓
+                                      .forge-design/history.jsonl
+```
+
+generate/history.py fournit seulement l'append du journal projet, pas l'écriture
+d'un template. Aucun appel automatique depuis generate ou diff. Métadonnées
+minimales : timestamp UTC, action generate_template et chemin relatif canonique.
+
+Validation et sérialisation UTF-8 bornée avant I/O, helper existant open_directory,
+dir_fd/O_NOFOLLOW, fichier régulier sans hardlink, O_APPEND et un write par événement.
+Fsync du fichier et des répertoires nouvellement concernés avant retour.
+Modes de création prudents ; aucun mode existant modifié.
+
+Les erreurs ne sont pas converties en succès ; short write/fsync échoué peuvent
+laisser des octets présents, sans rollback implicite. Aucun journal de diff,
+décision d'autorisation, lecteur d'historique, Web ou logique anti-écrasement.
+La phase SAFEWRITE ajoutera le contrôle réel des écritures et conflits.

@@ -64,3 +64,6 @@ MAX_GENERATED_TEMPLATE_CHARS = 1_000_000
 
 # Unified diff en mémoire, en-têtes et marqueurs compris.
 MAX_TEMPLATE_DIFF_CHARS = 1_000_000
+
+# Une entrée JSONL du journal projet, LF et UTF-8 compris.
+MAX_HISTORY_EVENT_BYTES = 16_384

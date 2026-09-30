@@ -1,9 +1,14 @@
-"""Génération de templates en mémoire, sans écriture projet."""
+"""Génération et diff en mémoire, journal explicite des écritures réussies."""
 
 from forge_design.generate.diff import (
     TemplateDiffIssue,
     TemplateDiffResult,
     build_template_diff,
+)
+from forge_design.generate.history import (
+    GenerationHistoryEvent,
+    HistoryAction,
+    append_generation_history,
 )
 from forge_design.generate.simple import (
     TemplateGenerationIssue,
@@ -12,6 +17,9 @@ from forge_design.generate.simple import (
 )
 
 __all__ = [
+    "HistoryAction",
+    "GenerationHistoryEvent",
+    "append_generation_history",
     "TemplateDiffIssue",
     "TemplateDiffResult",
     "build_template_diff",

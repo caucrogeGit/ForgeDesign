@@ -364,3 +364,88 @@ HTML/Jinja/ANSI présents dans les entrées restent du texte littéral. Les mét
 sont également conservées sans assainissement de présentation ; un futur affichage
 Web ou terminal devra traiter ces chaînes selon son contexte.
 Aucune UI, confirmation, sauvegarde, détection de conflit ou écriture dans ce service.
+
+## Journal des écritures — FD-GENERATE-005
+
+`append_generation_history(project_root: Path, *, action: HistoryAction,
+file: str, timestamp: datetime | None = None)` ajoute un événement dans
+`<project_root>/.forge-design/history.jsonl` et retourne une
+GenerationHistoryEvent gelée : timestamp, action, file. Ces types et la fonction
+sont exportés depuis forge_design.generate. HistoryAction accepte seulement
+generate_template, y compris au runtime.
+
+**L'appelant doit appeler ce service après une écriture autorisée et réussie.**
+Le journal ne prouve pas lui-même cette écriture, n'autorise rien et ne crée aucun
+template. Génération et diff n'appellent pas automatiquement le journal. Un diff
+refusé ou seulement consulté n'est pas un événement d'écriture.
+
+### Format minimal
+
+```json
+{"timestamp":"2026-09-30T09:15:00Z","action":"generate_template","file":"mvc/views/élèves/liste.html"}
+```
+
+Un objet compact dans cet ordre, UTF-8 sans BOM, ensure_ascii=False, un LF final.
+Aucun contenu de fichier, token, cookie, mot de passe ou environnement ajouté.
+Le champ file est une métadonnée fournie par l'appelant ; aucune extraction
+automatique de contenu ou analyse de secrets dans les noms n'est réalisée.
+
+Timestamp par défaut : heure réelle courante UTC. L'appelant peut injecter un
+datetime aware, converti en UTC avec suffixe Z ; microsecondes conservées si
+présentes. Datetime naïf refusé par ValueError. Pas d'horloge dans la sérialisation
+interne pure ; celle-ci reçoit l'événement préparé.
+
+File doit être une chaîne relative non vide à séparateurs /. Segments vides,
+. et .. interdits. Antislash, deux-points, contrôles ASCII et DEL refusés :
+chemins absolus POSIX, Windows, UNC et traversals ne sont pas normalisés puis acceptés.
+Le fichier tracé n'est ni ouvert ni vérifié : cette politique valide la métadonnée,
+pas l'autorisation d'écrire un futur template.
+
+### Append sécurisé
+
+La racine doit être un dossier réel. Le helper existant open_directory ouvre
+chaque segment sans suivre les symlinks ; les opérations suivantes utilisent
+dir_fd. Aucun resolve qui accepterait silencieusement une racine liée.
+
+.forge-design est créé si absent avec mode 0700 ; history.jsonl avec mode 0600
+(sous réserve d'un umask plus restrictif). Les modes existants ne sont pas modifiés.
+Le dossier et le fichier sont contrôlés par comparaison d'identité stat/fstat.
+Journal régulier obligatoire avec st_nlink==1. Symlinks, hardlinks, dossiers,
+FIFO, sockets et devices sont refusés.
+
+Création exclusive si absent ; sinon ouverture du fichier existant sans
+troncature. Flags O_WRONLY/O_APPEND/O_NOFOLLOW/O_NONBLOCK et O_CLOEXEC lorsque
+disponible. O_NONBLOCK évite l'attente sur une FIFO remplacée entre les contrôles.
+Les descripteurs sont fermés aussi en cas d'échec.
+
+L'événement est entièrement validé, sérialisé et borné avant toute I/O.
+Un seul os.write pour la ligne normale ; aucun seek(end), aucune boucle de
+réécriture partielle. O_APPEND place chaque write à la fin du fichier.
+Après succès : fsync du fichier ; fsync du dossier si le journal vient d'être
+créé, puis fsync du parent projet si .forge-design vient d'être créé.
+Retour de l'événement seulement après toutes ces opérations.
+
+### Limites et erreurs
+
+MAX_HISTORY_EVENT_BYTES=16_384 borne les octets UTF-8, LF compris.
+Limite exacte acceptée ; surplus ValueError avant I/O, journal inchangé.
+Les erreurs de permission, ouverture, écriture ou synchronisation se propagent.
+Une écriture courte lève OSError sans tentative supplémentaire qui pourrait
+entrelacer la fin de ligne avec une autre entrée concurrente.
+
+Un échec peut avoir laissé un dossier/fichier vide, un fragment de ligne ou une
+ligne déjà ajoutée mais dont la durabilité n'est pas confirmée. Aucun rollback,
+troncature ou retry automatique : l'appelant ne doit pas assimiler l'exception
+à « rien écrit », ni rejouer aveuglément l'événement.
+
+Cette stratégie suppose un filesystem POSIX avec les primitives nécessaires.
+O_APPEND ne promet pas les mêmes garanties sur tous les systèmes de fichiers
+réseau. Les contrôles d'identité réduisent les races à l'ouverture, sans garantir
+un instantané global face à un processus hostile : un dossier ouvert peut être
+renommé, un hardlink créé après le dernier contrôle, le journal supprimé ensuite.
+Le journal préexistant est supposé JSONL valide et terminé par LF ; il n'est pas
+relu, réparé ou compacté. Aucune rotation ni borne de taille totale ici.
+
+FD-GENERATE-005 fournit seulement History append. La future couche SAFEWRITE
+traitera écriture contrôlée, conflits et modifications externes. Ce journal
+minimal ne contient ni hash, révision, inode ou mtime.
