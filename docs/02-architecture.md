@@ -1734,3 +1734,28 @@ reste soumise au budget de sortie. Pas de nouveau modèle, API publique, résolu
 d'entité, singularisation ou action de ligne. Contrat list/fields et colonnes
 validés par le validateur existant. Les erreurs locales omettent la table ;
 troncature ou dépassement annule toute sortie. Aucun filesystem ou runtime Jinja.
+
+### Diff avant écriture — FD-GENERATE-004
+
+```text
+Design + Contract → générateur → texte généré
+                                  +
+                            texte actuel fourni
+                                  ↓
+                         build_template_diff()
+                                  ↓
+             diff unifié + métriques + cible + origine
+                                  ↓ future revue utilisateur
+                                  ↓ future écriture contrôlée
+```
+
+generate/diff.py est un service pur sur chaînes, indépendant des modèles et du
+générateur. Target/origin descriptifs, aucune résolution ou lecture automatique.
+Les contenus sont conservés exactement ; les métriques proviennent des opcodes
+SequenceMatcher sans séparateurs, le diff conserve les fins de ligne et signale
+l'absence de LF. Aucun timestamp ou moteur Jinja.
+
+Résultat et issues gelés, sortie bornée à un million de caractères ; dépassement
+annule seulement le diff, conserve contenus/métriques et marque complete=False.
+Aucun état global mutable, I/O, Web, historique ou écriture. Les API sont exportées
+par forge_design.generate, sans nouvelle dépendance ni package setuptools.

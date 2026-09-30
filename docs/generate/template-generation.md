@@ -292,3 +292,75 @@ Button, form, field et alert restent reportés. Aucune action CRUD de ligne n'es
 inventée : le modèle ne possède ni row_actions ni table_actions, et table n'accepte
 que des enfants empty_state. Pas de pagination, tri, filtres, layout ou écriture.
 Le ticket suivant est FD-GENERATE-004, diff avant écriture.
+
+## Diff avant écriture — FD-GENERATE-004
+
+`build_template_diff(*, target, current, generated, origin)` compare deux chaînes
+déjà disponibles en mémoire. Aucun appel au générateur, lecteur projet ou service
+d'écriture ; aucun couplage à DesignFile, ViewContract ou TemplateGenerationResult.
+
+L'API est exportée depuis forge_design.generate avec les dataclasses gelées
+TemplateDiffIssue(code, message) et TemplateDiffResult :
+
+- target et origin : métadonnées conservées exactement ;
+- current et generated : chaînes originales, sans normalisation ;
+- unified_diff et changed ;
+- added_lines, removed_lines, modified_lines ;
+- issues (tuple) et complete.
+
+Target et origin doivent être des chaînes non vides, sinon ValueError.
+Aucun strip ni origine par défaut. Target est seulement descriptif :
+../../etc/passwd n'est ni ouvert ni résolu, et n'est pas déclaré sûr pour une
+future écriture. La future couche d'écriture devra appliquer sa propre politique.
+
+### Unified diff et fins de ligne
+
+difflib.unified_diff utilise les lignes avec séparateurs conservés, un contexte
+de trois lignes, les en-têtes `--- target` et `+++ target.generated`, sans dates.
+Origin reste dans le résultat, sans être injectée dans le diff.
+Les en-têtes ont un LF ; les lignes de contenu gardent leurs séparateurs, CRLF
+compris. Une ligne produite sans LF reçoit un LF de présentation puis le marqueur
+textuel `\ No newline at end of file`, pour éviter de coller deux lignes du diff.
+Les contenus originaux restent disponibles exactement, quelle que soit la
+présentation des fins de ligne.
+
+Une égalité exacte donne changed=False, diff vide, compteurs zéro et complete=True.
+Une entrée current vide représente un ajout ; generated vide une suppression.
+Un changement uniquement de LF final ou CRLF/LF donne changed=True et un diff,
+même si les compteurs de contenu restent à zéro.
+
+### Métriques sémantiques
+
+Les métriques sont indépendantes du texte du diff. SequenceMatcher compare
+`splitlines()` sans séparateurs, avec son comportement standard (autojunk activé).
+
+| Opcode | Comptage |
+|---|---|
+| insert | Toutes les nouvelles lignes sont ajoutées |
+| delete | Toutes les anciennes lignes sont supprimées |
+| replace | min(anciennes, nouvelles) modifiées ; excédent ajouté ou supprimé |
+| equal | Aucun compteur |
+
+Un remplacement 1→1 donne 1 modifiée, 0 ajoutée, 0 supprimée ; 1→3 donne 1 modifiée
+et 2 ajoutées. Des insertions et suppressions indépendantes ne deviennent pas
+artificiellement des modifications. Les lignes de contenu commençant par --- ou
++++ n'interfèrent pas avec ces métriques.
+
+### Taille et présentation
+
+MAX_TEMPLATE_DIFF_CHARS=1_000_000 limite les caractères du unified diff, en-têtes,
+séparateurs et marqueurs compris. La limite exacte est acceptée. En cas de surplus :
+unified_diff="", complete=False et une issue diff.output_too_large. Les compteurs,
+changed, métadonnées et contenus sont conservés. Pas de diff partiel silencieux.
+
+Le budget ne limite ni les entrées, ni les listes de lignes, ni le temps/mémoire
+de SequenceMatcher. Des contenus répétitifs peuvent rendre la comparaison coûteuse ;
+les métriques suivent son alignement déterministe et ne constituent pas une mesure
+sémantique du code. Les séparateurs reconnus sont ceux de str.splitlines ; la sortie
+sert à la revue textuelle, pas à appliquer un patch universel à tous les encodages.
+
+Aucun HTML échappé, template exécuté, ANSI ajouté ou horodatage généré.
+HTML/Jinja/ANSI présents dans les entrées restent du texte littéral. Les métadonnées
+sont également conservées sans assainissement de présentation ; un futur affichage
+Web ou terminal devra traiter ces chaînes selon son contexte.
+Aucune UI, confirmation, sauvegarde, détection de conflit ou écriture dans ce service.

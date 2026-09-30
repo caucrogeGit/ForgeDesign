@@ -61,3 +61,6 @@ MAX_PREVIEW_HTML_CHARS = 1_000_000
 
 # Template utilisateur HTML/Jinja en mémoire, après échappement.
 MAX_GENERATED_TEMPLATE_CHARS = 1_000_000
+
+# Unified diff en mémoire, en-têtes et marqueurs compris.
+MAX_TEMPLATE_DIFF_CHARS = 1_000_000
