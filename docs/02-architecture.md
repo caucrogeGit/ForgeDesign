@@ -1661,3 +1661,28 @@ Cette présentation reste indicative : un div de largeur cible ne reproduit ni
 un viewport navigateur ni les media queries/Tailwind du projet. Pas de route,
 iframe, browser, hauteur fixe ou nouvelle dépendance. Elle clôt la phase Preview
 statique ; voir les [contrats de preview](preview/static-preview.md).
+
+### Génération simple en mémoire — FD-GENERATE-001
+
+```text
+ViewContract + DesignFile
+   ↓ précontrôle borné, revalidation Pydantic, nesting et bindings simples
+generate_simple_template()
+   ↓
+texte HTML/Jinja + issues + complete
+   ↓ futur diff
+   ↓ future écriture contrôlée
+```
+
+Le package public `forge_design.generate` est indépendant de la Preview et des
+lecteurs projet. Page ne produit aucune balise ; les six blocs structurels/textuels
+produisent des tags contrôlés et des classes explicites. Aucun layout implicite,
+donnée fictive, attribut de preview ou backend. Conditions et blocs fonctionnels
+reportés sont omis avec diagnostics, sans approximation.
+
+Les identifiants Jinja sont restreints ; les classes sont protégées contre les
+injections HTML et les délimiteurs Jinja. Le texte reste indenté à deux espaces.
+Revalidation sans mutation, budgets Design existants et borne de sortie d'un
+million de caractères. Toute issue rend complete=False ; invalidité bloquante
+ou dépassement annule toute sortie. Aucun moteur Jinja exécuté, fichier écrit,
+nouveau Tool ou route. Voir [génération de templates](generate/template-generation.md).

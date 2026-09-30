@@ -58,3 +58,6 @@ MAX_TABLE_COLUMNS = 512
 
 # Fragment HTML de preview, caractères après échappement.
 MAX_PREVIEW_HTML_CHARS = 1_000_000
+
+# Template utilisateur HTML/Jinja en mémoire, après échappement.
+MAX_GENERATED_TEMPLATE_CHARS = 1_000_000
