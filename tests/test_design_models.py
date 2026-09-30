@@ -25,7 +25,7 @@ BASE: dict[str, Any] = {
 }
 
 
-@pytest.mark.parametrize("fixture", ["minimal", "contacts-list"])
+@pytest.mark.parametrize("fixture", ["minimal", "contacts-list", "conditional"])
 @pytest.mark.parametrize("as_json", [False, True])
 def test_fixtures_round_trip(fixture: str, as_json: bool) -> None:
     text = (
@@ -348,3 +348,36 @@ def test_no_filesystem_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(builtins, "open", forbidden)
     monkeypatch.setattr(Path, "read_text", forbidden)
     assert DesignFile.model_validate(BASE).view == "home"
+
+
+@pytest.mark.parametrize("model", [DesignNode, PageRoot])
+@pytest.mark.parametrize("as_json", [False, True])
+def test_visible_if_omission_and_round_trip(
+    model: type[BaseModel], as_json: bool
+) -> None:
+    cases: list[dict[str, Any]] = [
+        {"type": "page", "children": []},
+        {"type": "page", "children": [], "visible_if": " peut_créer "},
+    ]
+    for data in cases:
+        result = (
+            model.model_validate_json(json.dumps(data))
+            if as_json
+            else model.model_validate(data)
+        )
+        assert result.model_dump(exclude_unset=True) == data
+        assert json.loads(result.model_dump_json(exclude_unset=True)) == data
+
+
+@pytest.mark.parametrize("value", [None, "", 1, True, {}, []])
+@pytest.mark.parametrize("model", [DesignNode, PageRoot])
+@pytest.mark.parametrize("as_json", [False, True])
+def test_visible_if_invalid(
+    model: type[BaseModel], value: object, as_json: bool
+) -> None:
+    data: dict[str, Any] = {"type": "page", "children": [], "visible_if": value}
+    with pytest.raises(ValidationError):
+        if as_json:
+            model.model_validate_json(json.dumps(data))
+        else:
+            model.model_validate(data)

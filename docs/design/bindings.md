@@ -202,3 +202,57 @@ Toutes les dataclasses de résultat sont gelées et leurs collections publiques 
 des tuples. Entrées inchangées, résultat déterministe sans mutation concurrente.
 Aucun filesystem, route, pagination, filtre, condition, formulaire avancé, Web,
 Tool ou génération HTML. Les bindings simples FD-BINDING-001 restent inchangés.
+
+## Bindings conditionnels — FD-BINDING-003
+
+Un bloc peut déclarer une référence booléenne de visibilité :
+
+```json
+{
+  "type": "button",
+  "binding": "create",
+  "visible_if": "can_create"
+}
+```
+
+binding porte la donnée/action principale du bloc ; visible_if porte une référence
+séparée, cherchée uniquement dans ViewContract.context et obligatoirement de type
+boolean. Tous les types de nœuds, root comprise, acceptent cette propriété.
+Une condition absente ne produit aucune erreur. L'action homonyme ne satisfait
+jamais une condition ; aucune truthiness de string, nombre, objet ou liste.
+
+```python
+from forge_design.design import validate_conditional_bindings
+
+conditions = validate_conditional_bindings(design, contract)
+```
+
+La fonction consomme des modèles déjà validés et retourne ConditionalBindingResult
+(valid, issues tuple, truncated). Les dataclasses résultat/issue sont gelées.
+Codes : design.condition.unknown_variable, design.condition.type_mismatch et
+design.condition.analysis_truncated. Une erreur ordinaire vise visible_if, par
+exemple ("root", "children", 0, "visible_if") ou ("root", "visible_if"). Le champ
+binding de l'issue contient la référence visible_if. Le marqueur terminal vise le
+nœud déclencheur et peut avoir binding=None, sans condition artificielle.
+
+Les noms sont exacts, sans strip/casefold/normalisation Unicode ou parsing.
+true ne désigne pas une constante ; permission.create ne parcourt pas des champs.
+!can_create, not can_create, comparaisons et AND/OR ne sont jamais interprétés :
+ces chaînes ne sont valides que si une clé littérale de type boolean existe.
+Aucune négation, AST, expression Jinja, RBAC, rôle, session ou politique d'autorisation.
+Le backend décide d'une permission et la fournit comme boolean ; Forge Design
+vérifie seulement sa déclaration, pas sa valeur ni la visibilité effective du bloc.
+
+Parcours préfixe itératif, racine comprise, ordre source, occurrences partagées
+analysées séparément. Mêmes limites que les autres validateurs : 4096 nœuds,
+profondeur 128 racine à zéro, 512 issues marqueur compris. Limite exacte sans
+surplus : pas de troncature. Surplus : arrêt, marqueur terminal unique et valid=False.
+Si les issues sont déjà au plafond, la dernière est remplacée par le marqueur.
+Cycles et largeur pathologique restent bornés, sans copie complète ou récursion.
+Coût O(N) à profondeur plafonnée, recherche dans le dictionnaire context existant.
+
+Aucun appel aux autres validateurs, aucune mutation, lecture de fichier, entité,
+route, fields, action ou propriété props. Nesting/binding principal/colonnes invalides
+n'empêchent pas cette analyse indépendante. Le pipeline peut composer Pydantic,
+nesting, bindings simples, tables et conditions explicitement. Génération Jinja
+reportée à FD-GENERATE-002, données fictives à FD-PREVIEW-001 ; aucun aperçu runtime.

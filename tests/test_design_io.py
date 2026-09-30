@@ -39,7 +39,7 @@ def snapshot(path: Path) -> tuple[bytes, int]:
     return path.read_bytes(), path.stat().st_mtime_ns
 
 
-@pytest.mark.parametrize("name", ["minimal", "contacts-list"])
+@pytest.mark.parametrize("name", ["minimal", "contacts-list", "conditional"])
 def test_round_trip_and_sentinels(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:

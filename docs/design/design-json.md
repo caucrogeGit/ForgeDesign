@@ -57,6 +57,7 @@ Button→aucun enfant n'est anticipée.
 | Champ facultatif du nœud | Déclaration |
 |---|---|
 | binding | Chaîne non vide, référence déclarative |
+| visible_if | Chaîne non vide, référence booléenne de visibilité (FD-BINDING-003) |
 | props | Objet à clés non vides, valeurs scalaires simples |
 | columns | Tableau de TableColumn |
 | children | Tableau récursif de DesignNode |
@@ -77,9 +78,9 @@ Aucun contrôle des propriétés propre à chaque type de bloc dans ce ticket.
 Un binding comme `page_title` ou `contacts` nomme une donnée déclarative ; il ne
 contient pas de Jinja à exécuter et ne déclenche aucune évaluation. Le schéma exige
 seulement une chaîne non vide, sans parser son contenu ni vérifier son existence.
-Ne pas écrire `{{ page_title }}` ou une expression métier. Les propriétés
-visible_if/if/unless/condition sont hors du format ; validation des bindings en
-phase FD-BINDING-001.
+Ne pas écrire `{{ page_title }}` ou une expression métier. Depuis FD-BINDING-003,
+visible_if est une référence déclarative distincte vers un boolean du contexte.
+Les propriétés if/unless/condition restent hors du format.
 
 TableColumn est strict : label et binding sont des chaînes non vides obligatoires.
 Columns reste facultatif sur DesignNode, sans condition exigeant type=table.
@@ -89,7 +90,7 @@ Les futurs modèles/règles pourront affiner les propriétés, sans les anticipe
 
 Les fixtures appartiennent uniquement au dépôt Forge Design ; aucun fichier n'est
 créé dans un projet cible. Ordre conceptuel recommandé : version, view,
-source_contract, root ; puis type, binding, props, columns, children. L'ordre des
+source_contract, root ; puis type, binding, visible_if, props, columns, children. L'ordre des
 clés JSON n'a pas de signification fonctionnelle.
 
 [Minimal](../../tests/fixtures/design/minimal.design.json) :
@@ -438,3 +439,26 @@ publication du nom temporaire face à un acteur pouvant écrire dans le même do
 Les descripteurs empêchent le suivi des liens, mais un dossier ouvert peut être
 renommé ; il n'existe pas d'instantané global de l'arborescence. Ces limites ne
 permettent pas de promettre un compare-and-swap face à un adversaire concurrent.
+
+
+## Visibilité déclarative — FD-BINDING-003
+
+Extension additive de v0.1 : visible_if est une chaîne non vide facultative sur
+DesignNode et PageRoot, sans changement du vocabulaire de blocs. Absence conservée
+au dump exclude_unset=True ; null explicite, chaîne vide et valeurs non textuelles
+refusés. Les documents v0.1 historiques restent valides, d'où le maintien de version
+0.1. Les anciens lecteurs stricts ne connaissant pas cette propriété peuvent refuser
+les nouveaux documents : la compatibilité est celle des anciens documents avec
+le format étendu, pas une promesse de lecture par les anciens binaires.
+
+Exemple de nœud : button avec binding=create et visible_if=can_create. Le premier
+nom vise une action ; le second une clé exacte de context de type boolean.
+Aucun moteur d'expression, permission interprétée ou valeur runtime évaluée.
+La [fixture conditionnelle](../../tests/fixtures/design/conditional.design.json)
+utilise page → section → container → button, compatible avec le nesting actuel.
+Les deux fixtures précédentes sont inchangées.
+
+La propriété traverse le cycle write_design/read_design sans adaptation du module
+I/O. Celui-ci continue à valider Pydantic et nesting seulement : la résolution de
+visible_if contre un contrat explicitement fourni reste une étape indépendante.
+Voir les [bindings conditionnels](bindings.md#bindings-conditionnels--fd-binding-003).

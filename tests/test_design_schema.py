@@ -60,6 +60,7 @@ def test_node_and_root_composition(schema: dict[str, Any]) -> None:
     assert set(node["properties"]) == {
         "type",
         "binding",
+        "visible_if",
         "props",
         "columns",
         "children",
@@ -185,7 +186,8 @@ def test_invalid_examples_explain_declared_constraints(schema: dict[str, Any]) -
         and schema["additionalProperties"] is False
     )
     assert (
-        "visible_if" not in node["properties"] and node["additionalProperties"] is False
+        "visible_unless" not in node["properties"]
+        and node["additionalProperties"] is False
     )
     assert len("") < node["properties"]["binding"]["minLength"]
     assert {"object", "array", "null"}.isdisjoint(schema["$defs"]["PropValue"]["type"])
@@ -256,3 +258,10 @@ def test_packaging_and_no_new_dependency_or_tool() -> None:
         "debug-center",
         "template-viewer",
     ]
+
+
+def test_visible_if_additive_declaration(schema: dict[str, Any]) -> None:
+    node = schema["$defs"]["DesignNode"]
+    assert node["properties"]["visible_if"] == {"type": "string", "minLength": 1}
+    assert "visible_if" not in node["required"]
+    assert schema["properties"]["version"]["const"] == "0.1"

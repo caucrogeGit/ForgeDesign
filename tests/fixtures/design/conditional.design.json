@@ -1,0 +1,25 @@
+{
+  "version": "0.1",
+  "view": "contacts/list",
+  "source_contract": "contacts/list.view.json",
+  "root": {
+    "type": "page",
+    "children": [
+      {
+        "type": "section",
+        "children": [
+          {
+            "type": "container",
+            "children": [
+              {
+                "type": "button",
+                "binding": "create",
+                "visible_if": "can_create"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

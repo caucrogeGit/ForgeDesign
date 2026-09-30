@@ -77,6 +77,10 @@
           "type": "string",
           "minLength": 1
         },
+        "visible_if": {
+          "type": "string",
+          "minLength": 1
+        },
         "props": {
           "type": "object",
           "propertyNames": {

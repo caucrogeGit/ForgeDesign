@@ -5,6 +5,11 @@ from forge_design.design.bindings import (
     DesignBindingResult,
     validate_design_bindings,
 )
+from forge_design.design.conditional_bindings import (
+    ConditionalBindingIssue,
+    ConditionalBindingResult,
+    validate_conditional_bindings,
+)
 from forge_design.design.io import (
     DesignIssue,
     DesignReadResult,
@@ -44,6 +49,9 @@ from forge_design.design.table_bindings import (
 )
 
 __all__ = [
+    "ConditionalBindingIssue",
+    "ConditionalBindingResult",
+    "validate_conditional_bindings",
     "SuggestedTableColumn",
     "TableBindingInfo",
     "TableBindingIssue",

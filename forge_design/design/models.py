@@ -71,6 +71,7 @@ class TableColumn(_DesignModel):
 
 class _NodeProperties(_DesignModel):
     binding: _Omissible[_NonEmpty] = None
+    visible_if: _Omissible[_NonEmpty] = None
     props: _Omissible[dict[_NonEmpty, PropValue]] = None
     columns: _Omissible[list[TableColumn]] = None
 

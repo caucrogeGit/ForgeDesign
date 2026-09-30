@@ -1572,3 +1572,20 @@ d'un dictionnaire vide, noms et types de champs exacts. L'entité déclarée est
 Budgets Design réutilisés et MAX_TABLE_COLUMNS=512 par occurrence ; résultats
 partiels explicitement tronqués. Propositions de colonnes en mémoire seulement,
 sans modifier Design/Contract, lire d'entité, générer du HTML ou ajouter un Tool.
+
+### Visibilité conditionnelle — FD-BINDING-003
+
+```text
+ViewContract.context[boolean] + DesignNode.visible_if (root comprise)
+                       ↓ validate_conditional_bindings
+ConditionalBindingResult : valid, issues, truncated
+```
+
+Extension additive et facultative du schéma/modèle Design v0.1 : chaîne non vide,
+absence distincte de null. Le validateur pur est indépendant de Pydantic, nesting,
+bindings simples et tableaux ; aucun appel en chaîne implicite. Recherche exacte
+dans context, sans expression ni valeur runtime. Le backend fournit les décisions
+de permission sous forme booléenne ; Forge Design n'implémente aucune autorisation.
+Parcours préfixe itératif avec les budgets Design existants ; diagnostics localisés
+sur visible_if. L'I/O conserve la propriété sans changement de logique et sans
+résolution automatique du contrat. Pas de nouvelle route, Tool ou génération.
