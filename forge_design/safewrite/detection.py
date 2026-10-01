@@ -135,6 +135,16 @@ def _read_revision(root: int, parts: tuple[str, ...]) -> TemplateRevision | None
     )
 
 
+def read_template_revision_at(directory: int, name: str) -> TemplateRevision | None:
+    """Même lecture sûre, ancrée sur un dossier déjà ouvert (revalidation writer).
+
+    None si name est absent ; TemplateSnapshotError ou OSError sinon.
+    """
+    if not name or "/" in name or name in {".", ".."}:
+        raise ValueError("Nom de template invalide.")
+    return _read_revision(directory, (name,))
+
+
 def snapshot_template(project_root: Path, template_path: str) -> TemplateSnapshot:
     """Lire l'état disque des octets du template ; aucun décodage ni écriture.
 

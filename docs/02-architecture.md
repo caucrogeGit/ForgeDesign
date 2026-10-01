@@ -505,7 +505,7 @@ Les dépendances lourdes restent attachées au Tool ou à un extra dédié.
 
 ## 14. Écriture
 
-Lorsqu'elle sera introduite :
+Principe :
 
 ```text
 lecture
@@ -516,6 +516,8 @@ lecture
 → écriture atomique
 → journalisation
 ```
+
+Implémenté pour les templates par FD-SAFEWRITE-001 à 003 (voir ci-dessous).
 
 Une écriture doit vérifier une seconde fois la cible canonique juste avant l'opération.
 
@@ -571,6 +573,37 @@ choix bornés. `unchanged` → `proceed`, `cancel` ; `modified`, `created`,
 défaut, aucun `overwrite`. `select_safe_write_choice` refuse tout choix hors
 matrice. `proceed` n'autorise pas une écriture future : le writer recontrôlera
 la révision juste avant publication. Aucun choix appliqué, aucune persistance.
+
+### Écriture contrôlée — FD-SAFEWRITE-003
+
+Pipeline réellement implémenté pour un template :
+
+```text
+snapshot
+→ generate
+→ diff
+→ detect
+→ explicit choice
+→ revalidate
+→ temp write
+→ revalidate
+→ atomic publish
+→ verify
+→ fsync
+→ history
+```
+
+`write_generated_template(root, *, generated, change, decision, timestamp=None)`
+n'accepte que `proceed` sur un changement `unchanged` cohérent, recalculé à
+partir des snapshots. Il revalide `change.current` par le chemin, puis
+re-contrôle révision et mode dans le dossier ouvert juste avant de publier.
+Création par `os.link` exclusif ; mise à jour par `os.replace`, avec le mode
+conservé. Le résultat publié est relu (digest, taille, inode) et le dossier est
+synchronisé avant le journal. `TemplatePublishedError` et
+`TemplateHistoryError` signalent une publication déjà faite, sans rollback.
+Ce n'est pas un compare-and-swap : la fenêtre entre le dernier contrôle et
+`os.replace` est documentée dans
+[anti-overwrite.md](safewrite/anti-overwrite.md).
 
 ## 15. Qualité et tests
 

@@ -1,4 +1,4 @@
-"""Anti-écrasement : détection des modifications externes et choix explicites."""
+"""Anti-écrasement : détection, choix explicite et écriture contrôlée."""
 
 from forge_design.safewrite.decision import (
     SafeWriteChoice,
@@ -18,6 +18,15 @@ from forge_design.safewrite.detection import (
     detect_template_change,
     snapshot_template,
 )
+from forge_design.safewrite.writer import (
+    TemplateHistoryError,
+    TemplatePublication,
+    TemplatePublishedError,
+    TemplateWriteConflictError,
+    TemplateWriteError,
+    TemplateWriteResult,
+    write_generated_template,
+)
 
 __all__ = [
     "TemplateRevision",
@@ -34,4 +43,11 @@ __all__ = [
     "decision_options",
     "select_safe_write_choice",
     "has_write_conflict",
+    "TemplatePublication",
+    "TemplateWriteResult",
+    "TemplateWriteError",
+    "TemplateWriteConflictError",
+    "TemplatePublishedError",
+    "TemplateHistoryError",
+    "write_generated_template",
 ]

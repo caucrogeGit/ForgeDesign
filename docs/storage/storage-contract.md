@@ -86,7 +86,7 @@ vue source (pas de segment caché, pas de nom sensible, pas de lien) :
 |---|---|---|---|
 | `*.view.json` | contrat de vue | aucune (voir dette) | lecture seule |
 | `*.design.json` | design de vue | `"version": "0.1"` | `write_design`, révision attendue |
-| `*.html` | template Forge | — | aucune écriture à ce jour |
+| `*.html` | template Forge | — | `write_generated_template` (FD-SAFEWRITE-003), révision attendue |
 
 Les temporaires d'écriture `.forge-design-write-<aléatoire>` sont créés dans le
 dossier cible et supprimés en sortie ; le préfixe est réservé.
