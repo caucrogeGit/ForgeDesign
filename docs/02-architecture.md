@@ -1630,9 +1630,11 @@ contexte courant ou préférence persistante. Schéma, modèles et nesting incha
 ### Éditeur structurel — FD-EDITOR-001
 
 ```text
-DesignFile
+DesignFile (+ ViewContract pour binding, visible_if, columns)
     ↓
-Structural Editor
+append / remove / move           (editor/structure.py)
+    ↓
+configure properties             (editor/properties.py, FD-EDITOR-003)
     ↓
 new DesignFile
     ├── preview future/UI
@@ -1651,6 +1653,11 @@ et revalidée. Un résultat `changed=True` est toujours valide et bien imbriqué
 un refus rend l'entrée telle quelle avec un diagnostic `editor.*`. Règles :
 `nesting.can_contain` uniquement ; bornes : `MAX_DESIGN_NODES` et
 `MAX_DESIGN_DEPTH`. Aucune I/O, sauvegarde, preview, génération, Web ou Tool.
+`editor/properties.py` modifie une seule propriété existante par appel
+(`binding`, `visible_if`, `props`, `columns` ; `None` supprime). Les règles
+contractuelles viennent des validateurs de `design/`, appliqués au seul bloc
+édité : une erreur ailleurs ne bloque pas une correction locale. Socle commun :
+`editor/_tree.py`.
 Voir [structural-editor.md](editor/structural-editor.md).
 
 ### Bindings simples — FD-BINDING-001

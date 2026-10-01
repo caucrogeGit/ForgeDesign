@@ -1,7 +1,7 @@
-# Éditeur structurel — FD-EDITOR-001, FD-EDITOR-002
+# Éditeur structurel — FD-EDITOR-001 à 003
 
 Mutations contrôlées d'un `DesignFile` : **ajouter**, **supprimer** et
-**déplacer** un bloc. L'éditeur est un moteur en mémoire, réutilisable par une future UI :
+**déplacer** un bloc, puis **configurer ses propriétés**. L'éditeur est un moteur en mémoire, réutilisable par une future UI :
 il ne lit, n'écrit, ne prévisualise ni ne génère rien.
 
 ```text
@@ -127,8 +127,8 @@ sont conservés à l'identique. Les opérations sont déterministes.
 
 Pas d'I/O (ni `read_design`, ni `write_design`, ni fichier) : la sauvegarde
 reste une action explicite de `design/io.py`. Pas de preview, génération ou diff
-automatiques, pas de Web, HTMX, JavaScript ni Tool. Pas d'édition de
-propriétés, de bindings, de `visible_if` ni de colonnes (FD-EDITOR-003).
+automatiques, pas de Web, HTMX, JavaScript ni Tool. Les propriétés se
+configurent avec les fonctions de FD-EDITOR-003 (section dédiée ci-dessous).
 
 ## Déplacement — FD-EDITOR-002
 
@@ -206,3 +206,85 @@ reçu, sans nouveau `DesignFile` produit.
 Les indices restent **non stables** : après un déplacement, les frères suivants
 de la source sont décalés. Tout chemin calculé avant l'opération est à
 recalculer.
+
+## Configuration des propriétés — FD-EDITOR-003
+
+Module `forge_design/editor/properties.py`. Il configure les propriétés
+**déjà prévues par Design v0.1**, sans modifier le schéma ni le modèle.
+`structure.py` gère l'arbre, `properties.py` la configuration d'un nœud. Les
+deux partagent le socle interne `editor/_tree.py` (chemins, revalidation,
+reconstruction) et le même contrat de résultat `DesignEditResult`.
+
+| Fonction | Propriété | Contrat requis |
+|---|---|---|
+| `set_design_binding(design, *, path, binding, contract)` | `binding` | oui |
+| `set_design_visibility(design, *, path, visible_if, contract)` | `visible_if` | oui |
+| `set_design_props(design, *, path, props)` | `props` | non |
+| `set_table_columns(design, *, path, columns, contract)` | `columns` | oui |
+
+Une fonction modifie **une seule propriété** : jamais les autres propriétés
+du bloc, ses enfants ou les autres blocs. Il n'y a pas d'`update_block(...)`
+qui mélangerait « non fourni », « effacer » et « mettre à jour ».
+
+### `None`, valeur vide et no-op
+
+- `None` **supprime** la propriété : la clé est omise du JSON.
+- `""` est refusé pour `binding` et `visible_if` : ce n'est pas une absence.
+- `props={}` reste `{}` et `columns=[]` reste `[]`, distincts de l'absence.
+- Si la propriété est **déjà exactement** dans l'état demandé : `changed=False`,
+  `affected_path=path`, `issues=()`, et `design` est l'objet reçu. La
+  comparaison est stricte au sens JSON : `1`, `1.0` et `True` diffèrent, et
+  l'ordre des clés de `props` compte.
+- Les valeurs de l'appelant (mapping, séquence) sont copiées : les modifier
+  ensuite n'affecte pas le résultat. Tout `Mapping` est accepté pour `props`.
+
+### Validation
+
+1. Validation du chemin et revalidation de l'entrée, comme pour la structure.
+   Le contrat est lui aussi revalidé (`editor.invalid_contract`), car ses
+   dictionnaires restent mutables.
+2. Pydantic applique le contrat Design : clés de props non vides, valeurs
+   `str`, `bool`, `int` ou `float` finies, pas de `null`, colonnes
+   `TableColumn` à chaînes non vides.
+3. Reconstruction et revalidation de l'imbrication (`editor.invalid_result`).
+4. **Validation contractuelle ciblée** par les validateurs existants
+   (`validate_design_bindings`, `validate_conditional_bindings`,
+   `validate_table_bindings`), appliqués à un Design **projeté** qui ne porte
+   que le bloc édité, sans ses enfants. Ces règles ne dépendent que du bloc et
+   du contrat. Une erreur préexistante sur un autre bloc ne bloque donc pas une
+   correction locale, et ne peut ni épuiser la limite de diagnostics ni tronquer
+   l'analyse du bloc édité. Aucune règle n'est recopiée dans l'éditeur.
+
+Supprimer une propriété (`None`) ne requiert aucune validation contractuelle.
+Effacer un binding présent sur un type qui n'en accepte pas (une section, par
+exemple) permet de réparer un Design.
+
+### Règles par propriété
+
+| Propriété | Accepté | Diagnostic |
+|---|---|---|
+| `binding` | `title`/`text` → variable `string`, `table` → variable `list`, `button` → action (règles de `design/bindings.py`) | `editor.invalid_binding` ; autre type, page comprise : `editor.binding_not_supported` |
+| `visible_if` | variable `boolean` du contexte, sur **tout** bloc, page comprise | `editor.invalid_condition` |
+| `props` | tout mapping conforme au modèle, **pas seulement** `tag` et `class` | `editor.invalid_props` |
+| `columns` | bloc `table` uniquement, binding vers une variable `list` du contrat ; champs déclarés si `fields` existe ; au plus `MAX_TABLE_COLUMNS` | `editor.columns_not_supported`, `editor.invalid_table_binding`, `editor.invalid_table_column`, `editor.column_limit` |
+
+Les props sont validées selon le **contrat Design**, pas selon les seules props
+connues du générateur. Une prop valide mais ignorée par la génération produira
+plus tard `generate.unsupported_prop`, ce qui est normal.
+
+Colonnes :
+- une table sans binding, liée à une variable inconnue ou non-`list` refuse
+  toute liste de colonnes, même vide : `editor.invalid_table_binding` ;
+- une collection sans `fields` accepte `[]` mais refuse des colonnes non vides ;
+- un champ non déclaré donne `editor.invalid_table_column`.
+
+`editor.analysis_truncated` est émis si un validateur est tronqué sur le bloc
+édité. Avec la projection, cela n'arrive pas en pratique : le nombre de
+colonnes est borné en amont.
+
+### Limites
+
+- Changer le `binding` d'une table ne revalide pas ses `columns` existantes :
+  une opération valide une seule propriété.
+- Aucune sauvegarde (`write_design` reste explicite), aucune génération,
+  preview, I/O, UI ni Tool.

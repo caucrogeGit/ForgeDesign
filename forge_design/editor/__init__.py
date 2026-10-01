@@ -1,5 +1,11 @@
-"""Éditeur structurel de Design en mémoire, sans I/O ni Web."""
+"""Éditeur de Design en mémoire : structure et propriétés, sans I/O ni Web."""
 
+from forge_design.editor.properties import (
+    set_design_binding,
+    set_design_props,
+    set_design_visibility,
+    set_table_columns,
+)
 from forge_design.editor.structure import (
     DesignEditIssue,
     DesignEditResult,
@@ -16,4 +22,8 @@ __all__ = [
     "append_design_block",
     "remove_design_block",
     "move_design_block",
+    "set_design_binding",
+    "set_design_visibility",
+    "set_design_props",
+    "set_table_columns",
 ]
