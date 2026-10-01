@@ -426,25 +426,21 @@ Un lecteur spécialisé ne lit que le minimum nécessaire à sa responsabilité.
 
 ## 10. Stockage
 
-### État utilisateur local
-
-Préférences, cache et état UI sont stockés hors du projet Forge, dans un emplacement utilisateur adapté au système.
-
-### État partagé Forge Design
-
-Le namespace projet réservé est :
+Le contrat normatif est [docs/storage/storage-contract.md](storage/storage-contract.md)
+(FD-STORAGE-001). Résumé :
 
 ```text
-.forge-design/
+A. État utilisateur local   $XDG_*_HOME/forge-design/   jamais partagé
+B. Métadonnées projet       <projet>/.forge-design/     partagé par Git
+C. Sources du projet        <projet>/mvc/…              partagé par Git
 ```
 
-Il n'est pas créé pendant Project Inspector en lecture seule.
-
-Aucun format sous `.forge-design/` n'est considéré stable avant un ticket dédié.
-
-### Sources Forge
-
-Les sources Forge restent inchangées jusqu'à l'arrivée d'un service d'écriture contrôlée.
+Tout ce que Forge Design écrit dans un projet est destiné à Git ; ce qui est
+propre à une personne ou une machine reste en zone A. `.forge-design/` n'est
+créé que par un service d'écriture après action explicite ; sa structure est
+fermée et listée dans le contrat. Chaque format persistant des zones A et B
+porte un entier `version` ; une version inconnue n'est ni lue ni réécrite.
+Aucune migration automatique silencieuse.
 
 ## 11. Compatibilité Forge
 

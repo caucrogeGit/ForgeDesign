@@ -160,9 +160,9 @@ Forge Design réserve le namespace :
 
 Il **n'est pas créé** pendant les phases de lecture seule.
 
-Sa structure future pourra contenir des métadonnées explicitement partagées et versionnées.
-
-Toute création de ce dossier fera l'objet d'un ticket dédié.
+Il contient des métadonnées partagées par Git et versionnées. Sa structure,
+le versionnement des formats et les migrations sont fixés par le
+[contrat de stockage](storage/storage-contract.md) (FD-STORAGE-001).
 
 ### 8.3 Fichiers Forge
 
