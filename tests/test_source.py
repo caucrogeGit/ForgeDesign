@@ -161,4 +161,3 @@ def test_source_locations(tmp_path: Path, async_method: bool) -> None:
     assert absent_class and absent_class.verification == "class-missing"
     assert absent_class.controller_file == "mvc/controllers/contact.py"
     assert absent_class.class_source is None and absent_class.method_source is None
-

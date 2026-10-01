@@ -160,8 +160,6 @@ def _entity(data: dict[str, object], source: SourceLocation) -> EntityInfo:
     )
 
 
-
-
 def _read(parent: int, name: str) -> str:
     metadata = os.stat(name, dir_fd=parent, follow_symlinks=False)
     if not S_ISREG(metadata.st_mode):

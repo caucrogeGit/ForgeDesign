@@ -268,9 +268,9 @@ def test_shared_navigation(
         assert '<nav aria-label="Navigation principale">' in html
         assert f'href="{path}" aria-current="page"' in html
         assert html.count('aria-current="page"') == 1
-        assert '>Accueil</a>' in html and '>Project Inspector</a>' in html
+        assert ">Accueil</a>" in html and ">Project Inspector</a>" in html
         assert 'href="/"' in html and 'href="/inspector"' in html
-        assert html.count('<main>') == html.count('<head>') == 1
+        assert html.count("<main>") == html.count("<head>") == 1
         assert 'href="/shell.css"' in html
     finally:
         connection.close()
@@ -281,4 +281,4 @@ def test_pages_extend_same_layout() -> None:
     for name in ("index.html", "inspector.html"):
         source = templates.joinpath(name).read_text()
         assert '{% extends "layout.html" %}' in source
-        assert '<head>' not in source and '<nav' not in source
+        assert "<head>" not in source and "<nav" not in source

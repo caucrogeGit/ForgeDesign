@@ -363,7 +363,9 @@ def _template_syntax(
         return replace(template, syntax="unreadable"), None
     syntax, tree = parse_template(source)
     return replace(
-        template, syntax=syntax.status, syntax_line=syntax.line,
+        template,
+        syntax=syntax.status,
+        syntax_line=syntax.line,
         syntax_message=syntax.message,
     ), tree
 

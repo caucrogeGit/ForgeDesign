@@ -10,6 +10,7 @@ from forge_design.limits import MAX_FILTER_QUERY_LENGTH
 LEVELS = ("all",) + DEBUG_LEVELS
 CATEGORIES = ("all",) + DEBUG_CATEGORIES
 
+
 @dataclass(frozen=True)
 class DebugFilter:
     query: str | None = None

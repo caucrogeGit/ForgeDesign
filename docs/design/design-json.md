@@ -349,7 +349,9 @@ read = read_design(root, "contacts/list.design.json")
 # Examiner read.issues ; read.design peut être présent malgré un nesting invalide.
 if read.design is not None and not read.issues:
     saved = write_design(
-        root, "contacts/list.design.json", read.design,
+        root,
+        "contacts/list.design.json",
+        read.design,
         expected_revision=read.revision,
     )
 # Pour créer un fichier absent : expected_revision=None, obligatoire explicitement.
