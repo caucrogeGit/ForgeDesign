@@ -282,3 +282,49 @@ def test_pages_extend_same_layout() -> None:
         source = templates.joinpath(name).read_text()
         assert '{% extends "layout.html" %}' in source
         assert "<head>" not in source and "<nav" not in source
+
+
+def _status_with_host(server: WSGIServer, path: str, host: str | None) -> int:
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+    try:
+        connection.putrequest("GET", path, skip_host=True)
+        if host is not None:
+            connection.putheader("Host", host)
+        connection.endheaders()
+        response = connection.getresponse()
+        response.read()
+        return response.status
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/", "/shell.css", "/health", "/debug", "/source?path=mvc/routes/web.py"],
+)
+@pytest.mark.parametrize(
+    "host",
+    [
+        "attacker.example:{port}",
+        "attacker.example",
+        "localhost:{port}",
+        "127.0.0.1",
+        "127.0.0.1:1",
+        "127.0.0.1:{port}.attacker.example",
+        "[::1]:{port}",
+        "",
+        None,
+    ],
+)
+def test_foreign_host_rejected(
+    running_server: WSGIServer, path: str, host: str | None
+) -> None:
+    port = running_server.server_port
+    value = None if host is None else host.format(port=port)
+    assert _status_with_host(running_server, path, value) == 400
+
+
+def test_exact_local_host_accepted(running_server: WSGIServer) -> None:
+    host = f"127.0.0.1:{running_server.server_port}"
+    assert _status_with_host(running_server, "/", host) == 200
+    assert _status_with_host(running_server, "/health", host) == 200

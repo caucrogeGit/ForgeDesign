@@ -111,6 +111,18 @@ par la composition Web. Les POST explicites Inspector, ouverture d’un récent 
 actualisation exécutent le Tool Inspector.
 La CLI reste inchangée ; aucun navigateur n'est ouvert automatiquement.
 
+### Contrôle de l'en-tête Host (FD-WEB-003)
+
+L'écoute loopback ne suffit pas contre le DNS rebinding : une page étrangère dont
+le domaine est rebindé sur `127.0.0.1` lit les réponses GET comme same-origin,
+mais conserve son propre `Host`. `create_server` enveloppe donc l'adaptateur WSGI
+Forge : toute requête dont `Host` n'est pas exactement `127.0.0.1:<port effectif>`
+reçoit un `400` texte, avant tout dispatch Forge (pages, ressources statiques et
+`/health` compris). `localhost`, `[::1]` et un `Host` absent sont refusés,
+cohérents avec `is_local_action`. Sur le port 80 seulement, `127.0.0.1` sans port
+est accepté. `create_application()` seule n'applique pas ce contrôle : il relève
+du transport.
+
 ### Project Inspector Web disponible (FD-UI-002)
 
 `GET /inspector` affiche un formulaire vierge ; `POST /inspector` inspecte le

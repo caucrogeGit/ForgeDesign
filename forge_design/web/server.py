@@ -1,7 +1,8 @@
 """Application Forge locale et inspection explicite via le Tool."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from importlib.resources import files
+from typing import Any
 from wsgiref.simple_server import WSGIServer, make_server
 
 from core.app.application import Application
@@ -53,6 +54,40 @@ def _entity_graph_script(request: Request) -> Response:
     return Response(
         body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
     )
+
+
+WsgiApp = Callable[[dict[str, Any], Callable[..., Any]], Iterable[bytes]]
+
+
+def _require_local_host(app: WsgiApp, server: WSGIServer) -> WsgiApp:
+    """Refuser tout Host autre que l'adresse d'écoute exacte (DNS rebinding).
+
+    Une page d'origine étrangère rebindée sur 127.0.0.1 garde son propre Host :
+    sans ce contrôle, elle lirait les réponses GET comme une page same-origin.
+    """
+
+    def guarded(
+        environ: dict[str, Any], start_response: Callable[..., Any]
+    ) -> Iterable[bytes]:
+        port = server.server_port
+        host = environ.get("HTTP_HOST")
+        # Sur le port 80, les navigateurs omettent le port dans Host.
+        if host != f"{DEFAULT_HOST}:{port}" and not (
+            port == 80 and host == DEFAULT_HOST
+        ):
+            body = "Hôte de requête non autorisé.".encode()
+            start_response(
+                "400 Bad Request",
+                [
+                    ("Content-Type", "text/plain; charset=utf-8"),
+                    ("Content-Length", str(len(body))),
+                    ("Cache-Control", "no-store"),
+                ],
+            )
+            return [body]
+        return app(environ, start_response)
+
+    return guarded
 
 
 def create_application(*, recent_projects: RecentProjects | None = None) -> Application:
@@ -164,7 +199,8 @@ def create_server(
 ) -> WSGIServer:
     """Ouvrir l'écoute locale servant exclusivement l'adaptateur WSGI Forge.
 
-    Seul 127.0.0.1 est accepté ; 0 demande un port éphémère. Les erreurs de bind
+    Seul 127.0.0.1 est accepté ; 0 demande un port éphémère. Toute requête dont
+    le Host diffère de l'adresse d'écoute est refusée en 400. Les erreurs de bind
     restent des OSError, sans repli. Fermer avec with ; pour arrêter une boucle
     dans un autre thread, appeler shutdown puis join avant de quitter le bloc.
     """
@@ -177,7 +213,11 @@ def create_server(
         if recent_projects is None
         else create_application(recent_projects=recent_projects)
     )
-    return make_server(host, port, create_wsgi_app(application))
+    wsgi_app = create_wsgi_app(application)
+    server = make_server(host, port, wsgi_app)
+    # Le port effectif (0 → éphémère) n'est connu qu'après le bind.
+    server.set_app(_require_local_host(wsgi_app, server))
+    return server
 
 
 def run_server(
