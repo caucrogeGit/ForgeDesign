@@ -6,6 +6,7 @@ from forge_design.generate.diff import (
     build_template_diff,
 )
 from forge_design.generate.history import (
+    HISTORY_FORMAT_VERSION,
     GenerationHistoryEvent,
     HistoryAction,
     append_generation_history,
@@ -17,6 +18,7 @@ from forge_design.generate.simple import (
 )
 
 __all__ = [
+    "HISTORY_FORMAT_VERSION",
     "HistoryAction",
     "GenerationHistoryEvent",
     "append_generation_history",

@@ -39,8 +39,8 @@ def test_nominal_and_permissions(tmp_path: Path) -> None:
     before = target.read_bytes(), target.stat().st_mtime_ns
     event = append(tmp_path)
     expected = (
-        '{"timestamp":"2026-09-30T09:15:00Z","action":"generate_template",'
-        '"file":"mvc/views/élèves/liste.html"}\n'
+        '{"version":1,"timestamp":"2026-09-30T09:15:00Z",'
+        '"action":"generate_template","file":"mvc/views/élèves/liste.html"}\n'
     ).encode()
     assert journal(tmp_path).read_bytes() == expected
     assert event == GenerationHistoryEvent(
@@ -374,3 +374,15 @@ def test_nonregular_descriptor_rejected(
     with pytest.raises(OSError):
         append(tmp_path)
     assert journal(tmp_path).read_bytes() == before
+
+
+def test_every_line_carries_format_version(tmp_path: Path) -> None:
+    append(tmp_path)
+    append(tmp_path)
+    lines = journal(tmp_path).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    for line in lines:
+        data = json.loads(line)
+        assert next(iter(data)) == "version"
+        assert data["version"] == history.HISTORY_FORMAT_VERSION == 1
+        assert type(data["version"]) is int

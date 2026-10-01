@@ -14,6 +14,10 @@ from forge_design.limits import MAX_HISTORY_EVENT_BYTES
 
 HistoryAction = Literal["generate_template"]
 
+# Version du format de ligne (docs/storage/storage-contract.md) ; écrite en tête
+# de chaque événement, jamais fournie par l'appelant.
+HISTORY_FORMAT_VERSION = 1
+
 
 @dataclass(frozen=True)
 class GenerationHistoryEvent:
@@ -37,7 +41,12 @@ def _validate_file(value: object) -> None:
 def _serialize_history_event(event: GenerationHistoryEvent) -> bytes:
     data = (
         json.dumps(
-            {"timestamp": event.timestamp, "action": event.action, "file": event.file},
+            {
+                "version": HISTORY_FORMAT_VERSION,
+                "timestamp": event.timestamp,
+                "action": event.action,
+                "file": event.file,
+            },
             ensure_ascii=False,
             separators=(",", ":"),
             allow_nan=False,

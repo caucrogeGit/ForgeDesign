@@ -382,10 +382,13 @@ refusé ou seulement consulté n'est pas un événement d'écriture.
 ### Format minimal
 
 ```json
-{"timestamp":"2026-09-30T09:15:00Z","action":"generate_template","file":"mvc/views/élèves/liste.html"}
+{"version":1,"timestamp":"2026-09-30T09:15:00Z","action":"generate_template","file":"mvc/views/élèves/liste.html"}
 ```
 
 Un objet compact dans cet ordre, UTF-8 sans BOM, ensure_ascii=False, un LF final.
+`version` (entier, `HISTORY_FORMAT_VERSION = 1`, FD-STORAGE-002) ouvre chaque ligne
+conformément au [contrat de stockage](../storage/storage-contract.md) ; il n'est
+pas fourni par l'appelant ni porté par GenerationHistoryEvent.
 Aucun contenu de fichier, token, cookie, mot de passe ou environnement ajouté.
 Le champ file est une métadonnée fournie par l'appelant ; aucune extraction
 automatique de contenu ou analyse de secrets dans les noms n'est réalisée.

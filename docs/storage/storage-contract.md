@@ -134,6 +134,6 @@ révision attendue → journalisation dans `history.jsonl`.
 
 | Élément | Écart | Traitement |
 |---|---|---|
-| `history.jsonl` | lignes sans `version` | FD-STORAGE-002 |
+| `history.jsonl` | lignes sans `version` | corrigé par FD-STORAGE-002 |
 | `*.view.json` | aucun champ de version | à décider avant stabilisation publique (cf. `docs/contracts/view-contract.md`) |
 | `*.design.json` | version `"0.1"` pré-stable | passage à `1` lors de la stabilisation du format |
