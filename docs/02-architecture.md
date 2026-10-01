@@ -549,6 +549,29 @@ spécial, permission, taille ou course = `TemplateSnapshotError`, jamais absence
 Lecture par `open_directory`, `O_NOFOLLOW | O_NONBLOCK`, `read_source_bytes` et
 relecture du nom après lecture. Aucun write, diff, journal, Web ni Tool.
 
+### Choix explicite avant conflit — FD-SAFEWRITE-002
+
+```text
+TemplateSnapshot
+      ↓
+detect_template_change
+      ↓
+TemplateChangeResult
+      ↓
+decision_options
+      ↓
+explicit user choice
+      ↓
+future controlled writer
+```
+
+`forge_design/safewrite/decision.py` est pur : il traduit `change.status` en
+choix bornés. `unchanged` → `proceed`, `cancel` ; `modified`, `created`,
+`deleted` → `cancel`, `regenerate`, `save_as`, `mark_manual`. Aucun choix par
+défaut, aucun `overwrite`. `select_safe_write_choice` refuse tout choix hors
+matrice. `proceed` n'autorise pas une écriture future : le writer recontrôlera
+la révision juste avant publication. Aucun choix appliqué, aucune persistance.
+
 ## 15. Qualité et tests
 
 Les frontières importantes sont testables indépendamment :

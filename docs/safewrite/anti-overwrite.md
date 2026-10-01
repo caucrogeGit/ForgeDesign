@@ -141,3 +141,74 @@ de FD-SAFEWRITE-002.
 - Sur des systèmes de fichiers à faible résolution temporelle ou réseau,
   `st_ino`/`st_ctime_ns` peuvent être moins fiables ; le digest reste décisif
   pour le contenu.
+
+## Choix explicite — FD-SAFEWRITE-002
+
+Module `forge_design/safewrite/decision.py`. Il répond seulement à : *étant
+donné l'état détecté, quelles décisions l'utilisateur peut-il prendre ?*
+
+```text
+TemplateChangeResult ─► decision_options() ─► choix autorisés
+                                                   │ l'utilisateur choisit
+                                                   ▼
+                     select_safe_write_choice() ─► SafeWriteDecision
+```
+
+| Symbole | Rôle |
+|---|---|
+| `SafeWriteChoice` | `Literal["proceed", "cancel", "regenerate", "save_as", "mark_manual"]` |
+| `has_write_conflict(change)` | `status != "unchanged"` |
+| `decision_options(change)` | `SafeWriteDecisionOptions(path, status, choices)` |
+| `select_safe_write_choice(change, choice)` | `SafeWriteDecision(path, status, choice)` ou `ValueError` |
+
+### Matrice
+
+| État | Choix, dans l'ordre de présentation |
+|---|---|
+| `unchanged` | `proceed`, `cancel` |
+| `modified` | `cancel`, `regenerate`, `save_as`, `mark_manual` |
+| `created` | `cancel`, `regenerate`, `save_as`, `mark_manual` |
+| `deleted` | `cancel`, `regenerate`, `save_as`, `mark_manual` |
+
+L'ordre est déterministe et ne sert qu'à la présentation : **aucun choix n'est
+sélectionné par défaut**. `cancel` vient en tête en cas de conflit parce que
+c'est l'option non destructive à proposer en premier. Aucun statut nouveau
+(`conflicted`, `stale`…) : le conflit se déduit de `status`.
+
+### Sens des choix
+
+| Choix | Signifie | Ne signifie pas |
+|---|---|---|
+| `proceed` | aucun conflit **au moment de la détection** | une autorisation intemporelle d'écrire |
+| `cancel` | abandonner, sans effet | — |
+| `regenerate` | reprendre le pipeline depuis l'état disque actuel (nouveau snapshot → génération → diff → nouvelle décision) | écraser, ni régénérer immédiatement |
+| `save_as` | ne pas remplacer la cible actuelle | un chemin : la destination est une responsabilité séparée |
+| `mark_manual` | l'utilisateur déclare la vue gérée manuellement | un marqueur persistant : rien n'est stocké |
+
+Il n'existe ni `overwrite`, ni `force`, ni `ignore_conflict`. Un remplacement
+volontaire aura son propre contrat dans la couche d'écriture.
+
+### Validation
+
+`select_safe_write_choice` refuse par `ValueError` tout choix absent de
+`decision_options(change).choices` : `proceed` sur un conflit, un choix de
+conflit sur `unchanged`, et au runtime toute valeur inconnue (`"overwrite"`,
+`"yes"`, `"force"`, `None`, octets, casse différente…) même si le typage est
+contourné. Un statut inconnu est aussi refusé. La décision porte la valeur
+canonique de la matrice, jamais l'objet fourni.
+
+### Pureté
+
+Les trois fonctions n'utilisent que `change.path` et `change.status` : aucune
+I/O, aucun appel à `snapshot_template` ou `detect_template_change`, aucun diff,
+aucun journal. `SafeWriteDecision` ne copie pas `expected`/`current` :
+l'orchestrateur conserve le `TemplateChangeResult` d'origine. Aucun jeton
+d'approbation : ce n'est pas une couche de sécurité Web.
+
+### Limites
+
+- Aucun choix appliqué, aucun writer : rien n'est écrit, relu ni journalisé.
+- `save_as` : aucun chemin alternatif.
+- `mark_manual` : décision transitoire destinée à un futur orchestrateur ou à
+  l'UI ; aucun marqueur persistant, contrat de stockage inchangé.
+- `proceed` : le writer devra **recontrôler la révision juste avant publication**.
