@@ -1627,6 +1627,30 @@ update optimiste par replace. Pas de verrou global : fenêtre TOCTOU documentée
 Aucun scanner, dossier créé, contrat/template modifié, génération, Web, Tool,
 contexte courant ou préférence persistante. Schéma, modèles et nesting inchangés.
 
+### Éditeur structurel — FD-EDITOR-001
+
+```text
+DesignFile
+    ↓
+Structural Editor
+    ↓
+new DesignFile
+    ├── preview future/UI
+    └── write_design explicite
+```
+
+`forge_design/editor/structure.py` ajoute un bloc en dernier enfant
+(`append_design_block`) ou supprime un bloc et son sous-arbre
+(`remove_design_block`), en mémoire. Adressage par `NodePath` (indices
+d'enfants, `()` = page), sans identifiant de nœud : les indices des frères
+suivants changent après une édition. L'entrée est revalidée (parcours borné,
+dump, Pydantic, nesting) ; la copie issue du dump est mutée puis reconstruite
+et revalidée. Un résultat `changed=True` est toujours valide et bien imbriqué,
+un refus rend l'entrée telle quelle avec un diagnostic `editor.*`. Règles :
+`nesting.can_contain` uniquement ; bornes : `MAX_DESIGN_NODES` et
+`MAX_DESIGN_DEPTH`. Aucune I/O, sauvegarde, preview, génération, Web ou Tool.
+Voir [structural-editor.md](editor/structural-editor.md).
+
 ### Bindings simples — FD-BINDING-001
 
 ```text
