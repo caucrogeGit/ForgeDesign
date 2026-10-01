@@ -1640,8 +1640,10 @@ new DesignFile
 ```
 
 `forge_design/editor/structure.py` ajoute un bloc en dernier enfant
-(`append_design_block`) ou supprime un bloc et son sous-arbre
-(`remove_design_block`), en mémoire. Adressage par `NodePath` (indices
+(`append_design_block`), supprime un bloc et son sous-arbre
+(`remove_design_block`) ou déplace un sous-arbre en dernier enfant d'un autre
+parent (`move_design_block`, FD-EDITOR-002, chemins de l'arbre initial
+recalculés après retrait), en mémoire. Adressage par `NodePath` (indices
 d'enfants, `()` = page), sans identifiant de nœud : les indices des frères
 suivants changent après une édition. L'entrée est revalidée (parcours borné,
 dump, Pydantic, nesting) ; la copie issue du dump est mutée puis reconstruite

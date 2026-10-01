@@ -5,6 +5,7 @@ from forge_design.editor.structure import (
     DesignEditResult,
     NodePath,
     append_design_block,
+    move_design_block,
     remove_design_block,
 )
 
@@ -14,4 +15,5 @@ __all__ = [
     "DesignEditResult",
     "append_design_block",
     "remove_design_block",
+    "move_design_block",
 ]
