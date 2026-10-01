@@ -519,6 +519,36 @@ lecture
 
 Une écriture doit vérifier une seconde fois la cible canonique juste avant l'opération.
 
+### Détection des modifications externes — FD-SAFEWRITE-001
+
+Pour un template (zone C), le pipeline normatif devient : lecture → génération
+→ diff → détection de changement externe → décision utilisateur → écriture
+future → `history.jsonl`. `forge_design.safewrite` implémente seulement la
+lecture et la détection ([anti-overwrite.md](safewrite/anti-overwrite.md)).
+
+```text
+read template
+      ↓
+TemplateSnapshot(expected)
+      ↓
+generate + diff
+      ↓
+detect current template state
+      ↓
+unchanged ?
+   yes     no
+    ↓       ↓
+future     SAFEWRITE-002
+write      explicit choice
+```
+
+La révision (taille, mtime, SHA-256, device, inode, ctime) reprend la forme de
+`DesignRevision` ; elle est comparée entière, si bien qu'un remplacement aux
+octets identiques est `modified`. Absence = `exists=False` ; lien, fichier
+spécial, permission, taille ou course = `TemplateSnapshotError`, jamais absence.
+Lecture par `open_directory`, `O_NOFOLLOW | O_NONBLOCK`, `read_source_bytes` et
+relecture du nom après lecture. Aucun write, diff, journal, Web ni Tool.
+
 ## 15. Qualité et tests
 
 Les frontières importantes sont testables indépendamment :
