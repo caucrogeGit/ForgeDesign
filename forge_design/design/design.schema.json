@@ -99,6 +99,9 @@
         "field": {
           "$ref": "#/$defs/FieldDefinition"
         },
+        "submit": {
+          "$ref": "#/$defs/SubmitDefinition"
+        },
         "children": {
           "type": "array",
           "items": {
@@ -173,6 +176,20 @@
         },
         "required": {
           "type": "boolean"
+        }
+      }
+    },
+    "SubmitDefinition": {
+      "type": "object",
+      "description": "Bouton de soumission du formulaire parent, réservé aux blocs button et exclusif de binding : libellé explicite, jamais inventé.",
+      "required": [
+        "label"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

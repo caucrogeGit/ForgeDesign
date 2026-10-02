@@ -86,6 +86,15 @@ class FieldDefinition(_DesignModel):
     required: _Omissible[bool] = None
 
 
+class SubmitDefinition(_DesignModel):
+    """Bouton de soumission du formulaire parent ; libellé explicite, jamais inventé.
+
+    Distinct d'un bouton d'action autonome, qui reste porté par binding.
+    """
+
+    label: _NonEmpty
+
+
 class _NodeProperties(_DesignModel):
     binding: _Omissible[_NonEmpty] = None
     visible_if: _Omissible[_NonEmpty] = None
@@ -93,6 +102,8 @@ class _NodeProperties(_DesignModel):
     columns: _Omissible[list[TableColumn]] = None
     # Réservé aux blocs field (règle sémantique de design/form_fields.py).
     field: _Omissible[FieldDefinition] = None
+    # Réservé aux boutons, exclusif de binding (règle de design/submit_buttons.py).
+    submit: _Omissible[SubmitDefinition] = None
 
 
 class DesignNode(_NodeProperties):

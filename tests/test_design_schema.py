@@ -40,6 +40,7 @@ def test_root_and_version_declarations(schema: dict[str, Any]) -> None:
         "PageRoot",
         "TableColumn",
         "FieldDefinition",
+        "SubmitDefinition",
         "PropValue",
     }
 
@@ -66,6 +67,7 @@ def test_node_and_root_composition(schema: dict[str, Any]) -> None:
         "props",
         "columns",
         "field",
+        "submit",
         "children",
     }
     assert node["properties"]["type"] == {
@@ -299,3 +301,13 @@ def test_field_definition(schema: dict[str, Any]) -> None:
         "label": {"type": "string", "minLength": 1},
         "required": {"type": "boolean"},
     }
+
+
+def test_submit_definition(schema: dict[str, Any]) -> None:
+    """FD-INTERACT-004 : bouton de soumission explicite."""
+    node = schema["$defs"]["DesignNode"]
+    assert node["properties"]["submit"] == {"$ref": "#/$defs/SubmitDefinition"}
+    submit = schema["$defs"]["SubmitDefinition"]
+    assert submit["type"] == "object" and submit["additionalProperties"] is False
+    assert submit["required"] == ["label"]
+    assert submit["properties"] == {"label": {"type": "string", "minLength": 1}}

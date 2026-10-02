@@ -543,3 +543,75 @@ Pas encore de `<form>` ni d'`<input>` générés (`generate.unsupported_block`),
 pas de rendu de champ dans la preview (un `field` reste un `<div>` générique),
 pas de valeur initiale, de placeholder, de `select`, `textarea`, `radio` ni
 d'upload, et pas de CSRF runtime.
+
+## Boutons submit — FD-INTERACT-004
+
+Un bouton peut **soumettre son formulaire parent**, ce qui est distinct d'un
+bouton d'action autonome. Rien n'est encore généré (`type="submit"` viendra
+avec FD-INTERACT-005).
+
+Fragment de bloc (non un Design complet) :
+
+```json
+{
+  "type": "form",
+  "binding": "create_contact",
+  "children": [
+    {
+      "type": "field",
+      "field": {
+        "name": "email",
+        "input_type": "email"
+      }
+    },
+    {
+      "type": "button",
+      "submit": {
+        "label": "Créer"
+      }
+    }
+  ]
+}
+```
+
+| Bouton | Représentation | Sens |
+|---|---|---|
+| action autonome (FD-INTERACT-001) | `binding`, sans `submit` | action du contrat, `hx-get`/`hx-post` propre |
+| soumission | `submit: {"label": …}`, sans `binding` | soumet le `form` parent |
+| ni l'un ni l'autre | ni `binding` ni `submit` | structurellement valide, ni action ni soumission |
+
+- `submit` (`SubmitDefinition`) n'a qu'un champ : `label`, chaîne **non vide
+  obligatoire**. Aucun libellé n'est inventé (« Envoyer », « Valider »…).
+  `null`, une chaîne vide et les clés inconnues (`name`, `value`,
+  `formaction`…) sont refusés par le modèle et le schéma.
+- `binding` garde sa sémantique d'action autonome : il n'y a pas de
+  `role: "submit"`, et aucun bouton ne devient implicitement un submit.
+- Un submit n'a **pas** de binding : `validate_design_bindings` ne signale
+  rien pour lui.
+
+### Validation sémantique
+
+`validate_submit_buttons(design)` (`design/submit_buttons.py`), borné par
+`MAX_DESIGN_NODES`, `MAX_DESIGN_DEPTH` et `MAX_DESIGN_ISSUES`, n'examine que
+le Design :
+
+| Code | Cas |
+|---|---|
+| `design.submit.unsupported_definition` | `submit` sur un autre type que `button` (page comprise) |
+| `design.submit.conflicting_action` | `binding` et `submit` sur le même bouton |
+| `design.submit.outside_form` | submit qui n'est pas **enfant direct** d'un `form` |
+| `design.submit.analysis_truncated` | borne atteinte |
+
+Plusieurs submits par formulaire sont admis (« Enregistrer », « Enregistrer
+et fermer »), et un bouton d'action reste autorisé dans un `form`. La validité
+de l'action du formulaire parent relève de `validate_design_bindings`, sans
+duplication. Un déplacement (`move_design_block`) peut sortir un submit de
+son formulaire : l'imbrication l'accepte, et `validate_submit_buttons` le
+signale après coup.
+
+### Compatibilité et limites
+
+La version reste `0.1`, et les boutons existants sont inchangés. En attendant
+FD-INTERACT-005, le générateur voit un submit comme un bouton **sans action**
+(`generate.button_missing_action`, bouton omis), et la preview l'affiche comme
+un bouton générique, sans `type="submit"` ni libellé.

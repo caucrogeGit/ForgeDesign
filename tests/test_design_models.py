@@ -329,6 +329,7 @@ def test_schema_concordance() -> None:
     actual = generated["$defs"]
     assert clean(actual["TableColumn"]) == clean(defs["TableColumn"])
     assert clean(actual["FieldDefinition"]) == clean(defs["FieldDefinition"])
+    assert clean(actual["SubmitDefinition"]) == clean(defs["SubmitDefinition"])
     assert set(actual) == set(defs) - {"PropValue"}
     expected_node = clean(defs["DesignNode"])
     prop = expected_node["properties"]["props"]["additionalProperties"]

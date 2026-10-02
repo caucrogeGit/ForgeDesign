@@ -5,6 +5,7 @@ from forge_design.editor.properties import (
     set_design_props,
     set_design_visibility,
     set_field_definition,
+    set_submit_definition,
     set_table_columns,
 )
 from forge_design.editor.structure import (
@@ -28,4 +29,5 @@ __all__ = [
     "set_design_props",
     "set_table_columns",
     "set_field_definition",
+    "set_submit_definition",
 ]

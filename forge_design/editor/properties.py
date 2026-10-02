@@ -18,8 +18,10 @@ from forge_design.design.models import (
     DesignFile,
     FieldDefinition,
     PropValue,
+    SubmitDefinition,
     TableColumn,
 )
+from forge_design.design.submit_buttons import validate_submit_buttons
 from forge_design.design.table_bindings import validate_table_bindings
 from forge_design.editor._tree import (
     DesignEditResult,
@@ -369,5 +371,80 @@ def set_field_definition(
         return _configure(
             design, node_path, "field", value, "invalid_field", check, guard
         )
+    except Refused as refused:
+        return refusal(design, refused)
+
+
+_SUBMIT_CODES = {
+    "design.submit.unsupported_definition": "submit_not_supported",
+    "design.submit.conflicting_action": "submit_conflicting_action",
+    "design.submit.outside_form": "submit_outside_form",
+}
+
+
+def _parent_projection(
+    model: DesignFile, path: NodePath
+) -> tuple[DesignFile, Location]:
+    """Le bloc édité sous son seul parent direct, sans autres enfants.
+
+    outside_form ne dépend que du parent : une erreur ailleurs ne bloque pas.
+    """
+    parent: Any = model.root
+    for index in path[:-1]:
+        parent = parent.children[index]
+    node = parent.children[path[-1]].model_dump(
+        exclude_unset=True, exclude={"children"}
+    )
+    data = model.model_dump(exclude_unset=True, exclude={"root"})
+    if len(path) == 1:
+        root = {"type": "page", "children": [node]}
+        location: Location = ("root", "children", 0)
+    else:
+        isolated = parent.model_dump(exclude_unset=True, exclude={"children"})
+        root = {"type": "page", "children": [{**isolated, "children": [node]}]}
+        location = ("root", "children", 0, "children", 0)
+    return DesignFile.model_validate({**data, "root": root}), location
+
+
+def set_submit_definition(
+    design: DesignFile, *, path: NodePath, submit: SubmitDefinition | None
+) -> DesignEditResult:
+    """Faire d'un bouton le bouton de soumission de son formulaire parent.
+
+    None supprime la définition, sur tout bloc, pour une correction progressive.
+    Une définition n'est acceptée que sur un button sans binding, enfant direct
+    d'un form ; les règles sont celles de validate_submit_buttons.
+    """
+    try:
+        node_path = check_path(path)
+        value: dict[str, Any] | None = None
+        raw = cast(object, submit)  # contrôle runtime malgré le typage
+        if raw is not None:
+            if not isinstance(raw, SubmitDefinition):
+                raise Refused(
+                    "invalid_submit", "Une SubmitDefinition est attendue.", node_path
+                )
+            value = raw.model_dump(exclude_unset=True)
+
+        def check(model: DesignFile, checked: NodePath) -> None:
+            if not checked:
+                # La page racine n'est jamais un bouton.
+                raise Refused(
+                    "submit_not_supported",
+                    "Seul un bloc button peut être un bouton de soumission.",
+                    checked,
+                )
+            projected, location = _parent_projection(model, checked)
+            result = validate_submit_buttons(projected)
+            if result.truncated:
+                raise Refused(
+                    "analysis_truncated", "Analyse des soumissions tronquée.", checked
+                )
+            for issue in result.issues:
+                if issue.location[: len(location)] == location:
+                    code = _SUBMIT_CODES.get(issue.code, "invalid_submit")
+                    raise Refused(code, issue.message, checked)
+
+        return _configure(design, node_path, "submit", value, "invalid_submit", check)
     except Refused as refused:
         return refusal(design, refused)

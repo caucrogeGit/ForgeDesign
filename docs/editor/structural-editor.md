@@ -222,6 +222,7 @@ reconstruction) et le même contrat de résultat `DesignEditResult`.
 | `set_design_props(design, *, path, props)` | `props` | non |
 | `set_table_columns(design, *, path, columns, contract)` | `columns` | oui |
 | `set_field_definition(design, *, path, field)` (FD-INTERACT-002) | `field` | non |
+| `set_submit_definition(design, *, path, submit)` (FD-INTERACT-004) | `submit` | non |
 
 Une fonction modifie **une seule propriété** : jamais les autres propriétés
 du bloc, ses enfants ou les autres blocs. Il n'y a pas d'`update_block(...)`
@@ -617,3 +618,26 @@ La définition n'est jamais perdue par les autres mutations : props, classes,
 condition, binding du formulaire et déplacement la conservent (testé par
 l'API et par le serveur Web réel). L'éditeur Web n'a pas encore de contrôle
 dédié pour `field` : il conserve la définition sans l'afficher.
+
+## Bouton de soumission — FD-INTERACT-004
+
+`set_submit_definition(design, *, path, submit: SubmitDefinition | None)`,
+dans `editor/properties.py`, suit le contrat des autres propriétés : `None`
+supprime la définition (sur tout bloc, pour une correction progressive), une
+valeur identique est un no-op, et seule une instance de `SubmitDefinition`
+est acceptée (`editor.invalid_submit` sinon, objet ressemblant compris).
+
+Les règles sont celles de `validate_submit_buttons`, appliquées à une
+projection réduite au bouton et à **son seul parent direct** : une erreur
+ailleurs (et même sur le parent) ne bloque pas l'édition.
+
+| Code | Cas |
+|---|---|
+| `editor.submit_not_supported` | bloc autre qu'un `button` (page comprise) |
+| `editor.submit_conflicting_action` | bouton qui a déjà un `binding` |
+| `editor.submit_outside_form` | bouton qui n'est pas enfant direct d'un `form` |
+
+`submit` est conservé par les autres opérations : props, classes Tailwind,
+condition, ajout, suppression et déplacement (testé par l'API et par le
+serveur Web réel). `move_design_block` n'est pas élargi : un submit peut être
+déplacé hors de son formulaire, ce que la validation signale ensuite.

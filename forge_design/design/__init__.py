@@ -35,6 +35,7 @@ from forge_design.design.models import (
     FieldInputType,
     PageRoot,
     PropValue,
+    SubmitDefinition,
     TableColumn,
 )
 from forge_design.design.nesting import (
@@ -43,6 +44,11 @@ from forge_design.design.nesting import (
     DesignNestingResult,
     can_contain,
     validate_design_nesting,
+)
+from forge_design.design.submit_buttons import (
+    SubmitButtonIssue,
+    SubmitButtonValidationResult,
+    validate_submit_buttons,
 )
 from forge_design.design.table_bindings import (
     SuggestedTableColumn,
@@ -91,6 +97,10 @@ __all__ = [
     "FormFieldIssue",
     "FormFieldValidationResult",
     "validate_form_fields",
+    "SubmitDefinition",
+    "SubmitButtonIssue",
+    "SubmitButtonValidationResult",
+    "validate_submit_buttons",
     "ALLOWED_CHILDREN",
     "DesignNestingIssue",
     "DesignNestingResult",

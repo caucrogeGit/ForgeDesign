@@ -1933,6 +1933,20 @@ annule seulement le diff, conserve contenus/métriques et marque complete=False.
 Aucun état global mutable, I/O, Web, historique ou écriture. Les API sont exportées
 par forge_design.generate, sans nouvelle dépendance ni package setuptools.
 
+### Boutons submit — FD-INTERACT-004
+
+```text
+Design button
+  binding ─────────► ViewAction      (action autonome)
+  submit.label                       (soumission du form parent)
+```
+
+`SubmitDefinition` (modèle et schéma) représente explicitement la
+soumission, et `binding` reste réservé aux actions autonomes. Les deux sont
+exclusifs, et un submit doit être enfant direct d'un `form` :
+`validate_submit_buttons` le vérifie, `set_submit_definition` l'édite. Aucun
+`type="submit"` n'est encore généré.
+
 ### Formulaires générés — FD-INTERACT-003
 
 ```text
