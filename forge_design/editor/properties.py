@@ -13,7 +13,13 @@ from pydantic import ValidationError
 from forge_design.contracts.models import ViewContract
 from forge_design.design.bindings import validate_design_bindings
 from forge_design.design.conditional_bindings import validate_conditional_bindings
-from forge_design.design.models import DesignFile, PropValue, TableColumn
+from forge_design.design.form_fields import validate_form_fields
+from forge_design.design.models import (
+    DesignFile,
+    FieldDefinition,
+    PropValue,
+    TableColumn,
+)
 from forge_design.design.table_bindings import validate_table_bindings
 from forge_design.editor._tree import (
     DesignEditResult,
@@ -28,6 +34,7 @@ from forge_design.editor._tree import (
 from forge_design.limits import MAX_TABLE_COLUMNS
 
 _Check = Callable[[DesignFile, NodePath], None]
+Location = tuple[str | int, ...]
 
 
 def _strict_equal(left: object, right: object) -> bool:
@@ -285,6 +292,82 @@ def set_table_columns(
 
         return _configure(
             design, node_path, "columns", value, "invalid_table_column", check, guard
+        )
+    except Refused as refused:
+        return refusal(design, refused)
+
+
+def _form_projection(model: DesignFile, path: NodePath) -> tuple[DesignFile, Location]:
+    """Form parent réduit à ses champs directs, le champ édité placé en dernier.
+
+    L'unicité ne dépend que des frères : en dernier, le champ édité porte le
+    diagnostic duplicate_name dès qu'un frère a déjà le même nom.
+    """
+    parent: Any = model.root
+    for index in path[:-1]:
+        parent = parent.children[index]
+    children = [
+        child.model_dump(exclude_unset=True, exclude={"children"})
+        for child in parent.children
+    ]
+    edited = children.pop(path[-1])
+    isolated = parent.model_dump(exclude_unset=True, exclude={"children"})
+    form = {**isolated, "children": [*children, edited]}
+    data = model.model_dump(exclude_unset=True, exclude={"root"})
+    projected = DesignFile.model_validate(
+        {**data, "root": {"type": "page", "children": [form]}}
+    )
+    return projected, ("root", "children", 0, "children", len(children))
+
+
+def set_field_definition(
+    design: DesignFile, *, path: NodePath, field: FieldDefinition | None
+) -> DesignEditResult:
+    """Définir le contrat d'un bloc field (name, input_type, label, required).
+
+    None supprime la définition, sur tout bloc, pour réparer progressivement un
+    Design ; une définition n'est acceptée que sur un bloc field, avec un nom
+    unique parmi les champs de son formulaire.
+    """
+    try:
+        node_path = check_path(path)
+        value: dict[str, Any] | None = None
+        raw = cast(object, field)  # contrôle runtime malgré le typage
+        if raw is not None:
+            if not isinstance(raw, FieldDefinition):
+                raise Refused(
+                    "invalid_field", "Une FieldDefinition est attendue.", node_path
+                )
+            # Copie revalidée ensuite par Pydantic avec le Design.
+            value = raw.model_dump(exclude_unset=True)
+
+        def guard(node: dict[str, Any]) -> None:
+            if node["type"] != "field":
+                raise Refused(
+                    "field_not_supported",
+                    "Seul un bloc field accepte une définition de champ.",
+                    node_path,
+                )
+
+        def check(model: DesignFile, checked: NodePath) -> None:
+            projected, location = _form_projection(model, checked)
+            result = validate_form_fields(projected)
+            if result.truncated:
+                raise Refused(
+                    "analysis_truncated", "Analyse des champs tronquée.", checked
+                )
+            for issue in result.issues:
+                if issue.location[: len(location)] != location:
+                    continue  # erreur préexistante d'un autre champ : ignorée
+                code = (
+                    "duplicate_field_name"
+                    if issue.code == "design.field.duplicate_name"
+                    else "invalid_field"
+                )
+                raise Refused(code, issue.message, checked)
+
+        return _configure(
+            design, node_path, "field", value, "invalid_field", check, guard
         )
     except Refused as refused:
         return refusal(design, refused)

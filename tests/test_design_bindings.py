@@ -75,7 +75,7 @@ def test_absent_binding_for_all_types(node_type: str) -> None:
         "container",
         "grid",
         "card",
-        "form",
+        # form référence une action depuis FD-INTERACT-002.
         "field",
         "alert",
         "empty_state",
@@ -219,7 +219,8 @@ def test_preorder_root_locations_and_multiple_errors() -> None:
         "unknown_variable",
         "unknown_action",
         "type_mismatch",
-        "unsupported",
+        # form → action (FD-INTERACT-002) : aucune action dans ce contrat.
+        "unknown_action",
     ]
     assert [i.location for i in result.issues] == [
         ("root", "binding"),

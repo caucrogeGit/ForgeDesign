@@ -464,3 +464,82 @@ La propriété traverse le cycle write_design/read_design sans adaptation du mod
 I/O. Celui-ci continue à valider Pydantic et nesting seulement : la résolution de
 visible_if contre un contrat explicitement fourni reste une étape indépendante.
 Voir les [bindings conditionnels](bindings.md#bindings-conditionnels--fd-binding-003).
+
+## Form / Field contract — FD-INTERACT-002
+
+Représentation minimale d'un futur formulaire HTML/HTMX. **Rien n'est encore
+généré** : ni `<form>`, ni `<input>`, ni HTMX de formulaire.
+
+```json
+{
+  "type": "form",
+  "binding": "create_contact",
+  "children": [
+    {
+      "type": "field",
+      "field": {
+        "name": "email",
+        "input_type": "email",
+        "label": "Adresse e-mail",
+        "required": true
+      }
+    },
+    { "type": "button", "binding": "create_contact" }
+  ]
+}
+```
+
+### Form
+
+`form.binding` désigne une **action** du contrat (`ViewContract.actions`),
+exactement comme un `button`. `validate_design_bindings` applique la règle
+`form → action` : une action inconnue donne `design.binding.unknown_action`.
+Un `form` sans binding reste structurellement valide et n'est pas signalé ;
+la génération future décidera qu'un formulaire actif exige une action.
+
+### Field
+
+Les informations d'un champ ne sont pas visuelles : elles ne vont pas dans
+`props`. Elles forment la propriété explicite `field` (`FieldDefinition`) :
+
+| Clé | Obligatoire | Sens |
+|---|---|---|
+| `name` | oui | futur attribut HTML `name`, chaîne non vide **opaque** (`email`, `contact.email`, `items[0].name`), jamais déduite du libellé, du contexte, du type ni de la position |
+| `input_type` | oui | `text`, `email`, `password`, `number`, `date` ou `checkbox` |
+| `label` | non | libellé non vide ; absent, aucun libellé ne sera inventé |
+| `required` | non | `true` (obligatoire), `false` (déclaré non obligatoire) ; absent, aucune exigence déclarée, distinct de `false` |
+
+`null`, les clés inconnues (`value`, `default`, `placeholder`…), un type
+inconnu et un `name` vide sont refusés par le modèle et le schéma. Le
+`binding` d'un `field` reste refusé (`design.binding.unsupported`) : le nom du
+champ est `field.name`, pas une troisième sémantique de `binding`.
+
+### Validation sémantique
+
+`validate_form_fields(design)` (`design/form_fields.py`) est borné par
+`MAX_DESIGN_NODES`, `MAX_DESIGN_DEPTH` et `MAX_DESIGN_ISSUES` :
+
+| Code | Cas |
+|---|---|
+| `design.field.missing_definition` | bloc `field` sans `field` |
+| `design.field.unsupported_definition` | `field` porté par un autre type (page comprise) |
+| `design.field.duplicate_name` | même `name` deux fois dans un **même** `form` (deux formulaires peuvent réutiliser un nom) |
+| `design.field.analysis_truncated` | borne atteinte |
+
+L'imbrication reste du ressort de `validate_design_nesting` : `form` contient
+`field`, `button` et `alert`, et `field` est une feuille, sans changement.
+
+### Compatibilité v0.1
+
+La version reste `0.1`, format pré-stable. `field` est facultatif au niveau
+générique : un Design sans bloc `field` est inchangé. Un ancien bloc `field`
+sans définition reste **valide pour Pydantic**, donc chargeable, mais il est
+**sémantiquement incomplet** (`design.field.missing_definition`). La
+migration peut ainsi se faire progressivement.
+
+### Limites
+
+Pas encore de `<form>` ni d'`<input>` générés (`generate.unsupported_block`),
+pas de rendu de champ dans la preview (un `field` reste un `<div>` générique),
+pas de valeur initiale, de placeholder, de `select`, `textarea`, `radio` ni
+d'upload, et pas de CSRF runtime.

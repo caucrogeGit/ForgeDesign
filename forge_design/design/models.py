@@ -69,11 +69,30 @@ class TableColumn(_DesignModel):
     binding: _NonEmpty
 
 
+FieldInputType = Literal["text", "email", "password", "number", "date", "checkbox"]
+
+
+class FieldDefinition(_DesignModel):
+    """Contrat d'un futur contrôle de formulaire ; rien n'est déduit ni inventé.
+
+    name est le futur attribut HTML name (opaque, non déduit du libellé ou de la
+    position) ; label absent : aucun libellé inventé ; required absent : aucune
+    exigence déclarée, distinct de false.
+    """
+
+    name: _NonEmpty
+    input_type: FieldInputType
+    label: _Omissible[_NonEmpty] = None
+    required: _Omissible[bool] = None
+
+
 class _NodeProperties(_DesignModel):
     binding: _Omissible[_NonEmpty] = None
     visible_if: _Omissible[_NonEmpty] = None
     props: _Omissible[dict[_NonEmpty, PropValue]] = None
     columns: _Omissible[list[TableColumn]] = None
+    # Réservé aux blocs field (règle sémantique de design/form_fields.py).
+    field: _Omissible[FieldDefinition] = None
 
 
 class DesignNode(_NodeProperties):

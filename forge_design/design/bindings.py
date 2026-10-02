@@ -11,7 +11,14 @@ from forge_design.limits import MAX_DESIGN_DEPTH, MAX_DESIGN_ISSUES, MAX_DESIGN_
 
 _BINDING_RULES: Mapping[DesignNodeType, Literal["string", "list", "action"]] = (
     MappingProxyType(
-        {"title": "string", "text": "string", "table": "list", "button": "action"}
+        {
+            "title": "string",
+            "text": "string",
+            "table": "list",
+            "button": "action",
+            # FD-INTERACT-002 : un formulaire référence une action du contrat.
+            "form": "action",
+        }
     )
 )
 

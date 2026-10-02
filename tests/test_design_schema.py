@@ -38,6 +38,7 @@ def test_root_and_version_declarations(schema: dict[str, Any]) -> None:
         "DesignNode",
         "PageRoot",
         "TableColumn",
+        "FieldDefinition",
         "PropValue",
     }
 
@@ -63,6 +64,7 @@ def test_node_and_root_composition(schema: dict[str, Any]) -> None:
         "visible_if",
         "props",
         "columns",
+        "field",
         "children",
     }
     assert node["properties"]["type"] == {
@@ -265,3 +267,21 @@ def test_visible_if_additive_declaration(schema: dict[str, Any]) -> None:
     assert node["properties"]["visible_if"] == {"type": "string", "minLength": 1}
     assert "visible_if" not in node["required"]
     assert schema["properties"]["version"]["const"] == "0.1"
+
+
+def test_field_definition(schema: dict[str, Any]) -> None:
+    """FD-INTERACT-002 : contrat minimal d'un champ de formulaire."""
+    node = schema["$defs"]["DesignNode"]
+    assert node["properties"]["field"] == {"$ref": "#/$defs/FieldDefinition"}
+    field = schema["$defs"]["FieldDefinition"]
+    assert field["type"] == "object" and field["additionalProperties"] is False
+    assert field["required"] == ["name", "input_type"]
+    assert field["properties"] == {
+        "name": {"type": "string", "minLength": 1},
+        "input_type": {
+            "type": "string",
+            "enum": ["text", "email", "password", "number", "date", "checkbox"],
+        },
+        "label": {"type": "string", "minLength": 1},
+        "required": {"type": "boolean"},
+    }

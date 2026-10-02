@@ -221,6 +221,7 @@ reconstruction) et le même contrat de résultat `DesignEditResult`.
 | `set_design_visibility(design, *, path, visible_if, contract)` | `visible_if` | oui |
 | `set_design_props(design, *, path, props)` | `props` | non |
 | `set_table_columns(design, *, path, columns, contract)` | `columns` | oui |
+| `set_field_definition(design, *, path, field)` (FD-INTERACT-002) | `field` | non |
 
 Une fonction modifie **une seule propriété** : jamais les autres propriétés
 du bloc, ses enfants ou les autres blocs. Il n'y a pas d'`update_block(...)`
@@ -593,3 +594,26 @@ et la preview reste identique.
   visibles) et les listes ont trois éléments (les `empty_state` ne sont
   généralement pas visibles). Il n'y a pas de bascule dans ce ticket.
 - Pas de Tailwind compilé, de backend réel, de JavaScript ni de HTMX.
+
+## Définition de champ — FD-INTERACT-002
+
+`set_field_definition(design, *, path, field: FieldDefinition | None)`, dans
+`editor/properties.py`, suit le contrat des autres propriétés : une seule
+propriété est modifiée, `None` la supprime (sur tout bloc, pour réparer un
+Design), une valeur identique est un no-op, et le résultat est revalidé.
+
+- La définition n'est acceptée que sur un bloc `field`, sinon
+  `editor.field_not_supported`.
+- La valeur doit être une `FieldDefinition` ; un dict ou un objet qui lui
+  ressemble est refusé (`editor.invalid_field`). Elle est copiée, jamais
+  conservée par référence.
+- Unicité : `validate_form_fields` est appliqué à une projection du
+  formulaire parent réduit à ses champs directs, le champ édité **placé en
+  dernier**. Un nom déjà porté par un frère donne donc
+  `editor.duplicate_field_name`, quel que soit l'ordre réel. Les erreurs
+  préexistantes des autres champs sont ignorées.
+
+La définition n'est jamais perdue par les autres mutations : props, classes,
+condition, binding du formulaire et déplacement la conservent (testé par
+l'API et par le serveur Web réel). L'éditeur Web n'a pas encore de contrôle
+dédié pour `field` : il conserve la définition sans l'afficher.

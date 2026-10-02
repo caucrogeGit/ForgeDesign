@@ -10,6 +10,11 @@ from forge_design.design.conditional_bindings import (
     ConditionalBindingResult,
     validate_conditional_bindings,
 )
+from forge_design.design.form_fields import (
+    FormFieldIssue,
+    FormFieldValidationResult,
+    validate_form_fields,
+)
 from forge_design.design.io import (
     DesignIssue,
     DesignReadResult,
@@ -26,6 +31,8 @@ from forge_design.design.models import (
     DesignFile,
     DesignNode,
     DesignNodeType,
+    FieldDefinition,
+    FieldInputType,
     PageRoot,
     PropValue,
     TableColumn,
@@ -79,6 +86,11 @@ __all__ = [
     "PageRoot",
     "PropValue",
     "TableColumn",
+    "FieldDefinition",
+    "FieldInputType",
+    "FormFieldIssue",
+    "FormFieldValidationResult",
+    "validate_form_fields",
     "ALLOWED_CHILDREN",
     "DesignNestingIssue",
     "DesignNestingResult",

@@ -96,6 +96,9 @@
             "$ref": "#/$defs/TableColumn"
           }
         },
+        "field": {
+          "$ref": "#/$defs/FieldDefinition"
+        },
         "children": {
           "type": "array",
           "items": {
@@ -137,6 +140,39 @@
         "binding": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "FieldDefinition": {
+      "type": "object",
+      "description": "Contrat d'un futur contrôle de formulaire, réservé aux blocs field : name est le futur attribut HTML name (opaque, jamais déduit) ; label absent, aucun libellé inventé ; required absent, aucune exigence déclarée (distinct de false).",
+      "required": [
+        "name",
+        "input_type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_type": {
+          "type": "string",
+          "enum": [
+            "text",
+            "email",
+            "password",
+            "number",
+            "date",
+            "checkbox"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
         }
       }
     },

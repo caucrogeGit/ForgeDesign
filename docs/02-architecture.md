@@ -1933,6 +1933,25 @@ annule seulement le diff, conserve contenus/métriques et marque complete=False.
 Aucun état global mutable, I/O, Web, historique ou écriture. Les API sont exportées
 par forge_design.generate, sans nouvelle dépendance ni package setuptools.
 
+### Contrat des formulaires — FD-INTERACT-002
+
+```text
+Design form
+  binding ─────────────► ViewAction
+
+Design field
+  field.name
+  field.input_type
+  field.label
+  field.required
+```
+
+`FieldDefinition` (modèle et schéma) porte le contrat d'un futur contrôle.
+`validate_design_bindings` vérifie `form → action` ; `validate_form_fields`
+vérifie la place des définitions et l'unicité des noms par formulaire ;
+`set_field_definition` édite la définition. Aucune génération de formulaire,
+ni HTMX de formulaire, ni CSRF. Voir [design-json.md](design/design-json.md).
+
 ### Boutons HTMX — FD-INTERACT-001
 
 ```text
