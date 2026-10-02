@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prévisualisation indicative — Forge Design</title>
+  <link rel="stylesheet" href="/editor-preview.css">
+</head>
+<body class="preview-document">
+<header class="preview-status">
+  <p><strong>Aperçu structurel</strong> — prévisualisation indicative{% if mode_label %}, {{ mode_label }} ({{ width_px }} px){% endif %}. Données fictives ; classes Tailwind conservées mais non compilées.</p>
+  {% if html is not none %}
+  <p>Données fictives : {% if data_complete %}complètes{% else %}partielles{% endif %} — Rendu : {% if render_complete %}complet{% else %}partiel{% endif %}</p>
+  {% if not render_complete %}<p class="preview-warning">Prévisualisation partielle.</p>{% endif %}
+  {% endif %}
+</header>
+{% if error %}<p class="preview-error" role="alert">{{ error }}</p>{% endif %}
+{% if data_issues or render_issues %}
+<details class="preview-issues" open>
+  <summary>Diagnostics</summary>
+  {% if data_issues %}<h2>Données fictives</h2><ul>{% for issue in data_issues %}<li><code>{{ issue.code }}</code> — {{ issue.message }}</li>{% endfor %}</ul>{% endif %}
+  {% if render_issues %}<h2>Rendu</h2><ul>{% for issue in render_issues %}<li><code>{{ issue.code }}</code> — {{ issue.message }}</li>{% endfor %}</ul>{% endif %}
+</details>
+{% endif %}
+{% if html is not none %}<main class="preview-canvas">
+{{ html }}
+</main>{% endif %}
+</body>
+</html>

@@ -1,4 +1,4 @@
-# Éditeur structurel — FD-EDITOR-001 à 005
+# Éditeur structurel — FD-EDITOR-001 à 006
 
 Mutations contrôlées d'un `DesignFile` : **ajouter**, **supprimer** et
 **déplacer** un bloc, puis **configurer ses propriétés**. L'éditeur est un moteur en mémoire, réutilisable par une future UI :
@@ -496,3 +496,100 @@ Inchangée par rapport à FD-EDITOR-004 : `is_local_action` (403), formulaire
 urlencodé (415), champs exacts par action (400), 64 Kio par champ, révision
 attendue (409 en cas de conflit). Un token invalide donne 400. Après l'action,
 le même bloc reste sélectionné.
+
+## Prévisualisation intégrée — FD-EDITOR-006
+
+L'éditeur affiche une **prévisualisation statique et indicative** du Design
+enregistré, produite exclusivement par les fonctions existantes :
+
+```text
+.design.json + .view.json
+   → generate_preview_data(contract)      (données fictives de preview/data.py)
+   → render_preview(design, data)         (renderer de preview/render.py)
+   → GET /editor/preview                  (document dédié)
+   → <iframe sandbox> dans /editor
+```
+
+Il n'y a ni second renderer, ni nouvelles données fictives, ni modification
+de `forge_design/preview/`. Le backend Forge cible n'est ni importé ni
+appelé, et aucun template Jinja n'est exécuté. Le GET est en lecture seule.
+
+### Document encadré
+
+`GET /editor/preview?design=<chemin>&mode=desktop|tablet|mobile` (exactement
+ces paramètres ; `mode` vaut `desktop` par défaut) renvoie un document HTML
+complet (`preview_frame.html`), stylé par `/editor-preview.css`. Ce CSS
+générique sert la lisibilité (marges, tableaux, contours de blocs) et
+**n'émule pas Tailwind** : les classes sont conservées dans le HTML mais aucun
+build Tailwind du projet n'est chargé. L'aperçu est donc structurel, pas le
+rendu final.
+
+Le HTML de `render_preview` est le **seul** contenu marqué sûr (`Markup`, côté
+Python) : ce renderer interne échappe valeurs, libellés et classes et n'émet
+que des balises en liste blanche. Diagnostics, chemins et messages restent
+échappés par Jinja.
+
+Indisponible, avec un message et sans rendu inventé : Design invalide,
+contrat absent ou invalide. Sans projet, 409 ; Design introuvable, 404 ;
+paramètre inconnu, dupliqué ou invalide, 400. Une preview partielle est
+affichée avec « Prévisualisation partielle » et ses diagnostics, séparés en
+« Données fictives » (`PreviewDataIssue`) et « Rendu » (`PreviewRenderIssue`),
+avec leurs codes.
+
+### Encadrement et sécurité
+
+Forge refuse par défaut tout encadrement (`X-Frame-Options: DENY`,
+`frame-ancestors 'none'`) : sans ajustement, l'iframe serait bloquée par le
+navigateur. **Seule** la réponse `/editor/preview` définit ses propres
+en-têtes, que Forge respecte (`setdefault`) :
+
+```text
+Content-Security-Policy: default-src 'none'; style-src 'self' http://127.0.0.1:<port>;
+  img-src 'self' data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'
+X-Frame-Options: SAMEORIGIN
+```
+
+Cette politique est plus stricte que la politique par défaut (aucun script,
+aucune soumission de formulaire), sauf sur un point : l'encadrement en **même
+origine**. Toutes les autres pages, l'éditeur compris, gardent `DENY` et
+`frame-ancestors 'none'`. L'origine exacte est ajoutée à `style-src` parce
+que, dans une iframe sandboxée sans `allow-same-origin`, l'origine du
+document est opaque et l'interprétation de `'self'` varie selon les
+navigateurs. Elle n'est ajoutée que si `Host` est exactement
+`127.0.0.1:<port>`, forme déjà imposée par FD-WEB-003.
+
+L'iframe porte `sandbox` **sans aucune permission** (ni `allow-scripts`, ni
+`allow-forms`, ni `allow-same-origin`) et `title="Prévisualisation du Design"`.
+Les boutons de preview (`type="button"`) n'ont aucun effet, et la preview ne
+peut ni modifier le document parent ni naviguer.
+
+### Modes
+
+`desktop` (1440 px), `tablet` (768 px) et `mobile` (390 px), selon les presets
+de `preview/responsive.py`. Les largeurs sont exprimées dans `shell.css`
+(`.preview-frame--desktop`, `--tablet` et `--mobile`, avec
+`max-width: 100%`) et non par `wrap_preview_html`, qui produit un style
+inline interdit par la CSP. Un test vérifie que ces largeurs restent alignées
+sur `PREVIEW_VIEWPORTS`.
+
+Le mode se choisit par des liens GET (« Desktop », « Tablette », « Mobile »,
+le mode actif portant `aria-current`) et se conserve par le paramètre
+`preview` de `/editor`. Il est omis pour `desktop`, si bien que les URL
+historiques restent valides. Les liens de l'arbre le conservent. Chaque
+formulaire d'action porte un champ `preview` **facultatif** : c'est le seul
+champ hors de l'ensemble exact de chaque action ; il est validé (400 si
+inconnu) et repris dans la redirection 303.
+
+### Mise à jour
+
+Aucun état ni rafraîchissement : chaque action suit
+`POST → write_design → 303 → GET /editor`, et l'iframe recharge
+`/editor/preview`, qui relit le Design enregistré. Un no-op ne réécrit rien,
+et la preview reste identique.
+
+### Limites connues
+
+- Données fictives : les booléens valent `true` (les blocs conditionnés sont
+  visibles) et les listes ont trois éléments (les `empty_state` ne sont
+  généralement pas visibles). Il n'y a pas de bascule dans ce ticket.
+- Pas de Tailwind compilé, de backend réel, de JavaScript ni de HTMX.

@@ -22,7 +22,7 @@ packages = ["forge_design", "forge_design.contracts", "forge_design.design", "fo
 [tool.setuptools.package-data]
 "forge_design.design" = ["design.schema.json"]
 "forge_design.contracts" = ["view_contract.schema.json"]
-"forge_design.web" = ["templates/editor.html", "templates/template_tree.html", "templates/templates.html", "templates/template_view.html", "templates/debug_detail.html", "templates/debug.html", "templates/entities.html", "templates/routes.html", "templates/source.html", "templates/layout.html", "templates/index.html", "templates/inspector.html", "static/shell.css", "static/route-graph.js", "static/entity-graph.js"]
+"forge_design.web" = ["templates/editor.html", "templates/preview_frame.html", "templates/template_tree.html", "templates/templates.html", "templates/template_view.html", "templates/debug_detail.html", "templates/debug.html", "templates/entities.html", "templates/routes.html", "templates/source.html", "templates/layout.html", "templates/index.html", "templates/inspector.html", "static/shell.css", "static/editor-preview.css", "static/route-graph.js", "static/entity-graph.js"]
 
 [tool.setuptools.dynamic]
 version = {attr = "forge_design.__version__"}

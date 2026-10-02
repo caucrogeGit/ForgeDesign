@@ -32,7 +32,7 @@
 {% for row in rows %}
 <li class="editor-node" data-path="{{ row.path_value }}" data-depth="{{ row.depth }}">
 {% if selected and row.path == selected.path %}<strong aria-current="true">{{ row.type }}</strong>
-{% else %}<a href="{{ editor_url(design_path, row.path) }}">{{ row.type }}</a>{% endif %}
+{% else %}<a href="{{ editor_url(design_path, row.path, preview=preview_mode) }}">{{ row.type }}</a>{% endif %}
 {% if row.binding %} <span class="editor-meta">binding : {{ row.binding }}</span>{% endif %}
 {% if row.visible_if %} <span class="editor-meta">si {{ row.visible_if }}</span>{% endif %}
 {% if row.opens %}<ul class="editor-nodes">{% else %}</li>{% for level in range(row.close_levels) %}</ul></li>{% endfor %}{% endif %}
@@ -54,6 +54,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="append">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="parent" value="{{ selected.path_value }}">
   <label for="block-type">Ajouter un enfant</label>
   {% if child_types %}<select id="block-type" name="block_type">{% for kind in child_types %}<option value="{{ kind }}">{{ kind }}</option>{% endfor %}</select>
@@ -64,6 +65,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="move">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <label for="destination">Déplacer en dernier enfant de</label>
   {% if destinations %}<select id="destination" name="destination">{% for row in destinations %}<option value="{{ row.path_value }}">{{ row.type }} ({% if row.path_value %}{{ row.path_value }}{% else %}racine{% endif %})</option>{% endfor %}</select>
@@ -73,6 +75,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="remove">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <button type="submit">Supprimer ce bloc et ses descendants</button>
 </form>
@@ -81,6 +84,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="binding">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <label for="binding">Binding</label>
   <select id="binding" name="binding"{% if not contract %} disabled{% endif %}>
@@ -94,6 +98,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="visibility">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <label for="visible-if">Condition d'affichage (booléen)</label>
   <select id="visible-if" name="visible_if"{% if not contract %} disabled{% endif %}>
@@ -106,6 +111,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="props">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <label for="props">Props (objet JSON ; vide pour supprimer)</label>
   <textarea id="props" name="props" rows="3">{{ props_json }}</textarea>
@@ -121,6 +127,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="tailwind_set">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <label for="classes">Classes réelles (vide pour supprimer)</label>
   <input id="classes" name="classes" value="{{ classes_value }}" autocomplete="off" spellcheck="false">
@@ -133,6 +140,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="tailwind_remove">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <input type="hidden" name="class_token" value="{{ token }}">
   <button type="submit" aria-label="Retirer {{ token }}">Retirer</button>
@@ -143,6 +151,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="tailwind_add">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <label for="class-token">Ajouter une classe (libre : md:grid-cols-2, hover:bg-slate-100, w-[37px]…)</label>
   <input id="class-token" name="class_token" list="tailwind-suggestions" autocomplete="off" spellcheck="false" required>
@@ -155,6 +164,7 @@
 <form action="/editor/action" method="post" aria-label="{{ category }}">
   <input type="hidden" name="action" value="tailwind_add">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <p>{{ category }}</p>
   {% for token in tokens %}<button type="submit" name="class_token" value="{{ token }}"{% if token in class_tokens %} disabled{% endif %}>{{ token }}</button> {% endfor %}
@@ -168,6 +178,7 @@
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="columns">
   <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
   <label for="columns">Colonnes (tableau JSON de {"label", "binding"} ; vide pour supprimer, [] pour aucune)</label>
   <textarea id="columns" name="columns" rows="6"{% if not contract %} disabled{% endif %}>{{ columns_json }}</textarea>
@@ -179,5 +190,15 @@
 </section>
 {% endif %}
 </div>
+<section class="editor-preview" aria-labelledby="preview-title">
+<h2 id="preview-title">Prévisualisation indicative</h2>
+<p>Aperçu structurel avec données fictives : les classes Tailwind sont conservées mais non compilées, ce n'est pas le rendu final.</p>
+<nav class="preview-modes" aria-label="Largeur de l'aperçu">
+{% for mode, label in preview_modes %}<a href="{{ editor_url(design_path, selected.path if selected else (), preview=mode) }}"{% if mode == preview_mode %} aria-current="true"{% endif %}>{{ label }}</a>
+{% endfor %}</nav>
+<div class="preview-viewport">
+<iframe class="preview-frame preview-frame--{{ preview_mode }}" src="{{ preview_frame_url(design_path, preview_mode) }}" title="Prévisualisation du Design" sandbox></iframe>
+</div>
+</section>
 {% endif %}
 {% endblock %}

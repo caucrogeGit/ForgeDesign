@@ -1,7 +1,8 @@
 """Éditeur Web réel : HTTP, lecture, editor/*, write_design, sans état serveur."""
 
 import json
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
+from contextlib import contextmanager
 from http.client import HTTPConnection
 from pathlib import Path
 from typing import Any
@@ -61,8 +62,8 @@ def design_data() -> dict[str, Any]:
     }
 
 
-@pytest.fixture
-def root(tmp_path: Path) -> Path:
+def make_root(tmp_path: Path) -> Path:
+    """Projet Forge temporaire avec Design, contrat et template témoin."""
     root = project(tmp_path / "project")
     views = root / "mvc/views/contacts"
     views.mkdir(parents=True)
@@ -70,6 +71,11 @@ def root(tmp_path: Path) -> Path:
     (views / "list.view.json").write_text(json.dumps(CONTRACT))
     (views / "list.html").write_text("<p>template intact</p>\n")
     return root
+
+
+@pytest.fixture
+def root(tmp_path: Path) -> Path:
+    return make_root(tmp_path)
 
 
 def design_file(root: Path) -> Path:
@@ -89,10 +95,17 @@ def snapshot(root: Path) -> tuple[bytes, int]:
     return file.read_bytes(), file.stat().st_mtime_ns
 
 
-@pytest.fixture
-def app(root: Path, tmp_path: Path) -> Iterator[WSGIServer]:
+@contextmanager
+def serving(root: Path, tmp_path: Path) -> Generator[WSGIServer, None, None]:
+    """Serveur réel avec root ouvert comme projet courant."""
     with running(RecentProjects(tmp_path / "recent.json")) as server:
         assert call(server, "/inspector", method="POST", value=str(root))[0] == 200
+        yield server
+
+
+@pytest.fixture
+def app(root: Path, tmp_path: Path) -> Iterator[WSGIServer]:
+    with serving(root, tmp_path) as server:
         yield server
 
 

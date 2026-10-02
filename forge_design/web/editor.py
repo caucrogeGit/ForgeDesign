@@ -60,6 +60,7 @@ from forge_design.limits import (
     MAX_DESIGN_NODES,
     MAX_SOURCE_PATH_LENGTH,
 )
+from forge_design.preview import PREVIEW_VIEWPORTS, PreviewViewportMode
 from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
 from forge_design.web.tailwind_classes import (
@@ -98,13 +99,21 @@ _ACTION_FIELDS: Mapping[str, frozenset[str]] = {
     "tailwind_remove": frozenset({"action", "design", "path", "class_token"}),
 }
 _CONTRACT_ACTIONS = frozenset({"binding", "visibility", "columns"})
+DEFAULT_PREVIEW_MODE: PreviewViewportMode = "desktop"
+PREVIEW_MODE_LABELS: tuple[tuple[PreviewViewportMode, str], ...] = (
+    ("desktop", "Desktop"),
+    ("tablet", "Tablette"),
+    ("mobile", "Mobile"),
+)
 _NOTICES = {
     "saved": "Modification enregistrée.",
     "noop": "Aucune modification.",
 }
 
 
-class _HttpError(Exception):
+class EditorHttpError(Exception):
+    """Échec HTTP contrôlé : statut et message affichable."""
+
     def __init__(self, status: int, message: str) -> None:
         super().__init__(message)
         self.status = status
@@ -158,13 +167,33 @@ def parse_node_path(value: str) -> NodePath:
     return tuple(int(part) for part in parts)
 
 
-def editor_url(design: str, node: NodePath = (), notice: str | None = None) -> str:
+def parse_preview_mode(value: str | None) -> PreviewViewportMode:
+    """Mode d'aperçu : desktop par défaut (URL historique), sinon preset connu."""
+    if value is None:
+        return DEFAULT_PREVIEW_MODE
+    if value not in PREVIEW_VIEWPORTS:
+        raise ValueError("Mode d'aperçu inconnu.")
+    return cast(PreviewViewportMode, value)
+
+
+def editor_url(
+    design: str,
+    node: NodePath = (),
+    notice: str | None = None,
+    preview: PreviewViewportMode = DEFAULT_PREVIEW_MODE,
+) -> str:
     params = {"design": design}
     if node:
         params["node"] = format_node_path(node)
+    if preview != DEFAULT_PREVIEW_MODE:
+        params["preview"] = preview
     if notice is not None:
         params["notice"] = notice
     return "/editor?" + urlencode(params)
+
+
+def preview_frame_url(design: str, mode: PreviewViewportMode) -> str:
+    return "/editor/preview?" + urlencode({"design": design, "mode": mode})
 
 
 def _project_tree(design: DesignFile) -> tuple[tuple[EditorNodeView, ...], bool]:
@@ -210,7 +239,8 @@ def _nest(rows: list[EditorNodeView]) -> tuple[EditorNodeView, ...]:
     return tuple(nested)
 
 
-def _read_contract(context: CurrentProjectContext, design: DesignFile) -> ContractState:
+def load_contract(context: CurrentProjectContext, design: DesignFile) -> ContractState:
+    """Contrat référencé par design.source_contract ; indisponible sans exception."""
     path = design.source_contract
     assert context.root is not None
     try:
@@ -228,19 +258,20 @@ def _read_contract(context: CurrentProjectContext, design: DesignFile) -> Contra
     return ContractState(path, result.contract, ())
 
 
-def _read(context: CurrentProjectContext, design_path: str) -> DesignReadResult:
+def load_design(context: CurrentProjectContext, design_path: str) -> DesignReadResult:
+    """Lecture d'un Design par le Web : statut HTTP explicite pour chaque échec."""
     if context.root is None:
-        raise _HttpError(409, "Aucun projet ouvert.")
+        raise EditorHttpError(409, "Aucun projet ouvert.")
     if len(design_path) > MAX_SOURCE_PATH_LENGTH or design_source(design_path) is None:
-        raise _HttpError(400, "Chemin de Design refusé.")
+        raise EditorHttpError(400, "Chemin de Design refusé.")
     try:
         return read_design(context.root, design_path)
     except FileNotFoundError:
-        raise _HttpError(404, "Design introuvable.") from None
+        raise EditorHttpError(404, "Design introuvable.") from None
     except SourceReadError:
-        raise _HttpError(400, "Chemin de Design refusé.") from None
+        raise EditorHttpError(400, "Chemin de Design refusé.") from None
     except _PROJECT_ERRORS:
-        raise _HttpError(409, "Projet courant indisponible.") from None
+        raise EditorHttpError(409, "Projet courant indisponible.") from None
 
 
 def _find(rows: tuple[EditorNodeView, ...], path: NodePath) -> EditorNodeView | None:
@@ -256,11 +287,15 @@ def _render(
     error: str | None = None,
     issues: tuple[str, ...] = (),
     message: str | None = None,
+    preview: PreviewViewportMode = DEFAULT_PREVIEW_MODE,
     status: int = 200,
 ) -> Response:
     page: dict[str, object] = {
         "active_page": "editor",
         "editor_url": editor_url,
+        "preview_frame_url": preview_frame_url,
+        "preview_mode": preview,
+        "preview_modes": PREVIEW_MODE_LABELS,
         "current_project": context.inspection,
         "design_path": design_path,
         "error": error,
@@ -278,7 +313,7 @@ def _render(
     if design is not None and context.root is not None:
         rows, truncated = _project_tree(design)
         selected = _find(rows, selected_path) or _find(rows, ())
-        state = _read_contract(context, design)
+        state = load_contract(context, design)
         page.update(
             {
                 "rows": rows,
@@ -353,7 +388,7 @@ def show_editor(request: Request, context: CurrentProjectContext) -> Response:
     if context.root is None:
         return _render(context, error="Aucun projet ouvert.", status=409)
     params = request.params
-    if not set(params) <= {"design", "node", "notice"} or any(
+    if not set(params) <= {"design", "node", "notice", "preview"} or any(
         len(values) != 1 for values in params.values()
     ):
         return _render(context, error="Paramètres de l'éditeur invalides.", status=400)
@@ -364,12 +399,16 @@ def show_editor(request: Request, context: CurrentProjectContext) -> Response:
     if notice is not None and notice not in _NOTICES:
         return _render(context, error="Paramètres de l'éditeur invalides.", status=400)
     try:
+        preview = parse_preview_mode(request.query("preview"))
+    except ValueError as error:
+        return _render(context, design_path=design_path, error=str(error), status=400)
+    try:
         node = parse_node_path(request.query("node", ""))
     except ValueError as error:
         return _render(context, design_path=design_path, error=str(error), status=400)
     try:
-        read = _read(context, design_path)
-    except _HttpError as error:
+        read = load_design(context, design_path)
+    except EditorHttpError as error:
         return _render(
             context, design_path=design_path, error=error.message, status=error.status
         )
@@ -381,6 +420,7 @@ def show_editor(request: Request, context: CurrentProjectContext) -> Response:
                 design_path=design_path,
                 read=read,
                 error="Aucun bloc à cet emplacement.",
+                preview=preview,
                 status=400,
             )
     return _render(
@@ -389,36 +429,37 @@ def show_editor(request: Request, context: CurrentProjectContext) -> Response:
         read=read,
         selected_path=node,
         message=_NOTICES.get(notice or ""),
+        preview=preview,
     )
 
 
 def _fields(request: Request) -> dict[str, str]:
     body: Mapping[str, list[str]] = request.body
     if any(len(values) != 1 for values in body.values()):
-        raise _HttpError(400, "Chaque champ doit être fourni une seule fois.")
+        raise EditorHttpError(400, "Chaque champ doit être fourni une seule fois.")
     fields = {key: values[0] for key, values in body.items()}
     if any(
         len(key) > MAX_EDITOR_FIELD_CHARS or len(value) > MAX_EDITOR_FIELD_CHARS
         for key, value in fields.items()
     ):
-        raise _HttpError(400, "Champ de formulaire trop long.")
+        raise EditorHttpError(400, "Champ de formulaire trop long.")
     return fields
 
 
 def _check_post(request: Request, context: CurrentProjectContext) -> None:
     if not is_local_action(request):
-        raise _HttpError(403, "Origine de la requête non autorisée.")
+        raise EditorHttpError(403, "Origine de la requête non autorisée.")
     if request.header("Content-Type", "").split(";", 1)[0] != _FORM:
-        raise _HttpError(415, "Format de formulaire non pris en charge.")
+        raise EditorHttpError(415, "Format de formulaire non pris en charge.")
     if context.root is None:
-        raise _HttpError(409, "Aucun projet ouvert.")
+        raise EditorHttpError(409, "Aucun projet ouvert.")
 
 
 def _path(fields: Mapping[str, str], key: str) -> NodePath:
     try:
         return parse_node_path(fields[key])
     except ValueError as error:
-        raise _HttpError(400, str(error)) from None
+        raise EditorHttpError(400, str(error)) from None
 
 
 def _optional(fields: Mapping[str, str], key: str) -> str | None:
@@ -432,9 +473,9 @@ def _props(text: str) -> dict[str, Any] | None:
     try:
         value = loads_strict_json(text)
     except (ValueError, RecursionError):
-        raise _HttpError(400, "Props : JSON invalide.") from None
+        raise EditorHttpError(400, "Props : JSON invalide.") from None
     if not isinstance(value, dict):
-        raise _HttpError(400, "Props : un objet JSON est attendu.")
+        raise EditorHttpError(400, "Props : un objet JSON est attendu.")
     return value  # pyright: ignore[reportUnknownVariableType]
 
 
@@ -444,14 +485,14 @@ def _columns(text: str) -> list[TableColumn] | None:
     try:
         value = loads_strict_json(text)
     except (ValueError, RecursionError):
-        raise _HttpError(400, "Colonnes : JSON invalide.") from None
+        raise EditorHttpError(400, "Colonnes : JSON invalide.") from None
     if not isinstance(value, list):
-        raise _HttpError(400, "Colonnes : un tableau JSON est attendu.")
+        raise EditorHttpError(400, "Colonnes : un tableau JSON est attendu.")
     items: list[object] = value  # pyright: ignore[reportUnknownVariableType]
     try:
         return [TableColumn.model_validate(item) for item in items]
     except ValidationError:
-        raise _HttpError(
+        raise EditorHttpError(
             400, "Colonnes : chaque élément doit avoir label et binding."
         ) from None
 
@@ -484,11 +525,11 @@ def _tailwind(
         else:
             updated = remove_class(props, fields["class_token"])
     except ClassNotEditableError:
-        raise _HttpError(
+        raise EditorHttpError(
             422, "props.class n'est pas une chaîne : corrigez-la via le JSON des props."
         ) from None
     except ValueError as error:
-        raise _HttpError(400, "Classes : " + str(error)) from None
+        raise EditorHttpError(400, "Classes : " + str(error)) from None
     return set_design_props(design, path=path, props=updated)
 
 
@@ -553,6 +594,7 @@ def _save(
     read: DesignReadResult,
     design: DesignFile,
     selected: NodePath,
+    preview: PreviewViewportMode,
 ) -> Response:
     """write_design avec la révision lue ; conflit et échec restent explicites."""
     assert context.root is not None
@@ -568,6 +610,7 @@ def _save(
                 "Le Design a été modifié depuis sa lecture. "
                 "Rechargez la page avant de recommencer."
             ),
+            preview=preview,
             status=409,
         )
     except InvalidDesignForWriteError as error:
@@ -578,6 +621,7 @@ def _save(
             selected_path=selected,
             error="Design refusé à l'écriture : défaut interne de l'éditeur.",
             issues=tuple(issue.message for issue in error.issues),
+            preview=preview,
             status=422,
         )
     except DesignWriteError:
@@ -587,40 +631,50 @@ def _save(
             design_path=design_path,
             selected_path=selected,
             error="Sauvegarde incertaine : relisez le Design avant de réessayer.",
+            preview=preview,
             status=500,
         )
     except _PROJECT_ERRORS:
         return _render(context, error="Projet courant indisponible.", status=409)
-    return _redirect(editor_url(design_path, selected, "saved"))
+    return _redirect(editor_url(design_path, selected, "saved", preview))
 
 
 def editor_action(request: Request, context: CurrentProjectContext) -> Response:
     design_path: str | None = None
     read: DesignReadResult | None = None
+    preview: PreviewViewportMode = DEFAULT_PREVIEW_MODE
     try:
         _check_post(request, context)
         fields = _fields(request)
         action = fields.get("action", "")
         expected = _ACTION_FIELDS.get(action)
-        if expected is None or frozenset(fields) != expected:
-            raise _HttpError(400, "Une seule action complète est attendue.")
+        # "preview" est le seul champ facultatif : il ne porte que le mode d'aperçu.
+        if expected is None or frozenset(fields) - {"preview"} != expected:
+            raise EditorHttpError(400, "Une seule action complète est attendue.")
+        try:
+            preview = parse_preview_mode(fields.get("preview"))
+        except ValueError as error:
+            raise EditorHttpError(400, str(error)) from None
         design_path = fields["design"]
-        read = _read(context, design_path)
+        read = load_design(context, design_path)
         design = read.design
         if design is None:
-            raise _HttpError(409, "Design illisible ou invalide : édition impossible.")
+            raise EditorHttpError(
+                409, "Design illisible ou invalide : édition impossible."
+            )
         contract = None
         if action in _CONTRACT_ACTIONS:
-            contract = _read_contract(context, design).contract
+            contract = load_contract(context, design).contract
             if contract is None:
-                raise _HttpError(409, "Contrat indisponible : action impossible.")
+                raise EditorHttpError(409, "Contrat indisponible : action impossible.")
         result = _apply(action, fields, design, contract)
-    except _HttpError as error:
+    except EditorHttpError as error:
         return _render(
             context,
             design_path=design_path,
             read=read,
             error=error.message,
+            preview=preview,
             status=error.status,
         )
     target = fields.get("parent") or fields.get("path") or ""
@@ -637,8 +691,9 @@ def editor_action(request: Request, context: CurrentProjectContext) -> Response:
             selected_path=selected,
             error="Modification refusée.",
             issues=tuple(issue.message for issue in result.issues),
+            preview=preview,
             status=422,
         )
     if not result.changed:
-        return _redirect(editor_url(design_path, selected, "noop"))
-    return _save(context, design_path, read, result.design, selected)
+        return _redirect(editor_url(design_path, selected, "noop", preview))
+    return _save(context, design_path, read, result.design, selected, preview)

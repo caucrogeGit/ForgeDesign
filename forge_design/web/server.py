@@ -18,6 +18,7 @@ from forge_design.recent_projects import RecentProjects
 from forge_design.web.debug import show_debug
 from forge_design.web.debug_detail import show_debug_detail
 from forge_design.web.editor import editor_action, show_editor
+from forge_design.web.editor_preview import show_editor_preview
 from forge_design.web.entities import show_entities
 from forge_design.web.inspector import (
     inspect_submission,
@@ -48,6 +49,11 @@ def _graph_script(request: Request) -> Response:
     return Response(
         body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
     )
+
+
+def _editor_preview_style(request: Request) -> Response:
+    css = files("forge_design.web").joinpath("static/editor-preview.css")
+    return Response(body=css.read_bytes(), content_type="text/css; charset=utf-8")
 
 
 def _entity_graph_script(request: Request) -> Response:
@@ -148,6 +154,9 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     def editor(request: Request) -> Response:
         return show_editor(request, context)
 
+    def editor_preview(request: Request) -> Response:
+        return show_editor_preview(request, context)
+
     def editor_post(request: Request) -> Response:
         return editor_action(request, context)
 
@@ -196,6 +205,9 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     router.add("GET", "/templates/view", template, public=True, no_store=True)
     router.add("GET", "/templates/tree", template_tree, public=True, no_store=True)
     router.add("GET", "/editor", editor, public=True, no_store=True)
+    # Document encadré par l'éditeur : CSP et X-Frame-Options propres à la réponse.
+    router.add("GET", "/editor/preview", editor_preview, public=True, no_store=True)
+    router.add("GET", "/editor-preview.css", _editor_preview_style, public=True)
     # Mutations du .design.json : même contrôle d'origine locale exacte.
     router.add(
         "POST", "/editor/action", editor_post, public=True, csrf=False, no_store=True

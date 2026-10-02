@@ -1,0 +1,15 @@
+/* Document de prévisualisation : lisibilité générique, aucune émulation Tailwind. */
+:root { color-scheme: light; }
+body.preview-document { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #172033; background: #fff; }
+.preview-status { padding: .5rem 1rem; border-bottom: 1px solid #d5dbd8; background: #f4f6f5; font-size: .85rem; color: #3f4a46; }
+.preview-status p { margin: .2rem 0; }
+.preview-warning, .preview-error { color: #973a27; font-weight: 600; }
+.preview-error { margin: 1rem; }
+.preview-issues { margin: .75rem 1rem; font-size: .85rem; }
+.preview-issues h2 { font-size: .95rem; margin: .5rem 0 .25rem; }
+.preview-canvas { padding: 1rem; }
+.preview-canvas section, .preview-canvas article, .preview-canvas div, .preview-canvas form { margin-block: .5rem; }
+.preview-canvas [data-forge-design-type] { outline: 1px dashed #c8cfcb; outline-offset: 2px; }
+.preview-canvas table { border-collapse: collapse; width: 100%; }
+.preview-canvas th, .preview-canvas td { border: 1px solid #c8cfcb; padding: .35rem .5rem; text-align: left; }
+.preview-canvas button { padding: .3rem .8rem; }

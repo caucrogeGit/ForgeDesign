@@ -118,3 +118,12 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .tailwind-suggestions p { margin: 0 0 .3rem; font-weight: 600; }
 .tailwind-suggestions button { margin: 0 .3rem .3rem 0; padding: .3rem .7rem; font-family: monospace; font-size: .85rem; }
 .tailwind-suggestions button:disabled { opacity: .45; cursor: default; }
+/* Prévisualisation encadrée : largeurs indicatives (preview/responsive.py), sans style inline. */
+.editor-preview { margin-top: 2.5rem; }
+.preview-modes { display: flex; gap: 1rem; margin: 1rem 0; }
+.preview-modes a[aria-current="true"] { font-weight: 700; text-decoration: underline; text-decoration-thickness: .15em; }
+.preview-viewport { overflow: auto; border: 1px solid #c8cfcb; background: #eef1f0; padding: 1rem 0; }
+.preview-frame { display: block; margin: 0 auto; max-width: 100%; height: 40rem; border: 1px solid #77847e; background: white; }
+.preview-frame--desktop { width: 1440px; }
+.preview-frame--tablet { width: 768px; }
+.preview-frame--mobile { width: 390px; }

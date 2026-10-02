@@ -1687,7 +1687,21 @@ POST action explicite → lecture Design → mutation Editor → write_design
 Un no-op ou un refus n'écrit rien. L'assistant de classes Tailwind
 (FD-EDITOR-005) suit le même chemin :
 `Web Editor → web/tailwind_classes.py → set_design_props → write_design`, en ne
-modifiant que `props.class` (tokens opaques, sans grammaire Tailwind). Les POST exigent
+modifiant que `props.class` (tokens opaques, sans grammaire Tailwind).
+
+Prévisualisation intégrée (FD-EDITOR-006) :
+
+```text
+                 ┌→ Editor tree/properties
+Design + Contract
+                 └→ Fake data → Preview renderer → sandboxed iframe
+```
+
+`GET /editor/preview` réutilise `generate_preview_data` et `render_preview`,
+en lecture seule. C'est la seule réponse encadrable, en même origine, avec une
+CSP propre plus stricte que celle de Forge (`default-src 'none'`,
+`form-action 'none'`) ; l'éditeur l'affiche dans une `<iframe sandbox>` sans
+permission. Les POST exigent
 `is_local_action` et un formulaire urlencodé. Sans contrat valide, la
 structure et les props restent éditables ; binding, condition et colonnes
 sont refusés côté serveur. Aucun JavaScript ni Tool.
