@@ -6,8 +6,14 @@ runner et le vrai proxy sur des projets Forge synthétiques (squelette rc9).
 """
 
 import json
+import os
 import re
+import signal
+import socket
+import subprocess
+import sys
 import threading
+import time
 from collections.abc import Callable, Generator, Iterator
 from contextlib import contextmanager
 from html import unescape
@@ -1148,3 +1154,125 @@ def test_real_server_shutdown_while_running(tmp_path: Path, no_survivors: None) 
     # Sortie du bloc : serveur fermé, runtime fermé (proxy puis runner).
     with pytest.raises(OSError):
         proxy_get(src)
+
+
+def _returning(
+    server: web.ForgeDesignServer,
+) -> Callable[[str, int], web.ForgeDesignServer]:
+    def create(host: str, port: int) -> web.ForgeDesignServer:
+        return server
+
+    return create
+
+
+# ── Arrêt par signal (FD-REALPREVIEW-005) ────────────────────────────────────
+# Défaut observé en session navigateur : SIGTERM ou SIGHUP tuaient Forge Design
+# sans finally ; la preview, dans sa propre session, survivait orpheline.
+
+
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGHUP"])
+def test_run_server_stops_on_signal(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str
+) -> None:
+    number = getattr(signal, name)
+    server = web.create_server(port=0, real_preview=harness.runtime)
+    harness.runtime.start(tmp_path)
+    outside: list[int] = []
+    interrupted: list[bool] = []
+
+    def outer_handler(signum: int, frame: object) -> None:
+        outside.append(signum)
+
+    def serve(poll_interval: float = 0.5) -> None:
+        os.kill(os.getpid(), number)
+        time.sleep(1)
+        interrupted.append(False)  # atteint seulement si le signal n'a rien arrêté
+
+    previous = signal.signal(number, outer_handler)
+    try:
+        monkeypatch.setattr(web, "create_server", _returning(server))
+        monkeypatch.setattr(server, "serve_forever", serve)
+        web.run_server(port=0)
+        assert outside == [] and interrupted == []
+        assert signal.getsignal(number) is outer_handler
+    finally:
+        signal.signal(number, previous)
+    assert harness.names()[-1] == "runner-stop"
+    assert "proxy-close" in harness.names()
+    assert server.socket.fileno() == -1
+
+
+def test_run_server_outside_main_thread_installs_no_handler(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    server = web.create_server(port=0, real_preview=harness.runtime)
+    monkeypatch.setattr(web, "create_server", _returning(server))
+    monkeypatch.setattr(server, "serve_forever", lambda poll_interval=0.5: None)
+    before = signal.getsignal(signal.SIGTERM)
+    errors: list[BaseException] = []
+
+    def target() -> None:
+        try:
+            web.run_server(port=0)
+        except BaseException as error:  # noqa: BLE001 - restituer au test
+            errors.append(error)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join(10)
+    assert errors == [] and signal.getsignal(signal.SIGTERM) is before
+
+
+SERVE = (
+    "import sys\n"
+    "from forge_design.web.server import run_server\n"
+    "run_server(port=int(sys.argv[1]), on_ready=lambda: print('PRET', flush=True))\n"
+)
+
+
+@pytest.mark.parametrize("name", ["SIGINT", "SIGTERM", "SIGHUP"])
+def test_real_signal_stops_preview(
+    tmp_path: Path, no_survivors: None, name: str
+) -> None:
+    root = real_project(tmp_path / "a")
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(tmp_path),
+        "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
+    }
+    process = subprocess.Popen(
+        [sys.executable, "-c", SERVE, str(port)],
+        cwd=tmp_path,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "PRET"
+
+        class Target:
+            server_port = port
+
+        target: Any = Target()
+        assert open_project(target, root)[0] == 200
+        assert real_start(target)[0] == 303
+        html = real_editor(target)[1]
+        proxy = int(html.split('src="http://127.0.0.1:')[1].split("/")[0])
+        assert processes_mentioning(str(root))
+        process.send_signal(getattr(signal, name))
+        process.wait(20)
+        output = process.stdout.read()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+    assert "Traceback" not in output
+    assert wait_until_dead(processes_mentioning(str(root))) == []
+    with pytest.raises(OSError):
+        socket.create_connection(("127.0.0.1", proxy), timeout=1).close()

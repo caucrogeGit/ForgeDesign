@@ -6,7 +6,8 @@ dépendent FD-REALPREVIEW-002 (runner local) et les tickets d'intégration Web
 suivants. Le runner est implémenté par FD-REALPREVIEW-002, le proxy par
 FD-REALPREVIEW-003, et l'intégration Web (Start/Stop, iframe, cycle de vie)
 par FD-REALPREVIEW-004 : voir « Implémentation du runner », « Implémentation
-du proxy » et « Intégration Web ».
+du proxy » et « Intégration Web ». FD-REALPREVIEW-005 l'a validée dans de vrais
+navigateurs (« Validation navigateur »).
 
 Les faits Forge cités ont été vérifiés statiquement dans `forge-mvc==1.0.0rc9`
 (version épinglée par Forge Design), le paquet installé et le dépôt Forge local
@@ -149,6 +150,59 @@ les modifier (`forge_design/web/real_preview.py`).
   seulement quand un proxy est actif, la CSP Forge par défaut suivie de
   `; frame-src 'self' <origine proxy>`. Les autres pages et l'éditeur sans
   proxy gardent la CSP Forge, et `X-Frame-Options: DENY` reste en place.
+
+## Validation navigateur
+
+FD-REALPREVIEW-005 a utilisé la preview réelle dans deux vrais navigateurs, en
+mode headless et pilotés par leur protocole de débogage. Session automatisée,
+non humaine : pas de contrôle visuel à l'œil sur un écran. Le rendu a été
+examiné sur des captures d'écran.
+- Chromium 154.0.8037.92 (paquet Debian 13), par le Chrome DevTools
+  Protocol ;
+- Firefox ESR 153.4.0, par WebDriver BiDi.
+
+Le projet testé est synthétique (squelette rc9). Constaté dans les deux
+moteurs :
+- **Iframe et en-têtes** : l'iframe est rendue sans erreur de console. La
+  CSP de l'éditeur (`frame-src 'self' <proxy>`) est acceptée, la réponse du
+  proxy n'a pas de `X-Frame-Options`, et son `frame-ancestors
+  http://127.0.0.1:<port Forge Design>` est accepté. Les autres directives de
+  la cible restent présentes.
+- **Contenu de la page** : `/static/` est chargé en 200 depuis le port du
+  proxy (`text/css`, `text/javascript`), le JavaScript de la page s'exécute,
+  et ses `fetch` same-origin réussissent.
+- **Isolation** : `window.top.document` et `window.parent.location` lèvent
+  `SecurityError`.
+- **Navigation** : les liens GET restent dans l'iframe, sur l'origine du
+  proxy, et le parent ne navigue pas.
+- **Formulaires** : un formulaire POST n'est jamais envoyé (aucune requête
+  POST). Chromium journalise « Blocked form submission … the form's frame is
+  sandboxed and the 'allow-forms' permission is not set ». Firefox ne remonte
+  aucun message par BiDi.
+- **Requête mutante** : un `fetch` POST avec `HX-Request` reçoit 405 du proxy
+  (`Allow: GET, HEAD`).
+- **Stop** : l'iframe disparaît, la CSP revient à la politique Forge et le
+  port du proxy refuse les connexions.
+
+Constaté en Chromium seul :
+- redirections 302 relatives et absolues vers le runner, réécrites et suivies
+  sur l'origine du proxy, sans aucune requête vers le port du runner ;
+- cookie posé puis renvoyé ;
+- 404 et 500 de la cible affichées telles quelles ;
+- défilement d'une page longue ;
+- cycles Start/Stop répétés (nouveau port de proxy à chaque fois) ;
+- changement de Design sans redémarrage, et Design sans route ;
+- changement de projet, projet invalide, fermeture de projet, projet en
+  échec ;
+- arrêt de Forge Design.
+
+**Écart corrigé** : SIGTERM et SIGHUP (arrêt par `kill`, `systemd`, terminal
+fermé) tuaient Forge Design sans exécuter le `finally` de `run_server`.
+L'application cible, lancée dans sa propre session, restait orpheline
+(PPID 1). Depuis FD-REALPREVIEW-005, `run_server` traite SIGTERM et SIGHUP
+comme Ctrl+C, dans le thread principal et seulement pendant le service. Les
+signaux suivants sont ignorés pendant la fermeture, puis les gestionnaires
+d'origine sont restaurés.
 
 ## Définition
 

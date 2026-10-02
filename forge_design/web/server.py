@@ -1,6 +1,9 @@
 """Application Forge locale et inspection explicite via le Tool."""
 
-from collections.abc import Callable, Iterable
+import signal
+import threading
+from collections.abc import Callable, Generator, Iterable
+from contextlib import contextmanager
 from importlib.resources import files
 from typing import Any
 from wsgiref.simple_server import WSGIServer, make_server
@@ -316,17 +319,52 @@ def create_server(
     return server
 
 
+_STOP_SIGNALS = tuple(
+    getattr(signal, name) for name in ("SIGTERM", "SIGHUP") if hasattr(signal, name)
+)
+
+
+@contextmanager
+def _stop_signals_as_interrupt() -> Generator[None, None, None]:
+    """SIGTERM et SIGHUP arrêtent le service comme Ctrl+C (thread principal seul).
+
+    Sans cela, ces signaux tuent Forge Design sans exécuter le finally : la
+    preview réelle, lancée dans sa propre session, survivrait orpheline.
+    Après le premier signal, les suivants sont ignorés pendant la fermeture ;
+    les gestionnaires d'origine sont restaurés en sortie.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    previous: dict[int, Any] = {}
+
+    def interrupt(signum: int, frame: object) -> None:
+        for number in previous:
+            signal.signal(number, signal.SIG_IGN)
+        raise KeyboardInterrupt
+
+    for number in _STOP_SIGNALS:
+        previous[number] = signal.signal(number, interrupt)
+    try:
+        yield
+    finally:
+        for number, handler in previous.items():
+            signal.signal(number, handler)
+
+
 def run_server(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
     *,
     on_ready: Callable[[], None] | None = None,
 ) -> None:
-    """Servir Forge jusqu'à Ctrl+C, puis fermer preview réelle et écoute.
+    """Servir Forge jusqu'à Ctrl+C, SIGTERM ou SIGHUP, puis fermer preview et écoute.
 
-    La preview est fermée dans un finally : Ctrl+C, exception ou fin normale.
+    La preview est fermée dans un finally : signal d'arrêt, exception ou fin
+    normale.
     """
-    with create_server(host, port) as server:
+    # Signaux à l'extérieur : un second signal reste ignoré pendant la fermeture.
+    with _stop_signals_as_interrupt(), create_server(host, port) as server:
         try:
             if on_ready is not None:
                 on_ready()
