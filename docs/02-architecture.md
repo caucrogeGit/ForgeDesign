@@ -2040,3 +2040,25 @@ Les erreurs ne sont pas converties en succès ; short write/fsync échoué peuve
 laisser des octets présents, sans rollback implicite. Aucun journal de diff,
 décision d'autorisation, lecteur d'historique, Web ou logique anti-écrasement.
 La phase SAFEWRITE ajoutera le contrôle réel des écritures et conflits.
+
+### Preview réelle — FD-REALPREVIEW-001
+
+```text
+Forge Design ──contrôle explicite──▶ RealPreviewController (composition)
+                                         │ processus enfant, shell=False
+                                         ▼
+          <projet>/.venv/bin/python app.py --env dev  (127.0.0.1:<port éphémère>)
+                                         ▲
+iframe éditeur ──▶ proxy GET/HEAD Forge Design (origine loopback dédiée, Host strict)
+```
+
+Troisième niveau, distinct de la preview statique et du template généré :
+le projet cible réellement exécuté rend une route. Il n'est jamais importé
+dans Forge Design. Environnement en liste blanche, aucun `.env` lu, pas de
+reload, cinq états (`stopped`, `starting`, `running`, `failed`, `stopping`),
+sonde `/health`, arrêt `SIGTERM` puis `SIGKILL` au groupe de processus, logs
+en mémoire bornée, aucun état disque. Seul le template présent sur disque est
+rendu, par une route `GET` publique, statique et unique issue de Route
+Explorer. Un processus séparé n'est pas une sandbox OS. Aucun code encore :
+futur paquet `forge_design/real_preview/`, runner seul en FD-REALPREVIEW-002.
+Contrat normatif : [preview réelle](preview/real-preview-contract.md).

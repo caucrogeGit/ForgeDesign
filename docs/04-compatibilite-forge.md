@@ -198,6 +198,26 @@ diagnostic
 
 Un dossier optionnel absent produit au besoin un avertissement, pas nécessairement un refus.
 
+### Lancement d'un projet — constats FD-REALPREVIEW-001
+
+Vérifiés statiquement dans `forge-mvc==1.0.0rc9` pour la future preview réelle
+(voir le [contrat](preview/real-preview-contract.md)), sans lancer de projet :
+
+- `forge run` démarre un reloader par défaut ; `--no-reload` exécute
+  `scripts/dev-server.sh` s'il existe, sinon `python app.py` ; aucune option
+  d'hôte ni de port ;
+- `python app.py --env dev` sert l'application avec `ThreadingHTTPServer`
+  (threads, aucun processus enfant) ; aucun handler `SIGTERM` ;
+- hôte, port et TLS viennent de `APP_HOST` (défaut `127.0.0.1`), `APP_PORT`
+  (défaut `8000`) et `APP_SSL_ENABLED` (défaut vrai hors prod) ; `config.py`
+  charge `env/example` puis `env/<APP_ENV>` avec écrasement des variables
+  reçues ;
+- port occupé : message puis sortie `1`, sans autre essai ;
+- `GET /health` → `200 {"status": "ok"}`, garanti par le contrat de
+  stabilité Forge sur les deux serveurs ;
+- en-têtes par défaut `X-Frame-Options: DENY` et `frame-ancestors 'none'` ;
+  aucun contrôle de l'en-tête `Host`.
+
 ## 8. Évolution
 
 Lorsqu'une évolution Forge casse une hypothèse Forge Design :

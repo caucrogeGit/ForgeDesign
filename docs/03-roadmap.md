@@ -260,7 +260,7 @@ Après stabilisation du socle :
 - anti-écrasement ;
 - éditeur structurel ;
 - HTMX/Alpine contrôlés ;
-- preview réelle.
+- preview réelle : contrat de sécurité (FD-REALPREVIEW-001) → runner → intégration Web.
 
 `Forge-Design-old` peut servir de référence technique, jamais de source à recopier massivement.
 
