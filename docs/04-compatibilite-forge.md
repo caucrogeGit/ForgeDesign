@@ -218,6 +218,25 @@ Vérifiés statiquement dans `forge-mvc==1.0.0rc9` pour la future preview réell
 - en-têtes par défaut `X-Frame-Options: DENY` et `frame-ancestors 'none'` ;
   aucun contrôle de l'en-tête `Host`.
 
+Complément FD-REALPREVIEW-001A (même version, dépôt Forge au commit
+`73a956e587e5f169c028415e0e540c149cbaff56`) :
+
+- `config.py` lit `APP_HOST`, `APP_PORT` et `APP_SSL_ENABLED` après
+  `load_dotenv(env/<APP_ENV>, override=True)` : une valeur fournie par le
+  processus parent ne peut pas être garantie pour `python app.py` ;
+- ces trois valeurs ne sont consommées que par le bloc `__main__` de `app.py` ;
+- `import app` construit `application` sans serveur (nom public et absence
+  d'effet de bord testés par Forge) ;
+- chemin WSGI documenté : `create_wsgi_app(application)` (`core.app.wsgi`),
+  servi par un serveur externe qui choisit son bind ; `/static/` non servi.
+
+Mécanisme retenu pour la preview réelle : bootstrap enfant de Forge Design,
+`import app` puis `create_wsgi_app(app.application)`, bind par le bootstrap sur
+`127.0.0.1:<port>`. `create_wsgi_app` est documenté et testé par Forge mais
+absent des imports publics du contrat de stabilité : le bootstrap vérifie la
+version `forge-mvc` du projet (`1.0.0rc9`) et la présence du symbole avant
+tout bind.
+
 ## 8. Évolution
 
 Lorsqu'une évolution Forge casse une hypothèse Forge Design :

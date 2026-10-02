@@ -2047,7 +2047,8 @@ La phase SAFEWRITE ajoutera le contrôle réel des écritures et conflits.
 Forge Design ──contrôle explicite──▶ RealPreviewController (composition)
                                          │ processus enfant, shell=False
                                          ▼
-          <projet>/.venv/bin/python app.py --env dev  (127.0.0.1:<port éphémère>)
+   <projet>/.venv/bin/python -I -u child_bootstrap.py --port <port éphémère>
+       import app → create_wsgi_app(application) → bind 127.0.0.1:<port>
                                          ▲
 iframe éditeur ──▶ proxy GET/HEAD Forge Design (origine loopback dédiée, Host strict)
 ```
@@ -2055,8 +2056,11 @@ iframe éditeur ──▶ proxy GET/HEAD Forge Design (origine loopback dédiée
 Troisième niveau, distinct de la preview statique et du template généré :
 le projet cible réellement exécuté rend une route. Il n'est jamais importé
 dans Forge Design. Environnement en liste blanche, aucun `.env` lu, pas de
-reload, cinq états (`stopped`, `starting`, `running`, `failed`, `stopping`),
-sonde `/health`, arrêt `SIGTERM` puis `SIGKILL` au groupe de processus, logs
+reload. Le bootstrap enfant de Forge Design importe `app.py` comme module et
+lie lui-même le serveur WSGI à `127.0.0.1:<port>` après toute configuration
+projet : `env/dev` ne peut plus changer l'adresse (garantie pré-bind,
+FD-REALPREVIEW-001A) ; la sonde `/health` ne sert qu'à la readiness. Cinq
+états (`stopped`, `starting`, `running`, `failed`, `stopping`), arrêt `SIGTERM` puis `SIGKILL` au groupe de processus, logs
 en mémoire bornée, aucun état disque. Seul le template présent sur disque est
 rendu, par une route `GET` publique, statique et unique issue de Route
 Explorer. Un processus séparé n'est pas une sandbox OS. Aucun code encore :

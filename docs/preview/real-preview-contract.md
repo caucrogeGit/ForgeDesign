@@ -1,11 +1,14 @@
 # Preview réelle — contrat
 
-Contrat normatif de FD-REALPREVIEW-001. Il fixe les décisions dont dépendent
-FD-REALPREVIEW-002 (runner local) et les tickets d'intégration Web suivants.
-Aucun code n'existe encore : ce document décrit ce qui sera implémenté.
+Contrat normatif de FD-REALPREVIEW-001, corrigé par FD-REALPREVIEW-001A
+(confinement réseau garanti avant le bind). Il fixe les décisions dont
+dépendent FD-REALPREVIEW-002 (runner local) et les tickets d'intégration Web
+suivants. Aucun code n'existe encore : ce document décrit ce qui sera
+implémenté.
 
 Les faits Forge cités ont été vérifiés statiquement dans `forge-mvc==1.0.0rc9`
 (version épinglée par Forge Design), le paquet installé et le dépôt Forge local
+au commit `73a956e587e5f169c028415e0e540c149cbaff56`
 (`v1.0.0-rc.9-7-g73a956e5`, même `version = "1.0.0rc9"`). Aucune application
 Forge n'a été lancée pour les établir.
 
@@ -47,23 +50,33 @@ RealPreviewController (détenu par la composition)
      │
      │ processus enfant, shell=False, nouveau groupe de processus
      ▼
-Projet Forge cible : <interpréteur du projet> app.py --env dev
-     │
-     └── écoute 127.0.0.1:<port alloué>
+<projet>/.venv/bin/python -I -u <child_bootstrap.py de Forge Design> --port <port>
+     │  1. garde d'audit socket.bind (loopback seulement)
+     │  2. import app  →  config.py, env/example, env/dev, build_application()
+     │  3. create_wsgi_app(app.application)
+     ▼
+serveur WSGI du bootstrap, lié à 127.0.0.1:<port>   ← bind après toute configuration projet,
+                                                      valeurs jamais lues dans le projet
 ```
 
-Ce qui peut être exécuté : uniquement le point d'entrée `app.py` du projet
-courant, avec l'interpréteur du projet (voir « Commande Forge »). Rien
-d'autre : ni commande fournie par le navigateur, ni script du projet, ni
-`forge` CLI.
+Ce qui peut être exécuté : uniquement le bootstrap enfant fourni par Forge
+Design, avec l'interpréteur du projet, qui importe `app.py` comme module
+(voir « Commande Forge »). Rien d'autre : ni commande fournie par le
+navigateur, ni script du projet, ni `forge` CLI, ni `python app.py`.
 
 ## Processus séparé
 
 Décision : **le projet cible n'est jamais importé dans le processus Python de
 Forge Design.** Sont interdits comme architecture, dans tout module de Forge
-Design : `import mvc`, `import config`, `import bootstrap`, `from app import …`,
-`importlib` sur un module du projet, ajout de la racine du projet à
-`sys.path`, `runpy`, `exec` de sources du projet.
+Design exécuté par Forge Design : `import mvc`, `import config`,
+`import bootstrap`, `from app import …`, `importlib` sur un module du projet,
+ajout de la racine du projet à `sys.path`, `runpy`, `exec` de sources du
+projet.
+
+Le projet doit bien être exécuté quelque part : il l'est **dans le processus
+enfant uniquement**, où le bootstrap l'importe. Le bootstrap est un script
+autonome (bibliothèque standard seulement) qui n'importe jamais
+`forge_design` et n'est jamais importé par Forge Design.
 
 Raison : le code cible peut modifier `sys.path` ou `os.environ`, ouvrir une
 base, lancer des threads, installer des handlers de signaux ou des hooks
@@ -85,50 +98,135 @@ et l'exécution de scripts du projet (`scripts/dev-server.sh`).
   `bash scripts/dev-server.sh` si ce script existe dans le projet (POSIX),
   sinon `[sys.executable, "app.py"]` ; `--env prod` est refusé. `forge run`
   n'a **aucune option d'hôte ni de port**.
-- `app.py` (squelette) : sous `__main__`, accepte `--env` (`dev` par défaut)
-  et positionne `APP_ENV` ; construit l'application WSGI, puis sert avec
-  `TLSThreadingHTTPServer((APP_HOST, APP_PORT), RequestHandler)`
-  (`ThreadingHTTPServer` : un thread par requête, aucun processus enfant) ;
-  `serve_forever()` ; sur `KeyboardInterrupt`, `shutdown()` puis
-  `server_close()`. Aucun handler `SIGTERM` n'est installé : `SIGTERM`
-  termine le processus par l'action par défaut.
-- Bind refusé `EADDRINUSE` : message `format_port_in_use_message` puis
-  `exit(1)`, sans essai d'un autre port.
-- `config.py` (squelette) : `load_dotenv("env/example")` puis
-  `load_dotenv(f"env/{APP_ENV}", override=True)`, donc **les fichiers `env/`
-  du projet peuvent écraser les variables reçues du processus parent** ;
-  `APP_HOST` (défaut `127.0.0.1`), `APP_PORT` (défaut `8000`),
-  `APP_SSL_ENABLED` (défaut vrai hors prod), certificats `cert.pem`/`key.pem`.
+- `app.py` (squelette) n'accepte que `--env` avec `choices=["dev", "prod"]`,
+  sous `if __name__ == "__main__":` ; aucune option d'hôte, de port ni de TLS.
+- `config.py` (squelette) lit `APP_ENV` (`read_app_env`), puis
+  `load_dotenv("env/example")` et `load_dotenv(f"env/{APP_ENV}",
+  override=True)`, puis seulement `APP_HOST`, `APP_PORT` et `APP_SSL_ENABLED`
+  par `os.getenv`, une fois, à l'import. **`env/dev` écrase donc toute valeur
+  reçue du processus parent.**
+- `APP_HOST`, `APP_PORT` et `APP_SSL_ENABLED` ne sont consommés que par le bloc
+  `if __name__ == "__main__":` de `app.py` (garde prod, bind
+  `TLSThreadingHTTPServer((APP_HOST, APP_PORT), RequestHandler)`, contexte
+  TLS, messages) ; aucun module de `core/` ne les lit (recherche exhaustive).
+- Importé comme module (`import app`), `app.py` exécute `config.py`,
+  `build_application()` (routes, `bootstrap.py`) et définit
+  `application`, **sans créer de serveur**. Forge le revendique et le teste :
+  nom public `application` (« Ne pas le renommer »), aucun effet de bord à
+  l'import (`tests/test_skeleton_public_application_001.py`).
+- Chemin WSGI documenté (`docs/deployment/wsgi-deployment.md`) :
+  `from app import application` puis
+  `core.app.wsgi.create_wsgi_app(application)`, servi par un serveur WSGI
+  externe **qui choisit lui-même son bind** (`gunicorn wsgi:application
+  --bind 127.0.0.1:8000`). L'adaptateur sert `/health` et `/media/`, pose les
+  en-têtes de sécurité, mais ne sert pas `/static/` (rôle du reverse proxy).
+  HSTS n'est posé que si `wsgi.url_scheme == "https"`.
 - `GET /health` → `200`, `application/json`, corps exact
-  `{"status": "ok"}` (`core/http/health.py`), servi par le serveur de
-  développement et par le chemin WSGI, et inscrit au contrat de stabilité
-  Forge comme surface publique garantie. La sonde ne touche ni base ni
+  `{"status": "ok"}` (`core/http/health.py`), servi par les deux chemins et
+  inscrit au contrat de stabilité Forge. La sonde ne touche ni base ni
   session.
 - Forge applique par défaut `X-Frame-Options: DENY` et une CSP contenant
-  `frame-ancestors 'none'` (`core/security/headers.py`, `core/security/csp.py`).
-- Forge ne contrôle pas l'en-tête `Host` (aucune liste d'hôtes autorisés).
+  `frame-ancestors 'none'` (`core/security/headers.py`, `core/security/csp.py`),
+  et ne contrôle pas l'en-tête `Host`.
 - Les routes non `public` passent par les middlewares (authentification)
   avant le handler (`core/app/application.py`).
 - La documentation Forge prescrit un environnement `python -m venv .venv` à la
   racine du projet.
 
+### Ordre réel de `python app.py --env dev`
+
+```text
+1. app.py __main__ : --env → os.environ.setdefault("APP_ENV")
+2. from config import … : read_app_env → load_dotenv(env/example)
+   → load_dotenv(env/dev, override=True) → os.getenv(APP_HOST, APP_PORT, APP_SSL_ENABLED)
+3. application = build_application()     (config, routes, bootstrap.py)
+4. __main__ : garde prod → bind (APP_HOST, APP_PORT) → TLS si APP_SSL_ENABLED → serve_forever
+```
+
+Toute variable posée par Forge Design est relue à l'étape 2, **après**
+`env/dev`, et utilisée au bind de l'étape 4. Forge n'offre aucun moyen
+supporté de la réimposer entre 2 et 4. Lancer `app.py` en script ne permet
+donc pas de garantir le confinement : cette commande, retenue par
+FD-REALPREVIEW-001, **n'est plus acceptable**.
+
 ### Commande retenue
 
 ```python
-[interpreter, "app.py", "--env", "dev"]   # cwd = racine canonique, shell=False
+[f"{root}/.venv/bin/python", "-I", "-u", CHILD_BOOTSTRAP, "--port", str(port)]
+# cwd = racine canonique, shell=False, start_new_session=True
 ```
 
-`forge run` n'est **pas** retenu : reloader par défaut (processus
-supplémentaires, watcher, cycle de vie à deux niveaux), et `--no-reload`
-délègue à un script shell du projet. Appeler `app.py` directement reproduit
-exactement la branche sans script de `forge run --no-reload`, sans reloader ni
-shell.
+`CHILD_BOOTSTRAP` est le chemin absolu du fichier
+`forge_design/real_preview/child_bootstrap.py` installé avec Forge Design,
+résolu par Forge Design. `-I` (mode isolé) ignore les variables `PYTHON*`,
+le site utilisateur et n'ajoute ni le cwd ni le dossier du script à
+`sys.path` ; `-u` remplace `PYTHONUNBUFFERED`, ignoré sous `-I`.
 
-L'hôte, le port et TLS sont transmis par variables d'environnement
-(`APP_HOST`, `APP_PORT`, `APP_SSL_ENABLED`), seul mécanisme offert par Forge.
-Comme `env/dev` peut les écraser, le runner ne présume pas qu'ils sont
-appliqués : la sonde de démarrage vérifie l'écoute effective (voir
-« Timeouts »).
+`forge run` n'est pas retenu (reloader, script shell), ni `python app.py`
+(bind dérivé de `env/dev`).
+
+### Bootstrap enfant
+
+Script autonome, bibliothèque standard seulement, exécuté uniquement dans
+l'enfant. Étapes normatives, dans cet ordre :
+
+1. Arguments : exactement `--port <entier 1024–65535>`, sinon sortie `2`.
+   L'hôte n'est **pas** un argument : c'est la constante `"127.0.0.1"` du
+   bootstrap.
+2. `sys.addaudithook` installe la garde de bind (ci-dessous), avant tout code
+   du projet.
+3. Racine = cwd ; insertion explicite en tête de `sys.path`.
+4. Compatibilité : `importlib.metadata.version("forge-mvc")` doit appartenir à
+   l'ensemble supporté (`1.0.0rc9`), et
+   `core.app.wsgi.create_wsgi_app` doit être importable et appelable ; sinon
+   sortie `3`, sans bind.
+5. `import app` : exécute `config.py` et `env/dev`, construit l'application.
+   Exception → trace sur stderr, sortie `5`, sans bind. `app.application`
+   doit exposer `dispatch` appelable, sinon sortie `3`.
+6. `create_wsgi_app(app.application)`, enveloppé d'une garde `Host` : toute
+   requête dont `Host` n'est pas exactement `127.0.0.1:<port>` reçoit `400`
+   sans atteindre l'application.
+7. Bind : serveur WSGI de la bibliothèque standard
+   (`wsgiref.simple_server.make_server`, classe avec `ThreadingMixIn`,
+   `allow_reuse_address = False`, `allow_reuse_port = False`) sur
+   `("127.0.0.1", port)`. `EADDRINUSE` → sortie `4`.
+8. `serve_forever()` ; aucun handler de signal installé par le bootstrap.
+
+Le bootstrap ne reconstruit ni `Application`, ni `Router`, ni les en-têtes, et
+ne patche aucun module Forge ou métier : il n'utilise que le nom public
+`application` et `create_wsgi_app`, exactement comme le `wsgi.py` documenté
+par Forge. Le serveur WSGI externe que Forge laisse au déployeur est ici celui
+du bootstrap.
+
+Codes de sortie : `2` usage, `3` Forge incompatible, `4` port occupé, `5`
+échec d'import du projet ; toute autre sortie est un arrêt inattendu.
+
+#### Garde d'audit `socket.bind`
+
+Hook d'audit (PEP 578, API standard, non retirable une fois installé) sur
+l'événement `socket.bind`, levé **avant** l'appel système : pour une famille
+`AF_INET` ou `AF_INET6`, toute adresse autre qu'une IP littérale de bouclage
+(`127.0.0.0/8`, `::1`) lève une exception et le bind n'a pas lieu. Les sockets
+Unix ne sont pas concernés. Elle est active pendant toute la vie de l'enfant,
+donc aussi pendant l'import de `app.py` et de `bootstrap.py`.
+
+Elle couvre un `app.py` personnalisé qui ouvrirait un serveur à l'import avec
+l'hôte de `env/dev` : le bind échoue, l'import échoue, sortie `5`. Elle ne
+couvre pas le code natif, `ctypes`, ni les sous-processus lancés par le
+projet (nouvel interpréteur sans hook) : ce n'est pas une sandbox.
+
+#### Dépendance à une API Forge hors contrat de stabilité
+
+`create_wsgi_app` (`core.app.wsgi`) n'est pas listé parmi les imports publics
+du contrat de stabilité Forge (qui couvre `core.http`, `core.auth`,
+`core.security`). Il est retenu parce qu'il est **la** voie documentée par
+Forge pour servir l'application armée hors `python app.py`, testée par Forge
+(`tests/test_wsgi_entrypoint_001.py`) et utilisée par le `wsgi.py` engendré
+par `forge deploy:init`. Risque : changement de signature dans une version
+mineure. Détection : étape 4 (version Forge du projet dans l'ensemble
+supporté, symbole présent et appelable) avant tout bind, et état `failed` avec
+la raison « Forge incompatible » ; l'ensemble supporté évolue avec la matrice
+de compatibilité de Forge Design.
 
 ### Interpréteur
 
@@ -159,11 +257,11 @@ squelette Forge) :
 | Variable | Source |
 |---|---|
 | `PATH`, `HOME`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TZ`, `TMPDIR` | Copiées de Forge Design si présentes |
-| `APP_ENV=dev` | Fixée |
-| `APP_HOST=127.0.0.1` | Fixée |
-| `APP_PORT=<port alloué>` | Fixée |
-| `APP_SSL_ENABLED=false` | Fixée (sonde et iframe en HTTP loopback) |
-| `PYTHONUNBUFFERED=1` | Fixée (logs lisibles sans attendre un flush) |
+| `APP_ENV=dev` | Fixée (lue par `config.py` avant `env/`) |
+
+`APP_HOST`, `APP_PORT` et `APP_SSL_ENABLED` ne sont **pas** transmis : ils ne
+sont pas un mécanisme de confinement (`env/dev` les écrase) et ne sont lus que
+par le bloc `__main__` de `app.py`, que le bootstrap n'exécute pas.
 
 **Jamais transmises** : toute autre variable de Forge Design, en particulier
 jetons et identifiants (`*_TOKEN`, `*_KEY`, `*_SECRET`, `*_PASSWORD`,
@@ -180,9 +278,10 @@ transmis par Forge Design : le projet les obtient de ses propres fichiers
 
 Forge Design ne lit, ne parse, ne copie, ne modifie ni n'affiche jamais un
 `.env` ou un fichier `env/*` pour construire la preview (la politique
-`source_parts` refuse déjà le segment `env`). Le projet, lui, charge
-`env/example` puis `env/dev` à son démarrage : c'est un comportement du
-projet cible, documenté ici comme risque.
+`source_parts` refuse déjà le segment `env`), et n'en crée aucun
+(`env/preview`, `env/forge-design`, `.env.preview`…). Le projet, lui, charge
+`env/example` puis `env/dev` dans l'enfant : c'est un comportement du projet
+cible, documenté ici comme risque, sans effet sur l'adresse d'écoute.
 
 Conséquence explicite : **une preview réelle a accès aux secrets que
 l'application lit normalement** (base, API, SMTP…). Elle n'est pas plus
@@ -190,40 +289,69 @@ confinée qu'un `python app.py` lancé à la main.
 
 ## Réseau
 
-- Écoute exclusive sur `127.0.0.1`. Interdits : `0.0.0.0`, `::`, adresse LAN,
-  adresse Tailscale ou VPN.
+### Garantie pré-bind (PRE-BIND guarantee)
+
+> Forge Design garantit que le serveur HTTP utilisé comme endpoint de preview
+> est configuré sur `127.0.0.1:<port choisi par Forge Design>`, en HTTP sans
+> TLS, avant son bind.
+
+Démonstration, sur le code de Forge 1.0.0rc9 :
+
+1. le seul serveur dont Forge Design fait son endpoint est créé par le
+   bootstrap (étape 7), jamais par `app.py` ;
+2. son hôte est une constante du bootstrap et son port un argument fourni par
+   Forge Design ; aucun des deux n'est lu dans `os.environ`, `config.py` ni
+   `env/*`, donc `APP_HOST=0.0.0.0` ou `APP_PORT=8000` dans `env/dev` n'ont
+   aucun effet sur ce bind ;
+3. le bind a lieu **après** l'import de `app.py` (étape 5), donc après toute
+   configuration projet (`env/example`, `env/dev`, `config.py`,
+   `bootstrap.py`) ; rien du projet ne s'exécute plus entre la construction de
+   l'adresse et le bind ;
+4. TLS : le serveur du bootstrap ne fait pas de TLS, et `APP_SSL_ENABLED`
+   n'est consommé que par le bloc `__main__` de `app.py`, non exécuté ;
+   `wsgi.url_scheme` vaut `http`, donc pas de HSTS ; `APP_SSL_ENABLED=true`
+   dans `env/dev` reste sans effet ;
+5. la garde d'audit refuse en plus, avant l'appel système, tout bind
+   `AF_INET`/`AF_INET6` non loopback dans l'enfant, y compris pendant
+   l'import du projet.
+
+La garantie porte sur l'endpoint HTTP de preview. Elle ne signifie pas que le
+projet ne peut ouvrir aucun port : voir « Threat model ».
+
+### Vérification post-bind (POST-BIND verification)
+
+La sonde `/health` (voir « Timeouts ») vérifie que le serveur écoute, sur le
+port attendu, et répond. C'est une **validation de readiness**, pas une
+barrière de confinement : le confinement est acquis avant le bind.
+
+### Port
+
 - Port dédié, distinct de celui de Forge Design, **alloué dynamiquement** :
   le runner lie un socket à `("127.0.0.1", 0)`, lit le port attribué par le
-  système, ferme le socket et transmet le port. Aucun port global figé.
+  système, ferme le socket et transmet le port au bootstrap. Aucun port global
+  figé.
 - Course connue : un autre processus peut prendre le port entre la fermeture
-  et le bind de l'application. Elle se manifeste par la sortie `EADDRINUSE`
-  de Forge (code 1) ou par une sonde en échec.
+  et le bind du bootstrap. Le bootstrap n'active ni `SO_REUSEADDR` ni
+  `SO_REUSEPORT` : il ne partage jamais un port déjà écouté et sort avec le
+  code `4`.
 - Collision : état `failed` avec la raison « port occupé ». **Aucun nouvel
   essai silencieux** (ni port+1, ni nouveau port automatique) : l'utilisateur
   relance explicitement, ce qui alloue un nouveau port.
-- Écoute effective : si `env/dev` impose un autre hôte, port ou TLS, la sonde
-  sur `http://127.0.0.1:<port>/health` échoue et la preview passe en `failed`
-  avec la raison « l'application n'écoute pas à l'adresse attendue
-  (configuration env/ du projet) ». Un bind sur `0.0.0.0` imposé par `env/dev`
-  et répondant aussi sur `127.0.0.1` n'est pas détectable par la sonde seule :
-  risque résiduel documenté (voir « Threat model »).
 
 ### Host, Origin et DNS rebinding
 
-Le serveur cible ne bénéficie pas du contrôle `Host` de Forge Design
-(FD-WEB-003), et Forge n'en propose pas. Pendant qu'une preview tourne, une
-page web malveillante ouverte dans le navigateur peut tenter un DNS rebinding
-vers `127.0.0.1:<port>` et lire les réponses de l'application cible.
+Forge ne contrôle pas l'en-tête `Host`. Le bootstrap ajoute ce contrôle à
+l'endpoint : seules les requêtes avec `Host: 127.0.0.1:<port>` atteignent
+l'application, ce qui neutralise un DNS rebinding visant directement le port
+cible (le navigateur envoie alors le nom de domaine de l'attaquant).
 
-Limitation retenue :
-
-- le navigateur n'accède pas directement au port cible : l'iframe passe par
-  le proxy de Forge Design, qui applique un contrôle `Host` strict (voir
-  « Iframe / proxy ») ;
-- le port cible reste néanmoins joignable par tout processus local et par un
-  rebinding visant ce port précis ; ce risque est réduit (port éphémère
-  imprévisible, preview arrêtée par défaut et sur action explicite, arrêt à
-  la fermeture de Forge Design), **pas supprimé** ;
+- Le navigateur n'accède pas directement au port cible : l'iframe passe par
+  le proxy de Forge Design, qui applique le contrôle `Host` strict de Forge
+  Design et envoie `Host: 127.0.0.1:<port>` (voir « Iframe / proxy ») ;
+- le port cible reste joignable par tout processus local, qui peut envoyer
+  l'en-tête attendu ; risque réduit (port éphémère, preview arrêtée par défaut
+  et sur action explicite, arrêt à la fermeture de Forge Design), **pas
+  supprimé** ;
 - les requêtes mutantes vers l'application suivent sa propre politique
   (CSRF, Origin) : Forge Design ne la contourne pas et ne l'affaiblit pas.
 
@@ -267,9 +395,9 @@ stopped ──start()──▶ starting ──sonde OK──▶ running
 - Stratégie POSIX : `SIGTERM` au groupe de processus → attente bornée de
   **5 s** → `SIGKILL` au groupe si nécessaire → attente bornée de **2 s** ;
   état final `stopped`, ou `failed` si le processus n'a pas pu être récolté.
-  Forge 1.0.0rc9 n'installant pas de handler `SIGTERM`, l'arrêt normal est
-  immédiat, sans `shutdown()` gracieux.
-- Groupe de processus : le serveur Forge ne crée pas d'enfant (threads
+  Le bootstrap n'installant pas de handler `SIGTERM`, l'arrêt normal est
+  immédiat, sans `shutdown()` gracieux (sauf handler installé par le projet).
+- Groupe de processus : le serveur du bootstrap ne crée pas d'enfant (threads
   seulement), mais le code du projet le peut (workers, sous-processus).
   Décision : l'enfant est lancé avec `start_new_session=True` et les signaux
   visent le **groupe** (`os.killpg`), pas le PID seul. Un descendant qui
@@ -367,8 +495,8 @@ réel, sans contournement ni repli sur la preview statique.
 - **X-Frame-Options / CSP** : Forge envoie `X-Frame-Options: DENY` et
   `frame-ancestors 'none'` par défaut ; la page ne s'affiche pas dans une
   iframe sans modifier le projet. Bloquant.
-- **Host / DNS rebinding** : le navigateur parle directement au serveur cible,
-  qui n'a pas de contrôle `Host`.
+- **Host / DNS rebinding** : le navigateur parle directement au serveur cible ;
+  seule la garde `Host` du bootstrap protège.
 - **Same-origin** : origine distincte de Forge Design (port différent), ce qui
   est bon pour l'isolation.
 - **Cookies / sessions** : cookies `127.0.0.1` partagés entre ports (les
@@ -392,8 +520,12 @@ réel, sans contournement ni repli sur la preview statique.
   aujourd'hui ; règle conservée). Même réserve de partage par hôte que pour A,
   réduite par le fait que Forge Design ne dépend d'aucun cookie.
 - **HTMX, navigation, assets** : chemins transmis sans réécriture (le proxy
-  est transparent sur son origine dédiée), donc `/static/…` et les URL
-  absolues de la page fonctionnent.
+  est transparent sur son origine dédiée), donc les URL absolues de la page
+  fonctionnent. Comme le reverse proxy du déploiement WSGI documenté par
+  Forge, le proxy sert lui-même `/static/…` depuis `<racine>/static`, en
+  lecture seule et avec les contrôles filesystem de Forge Design (pas de
+  lien, pas de segment caché, pas de clé) ; l'adaptateur WSGI ne les sert
+  pas.
 - **Méthodes** : `GET` et `HEAD` seulement dans la première version ; toute
   autre méthode reçoit `405` du proxy, sans atteindre la cible.
 
@@ -403,8 +535,8 @@ réel, sans contournement ni repli sur la preview statique.
 minimal, sur une origine loopback dédiée, `GET`/`HEAD` uniquement, avec
 contrôle `Host` strict, réponses et délais bornés, et seule réécriture des
 en-têtes d'encadrement. A est écarté parce qu'il exige de modifier les
-en-têtes de sécurité du projet et expose directement un serveur sans contrôle
-`Host`.
+en-têtes de sécurité du projet, et ne permet ni de filtrer les méthodes ni de
+servir les statiques que l'adaptateur WSGI ne sert pas.
 
 Le proxy n'est pas un proxy générique : il ne relaie que vers le port de la
 preview active de l'instance, jamais vers une destination fournie par une
@@ -443,11 +575,14 @@ Design.
 
 - Démarrage : `starting` dure au plus **15 s** ; au-delà, arrêt (stratégie
   d'arrêt) puis `failed` avec « délai de démarrage dépassé ».
-- Sonde : `GET http://127.0.0.1:<port>/health`, garantie par Forge 1.0.0rc9 ;
+- Sonde (vérification post-bind, readiness) : `GET
+  http://127.0.0.1:<port>/health` avec `Host: 127.0.0.1:<port>`, garantie par
+  Forge 1.0.0rc9 et servie par l'adaptateur WSGI ;
   timeout de **1 s** par tentative, toutes les **200 ms** jusqu'au délai de
   démarrage. Prête seulement si statut `200` et corps exact
   `{"status": "ok"}`. Aucune route métier (`/contacts`…) n'est sondée.
-- Une sortie de l'enfant pendant `starting` donne `failed` immédiatement.
+- Une sortie de l'enfant pendant `starting` donne `failed` immédiatement, avec
+  la raison dérivée du code de sortie du bootstrap (`3`, `4`, `5`).
 - Toute requête de contrôle future (sonde, proxy vers la cible) a un délai
   borné : 10 s par requête proxy dans la première intégration.
 
@@ -480,13 +615,21 @@ compte utilisateur.
 | Boucle infinie dans une requête | Iframe sans réponse | Timeout proxy 10 s, `stop()` | Thread cible occupé |
 | Processus enfant survivant | Processus orphelin | Groupe de processus, `killpg`, arrêt à la fermeture | `setsid` volontaire, arrêt brutal de Forge Design |
 | Port exposé | Accès par un autre processus local | Loopback seul, port éphémère, durée limitée | Processus locaux du même hôte |
-| DNS rebinding | Lecture de pages cibles par un site tiers | Proxy avec `Host` strict, port imprévisible | Rebinding visant directement le port cible |
-| Bind non loopback via `env/dev` | Exposition réseau | Variables fixées, sonde | Non détecté si la sonde loopback répond aussi |
+| DNS rebinding | Lecture de pages cibles par un site tiers | `Host` strict sur le proxy et sur l'endpoint du bootstrap, port imprévisible | Processus locaux envoyant le `Host` attendu |
+| `env/dev` impose `APP_HOST=0.0.0.0`, `APP_PORT=8000` ou TLS | Endpoint exposé ou sur un autre port | Garantie pré-bind : adresse de l'endpoint fixée par le bootstrap, jamais lue dans le projet ; `app.py` importé sans son bloc `__main__` | Aucun pour l'endpoint de preview |
+| Code projet ouvrant un serveur à l'import avec l'hôte de `env/dev` | Exposition réseau | Garde d'audit `socket.bind` : bind non loopback refusé avant l'appel système, sortie `5` | Code natif, `ctypes`, sous-processus du projet |
+| Code projet ouvrant d'autres sockets | Ports supplémentaires | Garde d'audit (non loopback refusé dans l'enfant) | Sockets loopback supplémentaires ; contournements natifs ; non empêché par Forge Design |
+| API Forge modifiée | Démarrage impossible ou incorrect | Contrôle de version et de `create_wsgi_app` avant bind, sortie `3` | Changement sémantique non détectable statiquement |
 | Secrets d'environnement | Fuite des secrets de Forge Design | Liste blanche d'environnement | Secrets du projet lus par le projet |
 | Effets base de données | Migrations, écritures | Avertissement, `GET`/`HEAD` seulement | Écritures au démarrage ou en `GET` |
 | Requêtes externes | Appels API, mails | Avertissement | Entier |
 | Logs sensibles | Secrets imprimés | Mémoire bornée, échappés, non persistés | Affichage à la demande |
 | Navigation iframe | Navigation du parent, popups, formulaires | Sandbox minimal, proxy `GET`/`HEAD` | Scripts actifs dans l'origine de preview |
+
+Forge Design garantit le serveur HTTP qu'il démarre comme endpoint de
+preview. Il ne prétend pas empêcher un code projet malveillant d'ouvrir
+explicitement `socket.bind(("0.0.0.0", …))` par un moyen qui échappe au hook
+d'audit, avec les droits de l'utilisateur.
 
 Termes à proscrire dans l'UI et la documentation tant qu'aucune isolation OS
 n'existe : « sandbox sécurisé », « isolé totalement », « sans risque ».
@@ -494,8 +637,12 @@ n'existe : « sandbox sécurisé », « isolé totalement », « sans risque ».
 ## Limites
 
 - POSIX uniquement pour la première version.
-- Projets suivant le squelette Forge (`app.py` sous `__main__`, `config.py`
-  lisant `APP_HOST`/`APP_PORT`/`APP_SSL_ENABLED`, `.venv` à la racine).
+- Projets suivant le squelette Forge : `app.py` exposant `application` et sans
+  serveur hors de `if __name__ == "__main__":`, `.venv` à la racine,
+  `forge-mvc` installé dans ce venv en version supportée.
+- Rendu par le chemin WSGI de Forge, pas par le `RequestHandler` du serveur
+  de développement : pages d'erreur et statiques peuvent différer de
+  `python app.py` (les statiques passent par le proxy).
 - Routes `GET` publiques, statiques et uniques seulement.
 - Pas d'authentification, pas de `POST`, pas de reload.
 - Une seule preview réelle par instance.
@@ -507,15 +654,17 @@ n'existe : « sandbox sécurisé », « isolé totalement », « sans risque ».
 |---|---|
 | Paquet | `forge_design/real_preview/` (pas `web/`, `preview/` ni `forge/`) |
 | Contrats | `RealPreviewState` (énumération des 5 états), `RealPreviewConfig` (racine, interpréteur, délais, borne de logs), `RealPreviewStatus` (état, port, raison, code de sortie, logs), `RealPreviewController` (`start`, `stop`, `status`), `RealPreviewError` |
-| Commande | `[<racine>/.venv/bin/python, "app.py", "--env", "dev"]`, cwd racine canonique, `shell=False`, `start_new_session=True` |
+| Commande | `[<racine>/.venv/bin/python, "-I", "-u", <child_bootstrap.py>, "--port", <port>]`, cwd racine canonique, `shell=False`, `start_new_session=True` ; `python app.py` abandonné (FD-REALPREVIEW-001A) |
+| Bootstrap | `forge_design/real_preview/child_bootstrap.py`, stdlib seule : garde d'audit `socket.bind`, contrôle de compatibilité, `import app`, `create_wsgi_app(app.application)`, garde `Host`, bind `127.0.0.1:<port>` |
+| Confinement | Garantie pré-bind par construction ; sonde `/health` = readiness post-bind |
 | Interpréteur | `.venv/bin/python` du projet, sinon indisponible ; ni `PATH` ni `sys.executable` |
-| Port | Éphémère via bind `127.0.0.1:0` ; collision → `failed`, pas de nouvel essai |
-| Environnement | Liste blanche (`PATH`, `HOME`, locale, `TZ`, `TMPDIR`) + `APP_ENV`, `APP_HOST`, `APP_PORT`, `APP_SSL_ENABLED=false`, `PYTHONUNBUFFERED` |
+| Port | Éphémère via bind `127.0.0.1:0`, transmis en argument ; collision → `failed` (sortie `4`), pas de nouvel essai |
+| Environnement | Liste blanche (`PATH`, `HOME`, locale, `TZ`, `TMPDIR`) + `APP_ENV=dev` ; ni `APP_HOST`, ni `APP_PORT`, ni `APP_SSL_ENABLED` |
 | Sonde | `/health`, 200 + corps exact, 1 s par tentative, démarrage ≤ 15 s |
 | Arrêt | `SIGTERM` au groupe, 5 s, `SIGKILL` au groupe, 2 s |
 | Logs | Tampon mémoire 200 lignes × 2 000 caractères, stdout+stderr fusionnés |
 | Route | Unique, `GET`, statique, `public`, issue de Route Explorer ; sinon indisponible avec raison |
-| Affichage | Proxy transparent sur origine loopback dédiée, `GET`/`HEAD`, `Host` strict ; iframe `allow-scripts allow-same-origin` |
+| Affichage | Proxy transparent sur origine loopback dédiée, `GET`/`HEAD`, `Host` strict, `/static/` servi par le proxy ; iframe `allow-scripts allow-same-origin` |
 | Périmètre de FD-REALPREVIEW-002 | Runner seul : cycle de vie, commande, environnement, port, sonde, arrêt, logs ; ni proxy, ni iframe, ni UI |
 
 ## Questions reportées
@@ -528,5 +677,4 @@ Ces points ne bloquent pas FD-REALPREVIEW-002 :
   paramètres ;
 - routes protégées (connexion manuelle dans l'iframe, donc `POST` contrôlé) ;
 - persistance optionnelle des logs dans le stockage utilisateur XDG ;
-- détection d'un bind non loopback imposé par `env/dev` ;
 - interpréteur configurable par l'utilisateur hors de `.venv`.
