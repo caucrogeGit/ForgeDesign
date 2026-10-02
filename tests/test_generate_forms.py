@@ -490,4 +490,6 @@ def test_preview_unchanged() -> None:
     model = page(form(field(EMAIL), binding="store", props={"hx-target": "#c"}))
     c = make_contract()
     html = render_preview(model, generate_preview_data(c).data).html
-    assert "<input" not in html and "hx-" not in html and "action=" not in html
+    # FD-INTERACT-006 : champ rendu, formulaire toujours sans action ni HTMX.
+    assert '<input data-forge-design-type="field" type="email"' in html
+    assert "hx-" not in html and "action=" not in html and "method=" not in html

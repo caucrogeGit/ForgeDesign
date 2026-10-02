@@ -597,11 +597,13 @@ def test_submit_pure(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.complete
 
 
-def test_submit_preview_still_structural() -> None:
+def test_submit_preview_aligned_but_inert() -> None:
+    # FD-INTERACT-006 : la preview rend le submit, toujours sans action.
     from forge_design.preview import generate_preview_data, render_preview
 
     holder = {"type": "form", "binding": "create_contact", "children": [save()]}
     model = design([{"type": "section", "children": [holder]}])
     c = contract({}, actions=FORM_ACTIONS)
     html = render_preview(model, generate_preview_data(c).data).html
-    assert 'type="submit"' not in html and "Enregistrer" not in html
+    assert 'type="submit">Enregistrer</button>' in html
+    assert "hx-" not in html and "action=" not in html

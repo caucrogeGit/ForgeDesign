@@ -45,7 +45,9 @@ class Parsed(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.tags.append((tag, dict(attrs)))
-        self.stack.append(tag)
+        # Élément vide HTML (input) : jamais de balise fermante.
+        if tag not in {"input"}:
+            self.stack.append(tag)
 
     def handle_endtag(self, tag: str) -> None:
         assert self.stack.pop() == tag
@@ -100,7 +102,7 @@ def test_minimal_stable() -> None:
         ("button", "button"),
         ("table", "table"),
         ("form", "form"),
-        ("field", "div"),
+        # field : <input> depuis FieldDefinition (tests FD-INTERACT-006 dédiés).
         ("alert", "div"),
         ("empty_state", "div"),
     ],
@@ -325,7 +327,9 @@ def test_table_empty_state(case: str) -> None:
 @pytest.mark.parametrize("surplus", [0, 1])
 def test_node_limits(surplus: int) -> None:
     result = render_preview(
-        design([{"type": "field"}] * (MAX_DESIGN_NODES - 1 + surplus)), {}
+        # Feuille neutre : un field sans définition est désormais diagnostiqué.
+        design([{"type": "alert"}] * (MAX_DESIGN_NODES - 1 + surplus)),
+        {},
     )
     assert result.complete is (not surplus)
     assert codes(result) == (["analysis_truncated"] if surplus else [])
@@ -444,3 +448,227 @@ def test_purity_nonmutation_and_frozen(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     with pytest.raises(FrozenInstanceError):
         result.complete = False  # type: ignore[misc]
+
+
+# Formulaires — FD-INTERACT-006.
+
+EMAIL = {
+    "name": "email",
+    "input_type": "email",
+    "label": "Adresse e-mail",
+    "required": True,
+}
+
+
+def in_form(*children: dict[str, Any], **form_extra: Any) -> Any:
+    holder = {"type": "form", "children": list(children), **form_extra}
+    return design([{"type": "section", "children": [holder]}])
+
+
+def field(definition: dict[str, Any] | None = None, **extra: Any) -> dict[str, Any]:
+    node: dict[str, Any] = {"type": "field", **extra}
+    if definition is not None:
+        node["field"] = definition
+    return node
+
+
+def save(label: str = "Enregistrer", **extra: Any) -> dict[str, Any]:
+    return {"type": "button", "submit": {"label": label}, **extra}
+
+
+def test_form_end_criterion() -> None:
+    result = render_preview(in_form(field(EMAIL), save()), {})
+    assert result.complete and result.issues == ()
+    assert result.html == (
+        '<div data-forge-design-type="page" data-forge-design-preview="page">'
+        '<section data-forge-design-type="section">'
+        '<form data-forge-design-type="form">'
+        "<label>Adresse e-mail"
+        '<input data-forge-design-type="field" type="email" name="email" required>'
+        "</label>"
+        '<button data-forge-design-type="button" type="submit">Enregistrer</button>'
+        "</form></section></div>"
+    )
+    Parsed(result.html)
+
+
+def test_form_without_action_attributes() -> None:
+    props = {"class": "space-y-4", "hx-target": "#c", "hx-swap": "none"}
+    model = in_form(field(EMAIL), save(), binding="create_contact", props=props)
+    result = render_preview(model, {})
+    for token in (
+        "action=",
+        "method=",
+        "hx-get=",
+        "hx-post=",
+        "hx-target=",
+        "hx-swap=",
+        "hx-confirm=",
+        "value=",
+        "id=",
+        "for=",
+        "<script",
+    ):
+        assert token not in result.html
+    assert '<form data-forge-design-type="form" class="space-y-4">' in result.html
+    # Pas de diagnostic d'action manquante : la preview n'est pas le générateur.
+    assert "form_missing_action" not in str(result.issues)
+    assert codes(result) == ["unsupported_prop", "unsupported_prop"]
+
+
+def test_field_minimal() -> None:
+    result = render_preview(in_form(field({"name": "name", "input_type": "text"})), {})
+    assert result.complete
+    assert '<input data-forge-design-type="field" type="text" name="name">' in (
+        result.html
+    )
+    assert "<label" not in result.html
+
+
+@pytest.mark.parametrize(
+    "input_type", ["text", "email", "password", "number", "date", "checkbox"]
+)
+def test_field_input_types(input_type: str) -> None:
+    definition = {"name": "x", "input_type": input_type}
+    parsed = Parsed(render_preview(in_form(field(definition)), {}).html)
+    inputs = [attrs for tag, attrs in parsed.tags if tag == "input"]
+    assert inputs == [
+        {"data-forge-design-type": "field", "type": input_type, "name": "x"}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("required", "expected"), [(True, " required>"), (False, '"x">'), (None, '"x">')]
+)
+def test_field_required(required: bool | None, expected: str) -> None:
+    definition: dict[str, Any] = {"name": "x", "input_type": "text"}
+    if required is not None:
+        definition["required"] = required
+    html = render_preview(in_form(field(definition)), {}).html
+    assert html.count(expected) == 1
+
+
+def test_field_without_values_from_fake_data() -> None:
+    definition = {"name": "page_title", "input_type": "text", "label": "Titre"}
+    c = contract({"page_title": {"type": "string"}})
+    html = render_preview(
+        in_form(field(definition)), generate_preview_data(c).data
+    ).html
+    assert "Exemple" not in html and "value=" not in html
+
+
+def test_field_class_on_input_and_unsupported_props() -> None:
+    props = {"class": "w-full", "placeholder": "x", "tag": "span", "id": "f"}
+    result = render_preview(in_form(field(EMAIL, props=props)), {})
+    assert codes(result) == ["unsupported_prop"] * 3
+    assert 'name="email" class="w-full" required>' in result.html
+    assert "<label>Adresse e-mail<input" in result.html
+    assert "placeholder" not in result.html and "<span" not in result.html
+
+
+def test_field_missing_definition() -> None:
+    result = render_preview(in_form(field()), {})
+    assert codes(result) == ["missing_field_definition"]
+    assert result.issues[0].location[-1] == "field"
+    assert "<input" not in result.html and 'type="field"' not in result.html
+    assert not result.complete
+
+
+@pytest.mark.parametrize(
+    "hostile", ['"><script>alert(1)</script>', "<img src=x onerror=alert(1)>"]
+)
+def test_field_hostile_name_and_label(hostile: str) -> None:
+    definition = {"name": hostile, "input_type": "text", "label": hostile}
+    result = render_preview(in_form(field(definition, props={"class": hostile})), {})
+    assert "<script>" not in result.html and "<img" not in result.html
+    parsed = Parsed(result.html)
+    (attrs,) = [attrs for tag, attrs in parsed.tags if tag == "input"]
+    assert attrs["name"] == hostile and attrs["class"] == hostile
+    assert escape(hostile) in result.html
+
+
+def test_submit_minimal_and_class() -> None:
+    result = render_preview(in_form(save(props={"class": "px-4 py-2"})), {})
+    assert result.complete
+    assert (
+        '<button data-forge-design-type="button" type="submit" class="px-4 py-2">'
+        "Enregistrer</button>"
+    ) in result.html
+    assert ">Action<" not in result.html
+
+
+@pytest.mark.parametrize(
+    "key", ["hx-target", "hx-swap", "hx-confirm", "onclick", "tag"]
+)
+def test_submit_unsupported_props(key: str) -> None:
+    result = render_preview(in_form(save(props={key: "x()"})), {})
+    assert codes(result) == ["unsupported_prop"]
+    assert "x()" not in result.html and 'type="submit">Enregistrer' in result.html
+
+
+def test_submit_hostile_label() -> None:
+    hostile = '"><script>alert(1)</script>'
+    result = render_preview(in_form(save(hostile)), {})
+    assert "<script>" not in result.html and escape(hostile) in result.html
+    Parsed(result.html)
+
+
+def test_submit_with_binding_is_invalid() -> None:
+    result = render_preview(in_form(save(binding="cancel")), {})
+    assert codes(result) == ["invalid_submit"]
+    assert "<button" not in result.html and not result.complete
+
+
+def test_action_button_unchanged() -> None:
+    holder = {"type": "container", "children": [{"type": "button", "binding": "go"}]}
+    result = render_preview(design([{"type": "section", "children": [holder]}]), {})
+    assert '<button data-forge-design-type="button" type="button">Action</button>' in (
+        result.html
+    )
+
+
+@pytest.mark.parametrize("visible", [True, False])
+def test_field_and_submit_conditions(visible: bool) -> None:
+    model = in_form(field(EMAIL, visible_if="show"), save(visible_if="show"))
+    html = render_preview(model, {"show": visible}).html
+    assert ("<input" in html) is visible
+    assert ('type="submit"' in html) is visible
+    assert "<form" in html
+
+
+def test_field_condition_diagnostics_kept() -> None:
+    result = render_preview(in_form(field(EMAIL, visible_if="missing")), {})
+    assert codes(result) == ["missing_condition"] and "<input" not in result.html
+
+
+def test_form_labels_count_in_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    long = "x" * 200
+    monkeypatch.setattr(render, "MAX_PREVIEW_HTML_CHARS", 300)
+    model = in_form(field({"name": "n", "input_type": "text", "label": long}))
+    result = render_preview(model, {})
+    assert codes(result) == ["output_too_large"]
+    assert (
+        result.html == '<div data-forge-design-preview-error="output-too-large"></div>'
+    )
+    over = render_preview(in_form(save(long)), {})
+    assert codes(over) == ["output_too_large"]
+
+
+def test_form_preview_pure_and_deterministic(monkeypatch: pytest.MonkeyPatch) -> None:
+    model = in_form(field(EMAIL), save())
+    before = copy.deepcopy(model.model_dump())
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("effet de bord interdit")
+
+    for target, name in (
+        (builtins, "open"),
+        (os, "open"),
+        (socket, "socket"),
+        (subprocess, "Popen"),
+    ):
+        monkeypatch.setattr(target, name, forbidden)
+    first = render_preview(model, {})
+    second = render_preview(model, {})
+    monkeypatch.undo()
+    assert first == second and model.model_dump() == before

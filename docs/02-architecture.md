@@ -1954,6 +1954,11 @@ inchangés. Première tranche « formulaire interactif contrôlé » complète :
 `form` porte l'action HTMX, `field` la donnée et `submit` la soumission
 explicite.
 
+FD-INTERACT-006 aligne la preview : `Design → Preview renderer → HTML inerte
+proche du template`. Les `field` deviennent des `<input>` et les submits des
+`<button type="submit">`, sans `action`, `method`, `hx-*`, valeur ni script.
+La preview reste sans contrat ni backend.
+
 ### Formulaires générés — FD-INTERACT-003
 
 ```text

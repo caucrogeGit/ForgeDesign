@@ -589,6 +589,12 @@ Aucun état ni rafraîchissement : chaque action suit
 `/editor/preview`, qui relit le Design enregistré. Un no-op ne réécrit rien,
 et la preview reste identique.
 
+Depuis FD-INTERACT-006, les formulaires de la preview reflètent la structure
+générée : `<input>` issus de `FieldDefinition` (libellé englobant,
+`required`) et `<button type="submit">Libellé</button>`, toujours sans
+`action`, `method`, `hx-*` ni valeur. Voir
+[static-preview.md](../preview/static-preview.md).
+
 ### Limites connues
 
 - Données fictives : les booléens valent `true` (les blocs conditionnés sont

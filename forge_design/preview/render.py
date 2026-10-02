@@ -26,6 +26,7 @@ _TAGS = {
     "button": "button",
     "table": "table",
     "form": "form",
+    # field est rendu par _Renderer.field (input), jamais par cette table.
     "field": "div",
     "alert": "div",
     "empty_state": "div",
@@ -159,6 +160,13 @@ class _Renderer:
                 return
             if condition is False:
                 return
+        # Formulaires (FD-INTERACT-006) : structure du template généré, sans action.
+        if node.type == "field":
+            self.field(node, path)
+            return
+        if node.type == "button" and node.submit is not None:
+            self.submit_button(node, path)
+            return
         tag = _TAGS[node.type]
         classes = None
         if node.props is not None:
@@ -212,6 +220,67 @@ class _Renderer:
                     depth + 1,
                     selected=child.type == "empty_state",
                 )
+
+    def classes_only(
+        self, node: DesignNode | PageRoot, path: tuple[str | int, ...]
+    ) -> str:
+        """Attribut class échappé ; toute autre prop (tag, hx-*…) est signalée."""
+        classes = ""
+        for key, value in (node.props or {}).items():
+            location = (*path, "props", key)
+            if key == "class" and isinstance(value, str):
+                classes = ' class="' + self.escaped(value, location) + '"'
+            else:
+                self.issue("unsupported_prop", location)
+        return classes
+
+    def field(self, node: DesignNode | PageRoot, path: tuple[str | int, ...]) -> None:
+        """Vrai contrôle depuis FieldDefinition : ni value, ni id, ni for."""
+        definition = node.field
+        if definition is None:
+            # Aucun faux <input> : la définition manque.
+            self.issue("missing_field_definition", (*path, "field"))
+            return
+        classes = self.classes_only(node, path)
+        location = (*path, "field")
+        label = (
+            None
+            if definition.label is None
+            else self.escaped(definition.label, (*location, "label"))
+        )
+        control = (
+            '<input data-forge-design-type="field" type="'
+            + definition.input_type
+            + '" name="'
+            + self.escaped(definition.name, (*location, "name"))
+            + '"'
+            + classes
+            + (" required" if definition.required is True else "")
+            + ">"
+        )
+        if label is not None:
+            control = "<label>" + label + control + "</label>"
+        self.emit(control, path)
+
+    def submit_button(
+        self, node: DesignNode | PageRoot, path: tuple[str | int, ...]
+    ) -> None:
+        """Bouton de soumission inerte : libellé du Design, sans action ni hx-*."""
+        assert node.submit is not None
+        if node.binding is not None:
+            # Action et soumission à la fois : sémantique ambiguë, bouton omis.
+            self.issue("invalid_submit", (*path, "submit"))
+            return
+        classes = self.classes_only(node, path)
+        label = self.escaped(node.submit.label, (*path, "submit", "label"))
+        self.emit(
+            '<button data-forge-design-type="button" type="submit"'
+            + classes
+            + ">"
+            + label
+            + "</button>",
+            path,
+        )
 
     def table(self, node: DesignNode | PageRoot, path: tuple[str | int, ...]) -> bool:
         rows: list[object] = []

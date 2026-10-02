@@ -290,3 +290,50 @@ devra traiter le rendu navigateur et CSS réel.
 
 FD-PREVIEW-003 clôt la phase Preview statique ; la suite est FD-GENERATE-001,
 génération d'un template simple.
+
+## Formulaires — FD-INTERACT-006
+
+La preview reflète désormais la **structure** des formulaires générés
+(FD-INTERACT-003 et FD-INTERACT-005), tout en restant inerte : aucune
+action, aucun HTMX, aucun script, aucune soumission ni appel backend. Son API
+est inchangée (`render_preview(design, data)`, sans contrat).
+
+```html
+<form data-forge-design-type="form">
+  <label>Adresse e-mail<input data-forge-design-type="field" type="email" name="email" required></label>
+  <button data-forge-design-type="button" type="submit">Enregistrer</button>
+</form>
+```
+
+Le HTML réel tient sur une ligne ; il est indenté ici pour la lecture.
+
+| Bloc | Preview | Template généré |
+|---|---|---|
+| `form` | `<form data-forge-design-type="form" [class]>`, rendu générique inchangé | ajoute `action`, `method` et `hx-get`/`hx-post` |
+| `field` (avec définition) | `<input data-forge-design-type="field" type name [class] [required]>`, enveloppé par `<label>Libellé…</label>` si un libellé existe | même structure, sans `data-*` |
+| `button` avec `submit` | `<button data-forge-design-type="button" type="submit" [class]>Libellé</button>` | même structure, sans `data-*` |
+| `button` d'action | `<button … type="button">Action</button>`, générique inchangé | ajoute `hx-get`/`hx-post` et les props HTMX |
+
+- **Pas d'action ni d'HTMX** : jamais d'`action`, `method` ni `hx-*`, même si
+  le Design porte un `binding` ou des props `hx-*`, qui donnent
+  `preview.unsupported_prop`. Un `form` sans binding n'est pas signalé : la
+  preview n'est pas le générateur.
+- **Pas de valeurs** : les données fictives décrivent le contexte
+  d'affichage, pas l'état d'un formulaire ; aucun `value` n'est rempli. Il
+  n'y a pas non plus d'`id`, de `for` ni de `placeholder`.
+- **Champ** : `type` vient de `input_type` (six types) et `name` de
+  `field.name`, échappé. `required` n'est émis que pour `true`. `class` est
+  posée sur l'`<input>`, jamais sur le `<label>`. Toute autre prop (`tag`,
+  `placeholder`…) donne `preview.unsupported_prop`. Un `field` sans
+  définition donne `preview.missing_field_definition`, sans faux `<input>`.
+- **Submit** : le libellé vient de `submit.label`, échappé, et n'est jamais
+  remplacé par `Action`. `class` est seule émise, les autres props sont
+  signalées. Un bouton qui porte `binding` et `submit` donne
+  `preview.invalid_submit` et n'est pas rendu. La preview ne détecte pas un
+  submit hors formulaire : le validateur Design en reste responsable.
+- `visible_if` s'applique avant le rendu (`false` : rien n'est émis) ; les
+  libellés, noms et classes consomment le budget `MAX_PREVIEW_HTML_CHARS`.
+- `<input>` est un élément vide : il n'a jamais de balise fermante.
+
+L'endpoint `/editor/preview` de l'éditeur Web utilise `render_preview` : il
+affiche ce rendu sans aucun changement de route, de CSP ni de sandbox.

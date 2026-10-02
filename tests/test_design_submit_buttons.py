@@ -440,11 +440,15 @@ def test_generation_now_emits_submit() -> None:
     assert '<button type="submit">Enregistrer</button>' in result.template
 
 
-def test_preview_unchanged() -> None:
+def test_preview_renders_submit() -> None:
+    # Générique jusqu'à FD-INTERACT-006, désormais rendu comme submit inerte.
     model = page(form(submit(), binding="create_contact"))
     c = contract({}, actions=ACTIONS)
     html = render_preview(model, generate_preview_data(c).data).html
-    assert 'type="submit"' not in html and "Enregistrer" not in html
+    assert (
+        '<button data-forge-design-type="button" type="submit">Enregistrer</button>'
+    ) in html
+    assert "hx-" not in html and "action=" not in html
 
 
 def test_inputs_not_mutated() -> None:

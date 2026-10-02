@@ -270,12 +270,16 @@ def test_contract_now_generated() -> None:
     )
 
 
-def test_preview_ignores_definition() -> None:
+def test_preview_renders_definition() -> None:
+    # Ignorée par la preview jusqu'à FD-INTERACT-006, désormais rendue.
     model = page(form(field(EMAIL), binding="create_contact"))
     c = contract({}, actions=ACTIONS)
     html = render_preview(model, generate_preview_data(c).data).html
-    assert '<div data-forge-design-type="field"></div>' in html
-    assert "<input" not in html and "email" not in html
+    assert (
+        '<label>Adresse e-mail<input data-forge-design-type="field" type="email"'
+        ' name="email" required></label>'
+    ) in html
+    assert "action=" not in html and "hx-" not in html
 
 
 # Éditeur.
