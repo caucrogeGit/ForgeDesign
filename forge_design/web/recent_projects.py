@@ -82,6 +82,15 @@ def recent_action(
         )
     if not remove:
         selection = selector.open(Path(value))
+        if selection.status == "busy":
+            return show_home(
+                request,
+                context,
+                store,
+                registry,
+                error=selection.error,
+                status=409,
+            )
         if selection.status != "selected":
             return show_home(
                 request,

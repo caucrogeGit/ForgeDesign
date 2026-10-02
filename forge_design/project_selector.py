@@ -1,5 +1,6 @@
 """Sélection explicite : inspection, contexte runtime, puis historique local."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -15,7 +16,7 @@ from forge_design.recent_projects import RecentProjects, RecentProjectsError
 from forge_design.tools.project_inspector import ProjectInspection
 
 SelectionStatus = Literal[
-    "selected", "invalid", "not-found", "not-directory", "resolution-error"
+    "selected", "invalid", "not-found", "not-directory", "resolution-error", "busy"
 ]
 
 
@@ -32,6 +33,9 @@ class ProjectSelector:
     registry: ToolRegistry
     context: CurrentProjectContext
     recent_projects: RecentProjects
+    # Appelé seulement quand un candidat valide va remplacer un autre projet :
+    # False conserve le projet courant (statut "busy"). Ex. arrêt de la preview.
+    before_change: Callable[[], bool] | None = None
 
     def open(self, path: Path) -> ProjectSelectionResult:
         """Réinspecter ; conserver le courant sur échec de validation uniquement."""
@@ -47,6 +51,16 @@ class ProjectSelector:
             raise TypeError("project-inspector doit retourner ProjectInspection.")
         if not inspection.valid:
             return ProjectSelectionResult("invalid", inspection)
+        if (
+            self.before_change is not None
+            and self.context.root != inspection.root
+            and not self.before_change()
+        ):
+            return ProjectSelectionResult(
+                "busy",
+                inspection,
+                error="La preview réelle du projet courant n'a pas pu être arrêtée.",
+            )
         self.context.set_project(inspection)
         warning = None
         try:

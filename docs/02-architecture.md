@@ -2105,3 +2105,28 @@ destination fixée par le seul `status().port`, aucune redirection suivie,
 10 s, corps HTML/CSS/JS jamais réécrits. Le proxy ne démarre ni n'arrête le
 runner. La composition (`create_application`), l'iframe et les contrôles
 Start/Stop relèvent de FD-REALPREVIEW-004.
+
+#### Intégration Web — FD-REALPREVIEW-004
+
+```text
+ForgeDesignServer (127.0.0.1:<port lié>)        server_close() / finally de run_server
+ └─ Application Forge Design                    → runtime.close()
+     ├─ CurrentProjectContext
+     ├─ ProjectSelector(before_change=runtime.stop)
+     └─ RealPreviewRuntime (web/real_preview.py)
+         ├─ RealPreviewController     (runner, inchangé)
+         └─ RealPreviewProxyServer    (proxy, inchangé) + thread
+             origine d'encadrement = http://127.0.0.1:<port lié de Forge Design>
+```
+
+Cycle de vie :
+- stop : proxy, puis runner ;
+- fermeture, changement ou invalidation du projet : stop, puis modification
+  du contexte ;
+- fermeture du serveur : `close()` idempotent.
+
+`real_preview/route_selection.py` choisit la route depuis Route Explorer et le
+contrat. `POST /editor/real-preview/start|stop` sont les seules mutations, et
+aucun GET ne démarre la preview. L'éditeur ajoute une iframe sur l'origine du
+proxy et `frame-src 'self' <origine proxy>` à sa seule réponse. Aucun nouveau
+Tool : le registre reste à cinq.

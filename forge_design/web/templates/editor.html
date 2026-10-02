@@ -200,5 +200,36 @@
 <iframe class="preview-frame preview-frame--{{ preview_mode }}" src="{{ preview_frame_url(design_path, preview_mode) }}" title="Prévisualisation du Design" sandbox></iframe>
 </div>
 </section>
+{% if real_preview %}{% set rp = real_preview %}
+<section class="real-preview" aria-labelledby="real-preview-title">
+<h2 id="real-preview-title">Preview réelle</h2>
+<p>Application Forge du projet réellement exécutée, sur une origine dédiée : distincte de la prévisualisation indicative ci-dessus, elle rend le template enregistré sur disque.</p>
+{% if not rp.enabled %}<p>Preview réelle indisponible sur ce serveur.</p>
+{% elif rp.route_available %}<p>Route : <code>{{ rp.route_path }}</code></p>
+{% else %}<p class="real-preview-reason">Preview réelle indisponible : {{ rp.route_reason }}</p>
+{% endif %}
+<p>État : <span class="real-preview-state" data-state="{{ rp.state }}">{{ rp.state_label }}</span></p>
+{% if rp.error %}<div class="message error" role="alert"><p>{{ rp.error }}</p>
+{% if rp.logs %}<pre class="real-preview-logs">{{ rp.logs | join("\n") }}</pre>{% endif %}
+</div>{% endif %}
+{% if rp.can_start %}<p class="real-preview-warning" role="note">{{ rp.warning }}</p>
+<form method="post" action="/editor/real-preview/start">
+  <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="node" value="{{ selected.path_value if selected else '' }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
+  <button type="submit">{% if rp.state == "failed" %}Démarrer à nouveau{% else %}Démarrer la preview réelle{% endif %}</button>
+</form>{% endif %}
+{% if rp.can_stop %}<form method="post" action="/editor/real-preview/stop">
+  <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="node" value="{{ selected.path_value if selected else '' }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
+  <button type="submit">Arrêter la preview réelle</button>
+</form>{% endif %}
+{% if rp.proxy_origin %}<p>Origine de la preview : <code>{{ rp.proxy_origin }}</code></p>{% endif %}
+{% if rp.frame_url %}<div class="preview-viewport">
+<iframe class="real-preview-frame" src="{{ rp.frame_url }}" title="Preview réelle" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
+</div>{% endif %}
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}

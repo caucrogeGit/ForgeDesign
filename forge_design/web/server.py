@@ -25,6 +25,11 @@ from forge_design.web.inspector import (
     refresh_project,
     show_inspector,
 )
+from forge_design.web.real_preview import (
+    RealPreviewPanel,
+    RealPreviewRuntime,
+    real_preview_action,
+)
 from forge_design.web.recent_projects import recent_action, show_home
 from forge_design.web.routes import show_routes
 from forge_design.web.security import is_local_action
@@ -97,17 +102,26 @@ def _require_local_host(app: WsgiApp, server: WSGIServer) -> WsgiApp:
     return guarded
 
 
-def create_application(*, recent_projects: RecentProjects | None = None) -> Application:
+def create_application(
+    *,
+    recent_projects: RecentProjects | None = None,
+    real_preview: RealPreviewRuntime | None = None,
+) -> Application:
     """Créer l'application Forge avec ses seules routes publiques explicites.
 
     Aucun chargement de config.py, bootstrap.py ou mvc du répertoire courant.
     Les middlewares Forge par défaut restent en place ; le shell est public.
+    Sans runtime fourni, la preview réelle reste désactivée : son origine
+    d'encadrement n'est connue qu'après le bind (create_server).
     """
     registry = create_tool_registry()
     context = CurrentProjectContext()
     store = recent_projects if recent_projects is not None else RecentProjects()
+    runtime = real_preview if real_preview is not None else RealPreviewRuntime()
+    panel = RealPreviewPanel(runtime, registry)
 
-    selector = ProjectSelector(registry, context, store)
+    # Un autre projet valide ne devient courant qu'après l'arrêt de la preview.
+    selector = ProjectSelector(registry, context, store, before_change=runtime.stop)
 
     def index(request: Request) -> Response:
         return show_home(request, context, store, registry)
@@ -118,6 +132,19 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     def close(request: Request) -> Response:
         if not is_local_action(request):
             return Response.html("Origine de la requête non autorisée.", status=403)
+        # Arrêter la preview de ce projet avant de le fermer, jamais l'inverse.
+        if not runtime.stop():
+            return show_home(
+                request,
+                context,
+                store,
+                registry,
+                error=(
+                    "La preview réelle n'a pas pu être arrêtée : "
+                    "le projet courant est conservé."
+                ),
+                status=409,
+            )
         context.clear()
         return index(request)
 
@@ -125,7 +152,7 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
         return inspect_submission(request, selector, context)
 
     def refresh(request: Request) -> Response:
-        return refresh_project(request, registry, context)
+        return refresh_project(request, registry, context, release=runtime.stop)
 
     def routes(request: Request) -> Response:
         return show_routes(request, context, registry)
@@ -152,13 +179,19 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
         return show_source(request, context)
 
     def editor(request: Request) -> Response:
-        return show_editor(request, context)
+        return show_editor(request, context, real_preview=panel)
 
     def editor_preview(request: Request) -> Response:
         return show_editor_preview(request, context)
 
     def editor_post(request: Request) -> Response:
         return editor_action(request, context)
+
+    def real_preview_start(request: Request) -> Response:
+        return real_preview_action(request, context, registry, runtime, stop=False)
+
+    def real_preview_stop(request: Request) -> Response:
+        return real_preview_action(request, context, registry, runtime, stop=True)
 
     def open_recent(request: Request) -> Response:
         return recent_action(request, context, registry, store, selector=selector)
@@ -212,7 +245,41 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     router.add(
         "POST", "/editor/action", editor_post, public=True, csrf=False, no_store=True
     )
+    # Preview réelle : seules mutations du runtime, jamais par GET.
+    router.add(
+        "POST",
+        "/editor/real-preview/start",
+        real_preview_start,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
+    router.add(
+        "POST",
+        "/editor/real-preview/stop",
+        real_preview_stop,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
     return Application(router, api_routes_module=None)
+
+
+class ForgeDesignServer(WSGIServer):
+    """Écoute Forge Design et runtime de preview réelle qu'elle possède.
+
+    server_close() (donc la sortie d'un bloc with) ferme d'abord le runtime :
+    proxy, puis runner.
+    """
+
+    real_preview: RealPreviewRuntime | None = None
+
+    def server_close(self) -> None:
+        try:
+            if self.real_preview is not None:
+                self.real_preview.close()
+        finally:
+            super().server_close()
 
 
 def create_server(
@@ -220,26 +287,31 @@ def create_server(
     port: int = DEFAULT_PORT,
     *,
     recent_projects: RecentProjects | None = None,
-) -> WSGIServer:
+    real_preview: RealPreviewRuntime | None = None,
+) -> ForgeDesignServer:
     """Ouvrir l'écoute locale servant exclusivement l'adaptateur WSGI Forge.
 
     Seul 127.0.0.1 est accepté ; 0 demande un port éphémère. Toute requête dont
     le Host diffère de l'adresse d'écoute est refusée en 400. Les erreurs de bind
     restent des OSError, sans repli. Fermer avec with ; pour arrêter une boucle
     dans un autre thread, appeler shutdown puis join avant de quitter le bloc.
+    La fermeture arrête aussi la preview réelle (server.real_preview) ; un
+    runtime peut être fourni explicitement (tests), sinon il est créé ici.
     """
     if host != DEFAULT_HOST:
         raise ValueError("Seul l'hôte local 127.0.0.1 est autorisé.")
     if isinstance(port, bool) or not 0 <= port <= 65535:
         raise ValueError("Le port doit être compris entre 0 et 65535.")
-    application = (
-        create_application()
-        if recent_projects is None
-        else create_application(recent_projects=recent_projects)
+    runtime = real_preview if real_preview is not None else RealPreviewRuntime()
+    application = create_application(
+        recent_projects=recent_projects, real_preview=runtime
     )
     wsgi_app = create_wsgi_app(application)
-    server = make_server(host, port, wsgi_app)
-    # Le port effectif (0 → éphémère) n'est connu qu'après le bind.
+    server = make_server(host, port, wsgi_app, server_class=ForgeDesignServer)
+    server.real_preview = runtime
+    # Le port effectif (0 → éphémère) n'est connu qu'après le bind : il fixe
+    # l'origine d'encadrement du proxy, jamais l'en-tête Host d'une requête.
+    runtime.bind_editor_origin(f"http://{DEFAULT_HOST}:{server.server_port}")
     server.set_app(_require_local_host(wsgi_app, server))
     return server
 
@@ -250,7 +322,10 @@ def run_server(
     *,
     on_ready: Callable[[], None] | None = None,
 ) -> None:
-    """Servir Forge dans le thread appelant jusqu'à Ctrl+C, puis fermer l'écoute."""
+    """Servir Forge jusqu'à Ctrl+C, puis fermer preview réelle et écoute.
+
+    La preview est fermée dans un finally : Ctrl+C, exception ou fin normale.
+    """
     with create_server(host, port) as server:
         try:
             if on_ready is not None:
@@ -258,3 +333,6 @@ def run_server(
             server.serve_forever()
         except KeyboardInterrupt:
             pass
+        finally:
+            if server.real_preview is not None:
+                server.real_preview.close()

@@ -3,9 +3,10 @@
 Contrat normatif de FD-REALPREVIEW-001, corrigé par FD-REALPREVIEW-001A
 (confinement réseau garanti avant le bind). Il fixe les décisions dont
 dépendent FD-REALPREVIEW-002 (runner local) et les tickets d'intégration Web
-suivants. Le runner est implémenté par FD-REALPREVIEW-002 et le proxy par
-FD-REALPREVIEW-003 (voir « Implémentation du runner » et « Implémentation du
-proxy ») ; iframe et UI restent à venir.
+suivants. Le runner est implémenté par FD-REALPREVIEW-002, le proxy par
+FD-REALPREVIEW-003, et l'intégration Web (Start/Stop, iframe, cycle de vie)
+par FD-REALPREVIEW-004 : voir « Implémentation du runner », « Implémentation
+du proxy » et « Intégration Web ».
 
 Les faits Forge cités ont été vérifiés statiquement dans `forge-mvc==1.0.0rc9`
 (version épinglée par Forge Design), le paquet installé et le dépôt Forge local
@@ -99,6 +100,55 @@ Précisions et écarts découverts en implémentant, sans changer le contrat :
 - **Cookies** : relayés dans les deux sens, sans ajout. Ils ne sont pas
   isolés par port : l'origine du proxy partage les cookies `127.0.0.1` avec
   Forge Design et le runner. Forge Design n'en pose aucun.
+
+## Intégration Web
+
+FD-REALPREVIEW-004 compose le runner et le proxy dans l'application Web, sans
+les modifier (`forge_design/web/real_preview.py`).
+
+- **Possession** : `RealPreviewRuntime`, un par application, détient le
+  contrôleur, le proxy éventuel, son thread (`daemon` mais toujours arrêté
+  explicitement : `shutdown`, `join`, `server_close`) et l'origine de
+  l'éditeur. Il n'y a aucun singleton. `create_server` crée le runtime, lie
+  l'écoute, puis fixe l'origine à `http://127.0.0.1:<port effectivement lié>`,
+  jamais d'après un en-tête `Host`. `create_application` seule laisse la
+  preview désactivée.
+- **Fermeture** : `ForgeDesignServer.server_close()` ferme le runtime avant
+  l'écoute. `run_server` le ferme aussi dans un `finally`, quelle que soit la
+  sortie (Ctrl+C, exception, fin normale).
+- **Arrêt** : proxy d'abord, runner ensuite. Un proxy impossible à créer ou à
+  lancer arrête le runner. Un proxy mort ou un runner sorti est détecté à la
+  lecture d'état suivante : proxy fermé, runner arrêté, état « failed ».
+- **Start / Stop** : `POST /editor/real-preview/start` et `…/stop`, origine
+  locale exacte, `application/x-www-form-urlencoded`, champs exacts `design`
+  (+ `node`, `preview` facultatifs). Aucun champ de route, de port ni d'URL :
+  tout autre champ donne 400. La route est recalculée côté serveur à
+  l'affichage et juste avant Start. Une route indisponible donne 409 sans
+  appel au runner. Start sur le même projet déjà actif ne redémarre rien. Stop
+  est idempotent et ne dépend pas de la lisibilité du Design.
+- **Sélection de route** : `real_preview/route_selection.py` applique le
+  tableau « Sélection de route » au template du contrat
+  (`ViewContract.template`). Écart précisé : Route Explorer avertit
+  toujours que sa lecture est statique et partielle, et ces avertissements
+  généraux ne bloquent pas. Est « partiel pertinent » toute route GET dont le
+  template n'est pas déterminable (handler dynamique ou absent, méthode non
+  vérifiée, rendu dynamique ou multiple). Elle pourrait rendre le même
+  template, donc aucune route n'est choisie.
+- **Projet courant** : fermeture, changement de projet (Inspector ou récents)
+  et refresh qui invalide ou change la racine arrêtent la preview **avant** de
+  modifier le contexte. Un candidat invalide ou introuvable n'arrête rien. Le
+  même projet rouvert ou rafraîchi, ainsi que le retrait d'un récent, ne
+  touchent pas la preview. Si l'arrêt échoue, le projet courant est conservé
+  (409). `ProjectSelector` reçoit un rappel générique `before_change` et un
+  statut `busy`.
+- **Éditeur** : la preview statique est inchangée. La section « Preview
+  réelle » affiche route ou raison, état, avertissement, erreur et derniers
+  logs en cas d'échec, puis l'iframe `sandbox="allow-scripts
+  allow-same-origin"`, `referrerpolicy="no-referrer"`, `title="Preview
+  réelle"`, de source `<origine proxy><route>`. La réponse de l'éditeur porte,
+  seulement quand un proxy est actif, la CSP Forge par défaut suivie de
+  `; frame-src 'self' <origine proxy>`. Les autres pages et l'éditeur sans
+  proxy gardent la CSP Forge, et `X-Frame-Options: DENY` reste en place.
 
 ## Définition
 

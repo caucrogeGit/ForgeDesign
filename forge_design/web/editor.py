@@ -8,11 +8,12 @@ puis redirigée (POST/Redirect/GET). Aucune règle d'édition n'est codée ici.
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from typing import Any, cast
+from typing import Any, Protocol, cast
 from urllib.parse import urlencode
 
 from core.http.request import Request
 from core.http.response import Response
+from core.security.csp import build_csp_header, get_request_nonce
 from pydantic import ValidationError
 
 from forge_design.contracts.models import ViewContract
@@ -108,7 +109,30 @@ PREVIEW_MODE_LABELS: tuple[tuple[PreviewViewportMode, str], ...] = (
 _NOTICES = {
     "saved": "Modification enregistrée.",
     "noop": "Aucune modification.",
+    "real-started": "Preview réelle démarrée.",
+    "real-failed": "La preview réelle n'a pas démarré.",
+    "real-stopped": "Preview réelle arrêtée.",
 }
+
+
+class RealPreviewPanelView(Protocol):
+    """Données immuables du panneau de preview réelle (aucun objet runtime)."""
+
+    @property
+    def proxy_origin(self) -> str | None: ...
+
+
+class RealPreviewPanel(Protocol):
+    """Fournisseur du panneau ; implémenté par forge_design.web.real_preview."""
+
+    def view(
+        self, context: CurrentProjectContext, contract: "ContractState"
+    ) -> RealPreviewPanelView: ...
+
+
+def editor_frame_policy(proxy_origin: str) -> str:
+    """CSP Forge par défaut, plus frame-src limité à 'self' et au proxy actif."""
+    return build_csp_header(get_request_nonce()) + f"; frame-src 'self' {proxy_origin}"
 
 
 class EditorHttpError(Exception):
@@ -289,7 +313,9 @@ def _render(
     message: str | None = None,
     preview: PreviewViewportMode = DEFAULT_PREVIEW_MODE,
     status: int = 200,
+    real_preview: RealPreviewPanel | None = None,
 ) -> Response:
+    real_view: RealPreviewPanelView | None = None
     page: dict[str, object] = {
         "active_page": "editor",
         "editor_url": editor_url,
@@ -306,6 +332,7 @@ def _render(
         "truncated": False,
         "selected": None,
         "contract_state": None,
+        "real_preview": None,
     }
     if read is not None:
         page["read_issues"] = tuple(issue.message for issue in read.issues)
@@ -325,7 +352,26 @@ def _render(
         )
         if selected is not None:
             page.update(_selection_context(rows, selected, state.contract))
-    return render_page("editor.html", page, status=status)
+        if real_preview is not None:
+            real_view = real_preview.view(context, state)
+            page["real_preview"] = real_view
+    response = render_page("editor.html", page, status=status)
+    if real_view is not None and real_view.proxy_origin is not None:
+        # Réponse de l'éditeur seulement : les autres pages gardent la CSP Forge.
+        response.headers["Content-Security-Policy"] = editor_frame_policy(
+            real_view.proxy_origin
+        )
+    return response
+
+
+def render_editor_error(
+    context: CurrentProjectContext,
+    design_path: str | None,
+    message: str,
+    status: int,
+) -> Response:
+    """Page d'éditeur portant une erreur contrôlée, sans arbre ni panneau."""
+    return _render(context, design_path=design_path, error=message, status=status)
 
 
 def _selection_context(
@@ -384,7 +430,12 @@ def _selection_context(
     }
 
 
-def show_editor(request: Request, context: CurrentProjectContext) -> Response:
+def show_editor(
+    request: Request,
+    context: CurrentProjectContext,
+    real_preview: RealPreviewPanel | None = None,
+) -> Response:
+    """Afficher l'éditeur ; ne démarre jamais la preview réelle."""
     if context.root is None:
         return _render(context, error="Aucun projet ouvert.", status=409)
     params = request.params
@@ -430,10 +481,11 @@ def show_editor(request: Request, context: CurrentProjectContext) -> Response:
         selected_path=node,
         message=_NOTICES.get(notice or ""),
         preview=preview,
+        real_preview=real_preview,
     )
 
 
-def _fields(request: Request) -> dict[str, str]:
+def editor_form_fields(request: Request) -> dict[str, str]:
     body: Mapping[str, list[str]] = request.body
     if any(len(values) != 1 for values in body.values()):
         raise EditorHttpError(400, "Chaque champ doit être fourni une seule fois.")
@@ -446,7 +498,7 @@ def _fields(request: Request) -> dict[str, str]:
     return fields
 
 
-def _check_post(request: Request, context: CurrentProjectContext) -> None:
+def check_editor_post(request: Request, context: CurrentProjectContext) -> None:
     if not is_local_action(request):
         raise EditorHttpError(403, "Origine de la requête non autorisée.")
     if request.header("Content-Type", "").split(";", 1)[0] != _FORM:
@@ -644,8 +696,8 @@ def editor_action(request: Request, context: CurrentProjectContext) -> Response:
     read: DesignReadResult | None = None
     preview: PreviewViewportMode = DEFAULT_PREVIEW_MODE
     try:
-        _check_post(request, context)
-        fields = _fields(request)
+        check_editor_post(request, context)
+        fields = editor_form_fields(request)
         action = fields.get("action", "")
         expected = _ACTION_FIELDS.get(action)
         # "preview" est le seul champ facultatif : il ne porte que le mode d'aperçu.

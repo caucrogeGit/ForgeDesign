@@ -107,6 +107,7 @@ def test_startup_has_no_business_or_browser_effects(
 
     class FakeServer:
         closed = False
+        real_preview = None
 
         def __enter__(self) -> "FakeServer":
             return self
@@ -142,6 +143,8 @@ def test_browser_after_socket_ready(
     events: list[str] = []
 
     class FakeServer:
+        real_preview = None
+
         def __enter__(self) -> "FakeServer":
             events.append("ready")
             return self

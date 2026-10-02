@@ -127,3 +127,7 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .preview-frame--desktop { width: 1440px; }
 .preview-frame--tablet { width: 768px; }
 .preview-frame--mobile { width: 390px; }
+.real-preview { margin-top: 2.5rem; }
+.real-preview-warning { border-left: 4px solid #b26b00; padding: 0.5rem 0.75rem; background: #fff6e5; }
+.real-preview-frame { display: block; width: 100%; height: 40rem; border: 1px solid #77847e; background: white; }
+.real-preview-logs { max-height: 16rem; overflow: auto; white-space: pre-wrap; font-size: 0.85rem; }

@@ -1,5 +1,6 @@
 """Frontière Web de Project Inspector : formulaire, délégation et rendu Forge."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 from core.http.request import Request
@@ -18,6 +19,9 @@ from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
 
 MAX_PATH_LENGTH = 4096
+PREVIEW_STILL_RUNNING = (
+    "La preview réelle n'a pas pu être arrêtée : le projet courant est conservé."
+)
 
 
 def _render(
@@ -89,14 +93,26 @@ def inspect_submission(
         result=selection.inspection,
         error=selection.error,
         message=message,
-        status=200 if selection.status in {"selected", "invalid"} else 400,
+        status=200
+        if selection.status in {"selected", "invalid"}
+        else 409
+        if selection.status == "busy"
+        else 400,
     )
 
 
 def refresh_project(
-    request: Request, registry: ToolRegistry, context: CurrentProjectContext
+    request: Request,
+    registry: ToolRegistry,
+    context: CurrentProjectContext,
+    *,
+    release: Callable[[], bool] | None = None,
 ) -> Response:
-    """Réinspecter uniquement la racine courante, sans utiliser de chemin HTTP."""
+    """Réinspecter uniquement la racine courante, sans utiliser de chemin HTTP.
+
+    release (arrêt de la preview réelle) précède toute fermeture ou tout
+    changement de racine ; s'il échoue, le projet courant est conservé.
+    """
     if not is_local_action(request):
         return _render(
             context, error="Origine de la requête non autorisée.", status=403
@@ -111,10 +127,16 @@ def refresh_project(
         ProjectRootNotDirectoryError,
         ProjectRootResolutionError,
     ) as error:
+        if release is not None and not release():
+            return _render(context, error=PREVIEW_STILL_RUNNING, status=409)
         context.clear()
         return _render(context, error=f"Projet fermé : {error}", status=400)
     if not isinstance(result, ProjectInspection):
         raise TypeError("project-inspector doit retourner ProjectInspection.")
+    if (not result.valid or result.root != root) and (
+        release is not None and not release()
+    ):
+        return _render(context, error=PREVIEW_STILL_RUNNING, status=409)
     if not result.valid:
         context.clear()
         return _render(

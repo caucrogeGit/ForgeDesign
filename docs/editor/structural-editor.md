@@ -647,3 +647,30 @@ ailleurs (et même sur le parent) ne bloque pas l'édition.
 condition, ajout, suppression et déplacement (testé par l'API et par le
 serveur Web réel). `move_design_block` n'est pas élargi : un submit peut être
 déplacé hors de son formulaire, ce que la validation signale ensuite.
+
+## Preview statique et preview réelle — FD-REALPREVIEW-004
+
+L'éditeur affiche deux zones distinctes :
+
+- **Prévisualisation indicative** (FD-EDITOR-006) : rendu structurel du Design
+  avec des données fictives, sans exécuter le projet, dans une iframe
+  `sandbox` vide. Elle est inchangée.
+- **Preview réelle** : l'application Forge du projet réellement exécutée,
+  rendant le template **enregistré sur disque**, et non le Design en mémoire.
+
+La preview réelle n'est jamais lancée automatiquement, ni à l'ouverture de
+l'éditeur ou d'un projet, ni après une modification. Elle n'est proposée que
+si une route GET publique, statique et unique rend le template du contrat du
+Design ; sinon, la raison est affichée. Avant le bouton « Démarrer la preview
+réelle », l'avertissement suivant est affiché :
+
+> La preview réelle exécute le projet Forge sélectionné et peut déclencher ses
+> effets de bord habituels.
+
+Une fois démarrée, la page reste sur une origine dédiée (proxy local), dans
+une iframe qui n'autorise que les scripts et sa propre origine. Formulaires,
+popups et navigation de l'éditeur sont bloqués, et le proxy refuse toute
+méthode autre que GET/HEAD. « Arrêter la preview réelle » arrête le proxy
+puis l'application. En cas d'échec, l'erreur et les derniers logs sont
+affichés, avec « Démarrer à nouveau ». Le contrat complet est dans
+[docs/preview/real-preview-contract.md](../preview/real-preview-contract.md).
