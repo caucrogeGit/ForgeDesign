@@ -642,8 +642,11 @@ def test_public_exports() -> None:
         "RealPreviewConfig",
         "RealPreviewController",
         "RealPreviewError",
+        "RealPreviewProxyConfig",
+        "RealPreviewProxyServer",
         "RealPreviewState",
         "RealPreviewStatus",
+        "create_real_preview_proxy",
     ]
     assert not hasattr(real_preview, "child_bootstrap") or "child_bootstrap" not in (
         real_preview.__all__

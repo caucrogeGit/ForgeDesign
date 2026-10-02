@@ -2088,3 +2088,20 @@ ni composition Web (le contrôleur n'est pas encore créé par
 Le projet n'est importé que dans l'enfant. Forge Design ne modifie ni son
 `sys.path`, ni son environnement, ni son cwd, et n'écoute sur aucun socket
 pour la preview.
+
+#### Proxy implémenté — FD-REALPREVIEW-003
+
+```text
+futur iframe (éditeur) ──▶ RealPreviewProxyServer 127.0.0.1:<port proxy>
+                              │ Host strict, GET/HEAD, controller.status()
+                              ├── /static/… → <projet>/static (lecture confinée)
+                              └── autre → http://127.0.0.1:<port runner>
+```
+
+`real_preview/proxy.py` fournit `create_real_preview_proxy` : origine dédiée,
+destination fixée par le seul `status().port`, aucune redirection suivie,
+`Location` du runner réécrite en chemin relatif, `X-Frame-Options` retiré et
+`frame-ancestors` remplacé. Réponses et statiques bornés à 8 Mio, délai de
+10 s, corps HTML/CSS/JS jamais réécrits. Le proxy ne démarre ni n'arrête le
+runner. La composition (`create_application`), l'iframe et les contrôles
+Start/Stop relèvent de FD-REALPREVIEW-004.

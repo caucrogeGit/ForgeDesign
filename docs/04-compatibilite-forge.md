@@ -250,6 +250,16 @@ utilisateur :
   en plus des signatures reconnues par Forge Design. Un projet sans `optins/`
   échoue à l'import (code 5), avec la trace dans les logs.
 
+Constaté par FD-REALPREVIEW-003 (même squelette, à travers le proxy) :
+
+- le routeur Forge rc9 ne traite pas `HEAD` comme `GET`. `HEAD /` répond
+  405, seul `HEAD /health` répond 200 (la sonde est servie avant le
+  routage) ;
+- `GET /` (route publique du squelette) renvoie du HTML. À travers le proxy,
+  la CSP Forge garde `default-src 'self'` et ses autres directives, mais plus
+  aucun `frame-ancestors 'none'` ; `X-Content-Type-Options: nosniff` est
+  conservé et `X-Frame-Options` n'apparaît plus.
+
 ## 8. Évolution
 
 Lorsqu'une évolution Forge casse une hypothèse Forge Design :

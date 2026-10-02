@@ -3,8 +3,9 @@
 Contrat normatif de FD-REALPREVIEW-001, corrigé par FD-REALPREVIEW-001A
 (confinement réseau garanti avant le bind). Il fixe les décisions dont
 dépendent FD-REALPREVIEW-002 (runner local) et les tickets d'intégration Web
-suivants. Le runner est implémenté par FD-REALPREVIEW-002 (voir
-« Implémentation du runner ») ; proxy, iframe et UI restent à venir.
+suivants. Le runner est implémenté par FD-REALPREVIEW-002 et le proxy par
+FD-REALPREVIEW-003 (voir « Implémentation du runner » et « Implémentation du
+proxy ») ; iframe et UI restent à venir.
 
 Les faits Forge cités ont été vérifiés statiquement dans `forge-mvc==1.0.0rc9`
 (version épinglée par Forge Design), le paquet installé et le dépôt Forge local
@@ -49,6 +50,55 @@ Précisions et écarts découverts en implémentant, sans changer le contrat :
 - **Paquet** : `forge_design.real_preview` est ajouté à la liste explicite des
   paquets de `pyproject.toml`, faute de quoi la wheel ne contiendrait pas le
   bootstrap.
+
+## Implémentation du proxy
+
+FD-REALPREVIEW-003 implémente le proxy B de « Iframe / proxy » dans
+`forge_design/real_preview/proxy.py` :
+`create_real_preview_proxy(controller, *, frame_ancestor_origin, host,
+port, config)` renvoie un `RealPreviewProxyServer` (listener
+`127.0.0.1:<port proxy>`, sans thread caché), configuré par
+`RealPreviewProxyConfig` (délai 10 s, réponses et statiques bornés à 8 Mio).
+Il ne consomme que `controller.status()`.
+
+Précisions et écarts découverts en implémentant, sans changer le contrat :
+
+- **Origine d'encadrement** : fournie explicitement, exactement
+  `http://127.0.0.1:<port>`. Le proxy n'en invente aucune et ne pose jamais
+  `frame-ancestors *`.
+- **CSP** : chaque politique active est découpée comme le fait la
+  spécification (`,` puis `;`). Seule la directive `frame-ancestors` est
+  remplacée, et les politiques multiples restent des en-têtes séparés. Si
+  aucune ne contient la directive, une politique
+  `frame-ancestors <origine>` est ajoutée. `Report-Only` est intacte.
+- **Réponses d'erreur du proxy** (400, 403, 404, 405, 502, 503, 504) : texte
+  brut, `no-store`, `nosniff`, `default-src 'none'; frame-ancestors
+  <origine>`.
+- **En-têtes de requête** : liste blanche positive (`Accept`,
+  `Accept-Language`, `User-Agent`, `Cookie`, `Referer`, `Origin`,
+  `Cache-Control`, `Pragma`, en-têtes conditionnels et `HX-*`). Ne sont
+  jamais relayés : `Accept-Encoding` (la cible répond sans compression, le
+  corps reste opaque), `Authorization` (routes publiques seulement), les
+  en-têtes hop-by-hop et `X-Forwarded-*`.
+- **Corps amont** : lu au plus jusqu'à la borne + 1. Un corps plus court que
+  son `Content-Length` donne 502, parce que `http.client` rend un corps
+  partiel sans erreur. Une durée totale de lecture supérieure au délai donne
+  504.
+- **Statiques** : `/static/` est décodé (`%XX` en UTF-8 strict) ; `%2F` et
+  `%5C` sont refusés. La politique lexicale `unsafe_relative_path` est
+  extraite de `source_parts` et partagée. Code 400 pour un chemin refusé,
+  404 pour un fichier absent, 403 pour un lien, un fichier non ordinaire, un
+  fichier trop gros ou modifié pendant la lecture. Le type MIME vient de la
+  table intégrée de `mimetypes`, sans `/etc/mime.types`, pour un résultat
+  déterministe.
+- **Requêtes refusées** : un corps annoncé (≤ 1 Mio) est lu puis jeté avant
+  la réponse 400 ou 405, pour que la fermeture n'efface pas la réponse (RST).
+  Un délai de 15 s s'applique côté client.
+- **HEAD** : Forge rc9 ne route pas HEAD vers GET (seul `/health` répond).
+  `HEAD /` donne donc le 405 de la cible, relayé tel quel.
+- **Cookies** : relayés dans les deux sens, sans ajout. Ils ne sont pas
+  isolés par port : l'origine du proxy partage les cookies `127.0.0.1` avec
+  Forge Design et le runner. Forge Design n'en pose aucun.
 
 ## Définition
 

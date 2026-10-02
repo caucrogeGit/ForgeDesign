@@ -29,14 +29,16 @@ def _is_entity_source(parts: tuple[str, ...]) -> bool:
     )
 
 
-def source_parts(path: str) -> tuple[str, ...]:
-    """Politique lexicale, sans normalisation ni consultation filesystem."""
-    parts = tuple(path.split("/"))
-    if (
+def unsafe_relative_path(path: str) -> bool:
+    """Politique lexicale commune des chemins relatifs lus dans un projet.
+
+    Refuse les chemins trop longs, segments vides ou cachés (donc . et ..),
+    segment env, clés (.pem, .key, id_rsa…), antislash, deux-points et NUL.
+    Aucune normalisation ni consultation filesystem.
+    """
+    parts = path.split("/")
+    return (
         len(path) > MAX_SOURCE_PATH_LENGTH
-        or len(parts) < 3
-        or parts[0] != "mvc"
-        or parts[1] not in {"routes", "controllers", "views", "entities"}
         or any(not part or part.startswith(".") for part in parts)
         or any(
             part.casefold() == "env"
@@ -47,6 +49,17 @@ def source_parts(path: str) -> tuple[str, ...]:
             for part in parts
         )
         or any(c in path for c in ("\\", ":", "\x00"))
+    )
+
+
+def source_parts(path: str) -> tuple[str, ...]:
+    """Politique lexicale, sans normalisation ni consultation filesystem."""
+    parts = tuple(path.split("/"))
+    if (
+        unsafe_relative_path(path)
+        or len(parts) < 3
+        or parts[0] != "mvc"
+        or parts[1] not in {"routes", "controllers", "views", "entities"}
         or (
             parts[1] in {"routes", "controllers"}
             and (len(parts) != 3 or not parts[-1].endswith(".py"))
