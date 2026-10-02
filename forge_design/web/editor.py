@@ -578,29 +578,3 @@ def editor_action(request: Request, context: CurrentProjectContext) -> Response:
     if not result.changed:
         return _redirect(editor_url(design_path, selected, "noop"))
     return _save(context, design_path, read, result.design, selected)
-
-
-def editor_save(request: Request, context: CurrentProjectContext) -> Response:
-    """Réécrire explicitement le Design lu dans sa forme canonique."""
-    design_path: str | None = None
-    read: DesignReadResult | None = None
-    try:
-        _check_post(request, context)
-        fields = _fields(request)
-        if set(fields) != {"design"}:
-            raise _HttpError(400, "Seul le champ design est attendu.")
-        design_path = fields["design"]
-        read = _read(context, design_path)
-        if read.design is None or read.issues:
-            raise _HttpError(
-                409, "Design illisible ou invalide : sauvegarde impossible."
-            )
-    except _HttpError as error:
-        return _render(
-            context,
-            design_path=design_path,
-            read=read,
-            error=error.message,
-            status=error.status,
-        )
-    return _save(context, design_path, read, read.design, ())

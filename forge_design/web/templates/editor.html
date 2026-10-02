@@ -23,7 +23,7 @@
 {% endif %}
 {% if rows %}
 {% set contract = contract_state.contract %}
-<p>Chaque modification réussie enregistre immédiatement le fichier .design.json. Aucun template HTML n'est généré ni écrit.</p>
+<p>Les modifications validées sont enregistrées immédiatement dans le fichier Design. Aucun template HTML n'est généré ni écrit.</p>
 <div class="editor-layout">
 <section class="editor-tree" aria-labelledby="tree-title">
 <h2 id="tree-title">Arbre</h2>
@@ -123,10 +123,6 @@
 </form>
 {% endif %}
 
-<form action="/editor/save" method="post">
-  <input type="hidden" name="design" value="{{ design_path }}">
-  <button type="submit">Réenregistrer le Design (forme canonique)</button>
-</form>
 {% endif %}
 </section>
 {% endif %}

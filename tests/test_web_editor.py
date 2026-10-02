@@ -314,7 +314,6 @@ def test_foreign_origin_403(app: WSGIServer, root: Path) -> None:
         origin="http://attacker.example",
     )
     assert status == 403 and snapshot(root) == before
-    assert request(app, "/editor/save", {"design": DESIGN}, origin="null")[0] == 403
 
 
 def test_wrong_content_type_415(app: WSGIServer, root: Path) -> None:
@@ -529,16 +528,52 @@ def test_write_uses_read_revision(
     assert len(seen) == 1 and seen[0] is not None
 
 
-# Sauvegarde explicite.
+# Aucune sauvegarde explicite : seule une mutation effective écrit.
 
 
-def test_save_rewrites_canonical(app: WSGIServer, root: Path) -> None:
-    design_file(root).write_text(json.dumps(design_data()))  # compact, non canonique
-    status, _, headers = request(app, "/editor/save", {"design": DESIGN})
-    assert status == 303 and location(headers)["notice"] == ["saved"]
-    text = design_file(root).read_text()
-    assert text.startswith("{\n  ") and json.loads(text) == design_data()
-    assert request(app, "/editor/save", {"design": DESIGN, "x": "1"})[0] == 400
+def test_save_route_removed(app: WSGIServer, root: Path) -> None:
+    before = snapshot(root)
+    status, _, _ = request(app, "/editor/save", {"design": DESIGN})
+    assert status == 404
+    assert snapshot(root) == before
+    for node in ("", "0", "1"):
+        assert "/editor/save" not in get(app, design=DESIGN, node=node)[1]
+
+
+def test_editor_refusal_never_writes(
+    app: WSGIServer, root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[object] = []
+
+    def spy(*args: Any, **kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(web_editor, "write_design", spy)
+    assert action(app, action="append", parent="", block_type="card")[0] == 422
+    assert action(app, action="binding", path="0.0.1", binding="can_view")[0] == 422
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"action": "append", "parent": "0", "block_type": "text"},
+        {"action": "props", "path": "0", "props": '{"class": "x"}'},
+    ],
+)
+def test_effective_mutation_writes_once(
+    app: WSGIServer, monkeypatch: pytest.MonkeyPatch, fields: dict[str, str]
+) -> None:
+    calls: list[object] = []
+    original = web_editor.write_design
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs["expected_revision"])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(web_editor, "write_design", spy)
+    assert action(app, **fields)[0] == 303
+    assert len(calls) == 1 and calls[0] is not None
 
 
 # Sans état, I/O encapsulée, périmètre.

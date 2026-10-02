@@ -314,7 +314,9 @@ Navigateur ─► Web Editor ─► read_design / read_view_contract
 |---|---|
 | `GET /editor?design=<chemin>&node=<chemin de bloc>` | arbre et bloc sélectionné (la racine par défaut) ; sans `design`, un formulaire d'ouverture |
 | `POST /editor/action` | une action : `append`, `remove`, `move`, `binding`, `visibility`, `props`, `columns` |
-| `POST /editor/save` | réécriture explicite du Design dans sa forme canonique |
+
+Il n'existe pas de route de sauvegarde séparée : `POST /editor/save`, présente
+dans FD-EDITOR-004, a été retirée par FD-EDITOR-004A (404).
 
 `design` est relatif à `mvc/views` (`contacts/list.design.json`). Il n'y a pas
 d'inventaire de Designs : l'accès se fait par URL explicite. Le lien
@@ -335,8 +337,19 @@ L'enregistrement immédiat concerne **uniquement le `.design.json`**, jamais le
 template HTML : pas de génération, de diff, de SAFEWRITE ni de journal. Il
 évite une session ou un brouillon serveur, et s'appuie sur les garanties de
 `write_design` (révision attendue, écriture atomique, conflit détecté).
-`/editor/save` réécrit le Design lu dans la forme canonique de `write_design`
-(indentation de 2 espaces, LF final), avec la même révision attendue.
+
+**Chaque mutation réussie est écrite immédiatement par `write_design`, avec
+la révision lue au début de la requête.** C'est une écriture synchrone,
+déclenchée par une action explicite de l'utilisateur, et non une sauvegarde
+périodique ou en arrière-plan. Ce sont les seules écritures de l'éditeur Web :
+- `changed=True` : une écriture, puis 303 ;
+- `changed=False` sans diagnostic (no-op) : **aucune** écriture, 303 avec
+  « Aucune modification. » ;
+- refus de l'éditeur (`issues`) : **aucune** écriture, 422.
+
+Aucune action ne se contente de réécrire le Design sans le modifier. Une
+normalisation explicite d'un fichier écrit à la main pourra faire l'objet d'un
+ticket dédié si le besoin apparaît.
 
 Bloc sélectionné après une action : le bloc ajouté ou déplacé
 (`affected_path`), le parent après une suppression, ou le bloc lui-même après

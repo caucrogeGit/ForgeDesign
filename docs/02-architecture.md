@@ -1676,8 +1676,15 @@ write_design          (révision lue, écriture atomique)
 .design.json          (aucune écriture HTML)
 ```
 
-`GET /editor`, `POST /editor/action` et `POST /editor/save`. Chaque action
-réussie est enregistrée aussitôt puis redirigée (303). Les POST exigent
+`GET /editor` et `POST /editor/action` (FD-EDITOR-004A a retiré
+`/editor/save`). Seule une mutation effective écrit :
+
+```text
+POST action explicite → lecture Design → mutation Editor → write_design
+→ redirect 303 → GET /editor
+```
+
+Un no-op ou un refus n'écrit rien. Les POST exigent
 `is_local_action` et un formulaire urlencodé. Sans contrat valide, la
 structure et les props restent éditables ; binding, condition et colonnes
 sont refusés côté serveur. Aucun JavaScript ni Tool.

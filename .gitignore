@@ -11,3 +11,6 @@ dist/
 
 # Instructions et fichiers de travail locaux.
 /tmp/
+
+# Journaux runtime Forge locaux (storage/logs/errors.dev.*), racine seulement.
+/storage/
