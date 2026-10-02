@@ -1660,6 +1660,28 @@ contractuelles viennent des validateurs de `design/`, appliqués au seul bloc
 `editor/_tree.py`.
 Voir [structural-editor.md](editor/structural-editor.md).
 
+### Interface Web de l'éditeur — FD-EDITOR-004
+
+```text
+Browser
+   ↓
+Web Editor            (web/editor.py, sans état)
+   ↓
+read_design / read_view_contract
+   ↓
+editor API            (une opération par requête)
+   ↓
+write_design          (révision lue, écriture atomique)
+   ↓
+.design.json          (aucune écriture HTML)
+```
+
+`GET /editor`, `POST /editor/action` et `POST /editor/save`. Chaque action
+réussie est enregistrée aussitôt puis redirigée (303). Les POST exigent
+`is_local_action` et un formulaire urlencodé. Sans contrat valide, la
+structure et les props restent éditables ; binding, condition et colonnes
+sont refusés côté serveur. Aucun JavaScript ni Tool.
+
 ### Bindings simples — FD-BINDING-001
 
 ```text

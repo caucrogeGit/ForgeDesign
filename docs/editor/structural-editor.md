@@ -1,4 +1,4 @@
-# Éditeur structurel — FD-EDITOR-001 à 003
+# Éditeur structurel — FD-EDITOR-001 à 004
 
 Mutations contrôlées d'un `DesignFile` : **ajouter**, **supprimer** et
 **déplacer** un bloc, puis **configurer ses propriétés**. L'éditeur est un moteur en mémoire, réutilisable par une future UI :
@@ -287,4 +287,112 @@ colonnes est borné en amont.
 - Changer le `binding` d'une table ne revalide pas ses `columns` existantes :
   une opération valide une seule propriété.
 - Aucune sauvegarde (`write_design` reste explicite), aucune génération,
-  preview, I/O, UI ni Tool.
+  preview, I/O, UI ni Tool : l'interface Web est décrite ci-dessous.
+
+## Interface Web — FD-EDITOR-004
+
+Module `forge_design/web/editor.py`, template `web/templates/editor.html`. La
+couche Web fait le parsing HTTP, les lectures, les appels à `editor/*`, la
+sauvegarde et le rendu. **Aucune règle d'édition n'y est codée.**
+
+```text
+Navigateur ─► Web Editor ─► read_design / read_view_contract
+                                │
+                                ▼
+                          API editor/*  (une opération)
+                                │
+                                ▼
+                          write_design(expected_revision)
+                                │
+                                ▼
+                          .design.json   (aucun .html écrit)
+```
+
+### Routes
+
+| Route | Rôle |
+|---|---|
+| `GET /editor?design=<chemin>&node=<chemin de bloc>` | arbre et bloc sélectionné (la racine par défaut) ; sans `design`, un formulaire d'ouverture |
+| `POST /editor/action` | une action : `append`, `remove`, `move`, `binding`, `visibility`, `props`, `columns` |
+| `POST /editor/save` | réécriture explicite du Design dans sa forme canonique |
+
+`design` est relatif à `mvc/views` (`contacts/list.design.json`). Il n'y a pas
+d'inventaire de Designs : l'accès se fait par URL explicite. Le lien
+« Éditeur » est toujours visible ; sans projet, la page répond **409**.
+
+### Sans état, enregistrement par action
+
+Aucun Design n'est gardé en mémoire : ni session, ni cookie, ni singleton, ni
+`CurrentProjectContext`. Chaque requête **relit** le `.design.json` et son
+contrat. Chaque action réussie suit le chemin suivant :
+
+```text
+read_design → une opération editor/* → write_design(expected_revision=révision lue)
+            → 303 vers GET /editor?design=…&node=<bloc concerné>&notice=saved
+```
+
+L'enregistrement immédiat concerne **uniquement le `.design.json`**, jamais le
+template HTML : pas de génération, de diff, de SAFEWRITE ni de journal. Il
+évite une session ou un brouillon serveur, et s'appuie sur les garanties de
+`write_design` (révision attendue, écriture atomique, conflit détecté).
+`/editor/save` réécrit le Design lu dans la forme canonique de `write_design`
+(indentation de 2 espaces, LF final), avec la même révision attendue.
+
+Bloc sélectionné après une action : le bloc ajouté ou déplacé
+(`affected_path`), le parent après une suppression, ou le bloc lui-même après
+une propriété.
+
+### Chemins de bloc dans HTTP
+
+`format_node_path` / `parse_node_path` : `()` ↔ `""`, `(0,)` ↔ `"0"`,
+`(0, 2)` ↔ `"0.2"`. Seuls des entiers décimaux ASCII, sans zéro initial et
+séparés par un seul point, sont acceptés. `-1`, `01`, `0..1`, `a`, `0/1`, les
+espaces et les chiffres non ASCII sont refusés, sans normalisation. Un `node`
+invalide ou absent de l'arbre donne **400**, sans repli.
+
+### Formulaires
+
+- **Ajouter** : types proposés = `ALLOWED_CHILDREN[type du parent]`, triés.
+- **Déplacer** : destinations = blocs hors du sous-arbre source acceptant le
+  type (`can_contain`) ; la page n'est jamais déplaçable.
+- **Supprimer** : un bouton par bloc, sauf la page. Pas de confirmation en
+  JavaScript.
+- **Binding** : `<select>` de toutes les variables (avec leur type) et actions
+  du contrat, plus « Aucun binding ». `set_design_binding` reste l'autorité.
+- **Condition** : variables `boolean` du contrat, plus « Toujours visible ».
+- **Props** : champ **JSON** (objet, ou vide pour supprimer), lu par
+  `loads_strict_json`. Toutes les props du modèle sont exposées, sans fausse
+  restriction à `class` et `tag`.
+- **Colonnes** (tables) : tableau JSON de `{"label", "binding"}`. Vide supprime
+  la propriété, `[]` donne aucune colonne.
+
+### Contrat indisponible
+
+L'arbre reste affiché. Ajout, suppression, déplacement et props restent
+possibles. Binding, condition et colonnes sont **désactivés à l'affichage et
+refusés côté serveur** (409), indépendamment du bouton.
+
+### Statuts
+
+| Cas | Statut |
+|---|---|
+| succès, ou no-op (`notice=noop`, **aucun appel** à `write_design`) | 303 |
+| paramètre, chemin, champ, JSON ou forme d'action invalide | 400 |
+| origine non locale (`is_local_action`) | 403 |
+| Content-Type autre que `application/x-www-form-urlencoded` | 415 |
+| Design introuvable | 404 |
+| sans projet, Design non éditable, contrat indisponible, conflit de révision | 409 |
+| refus de l'éditeur (`editor.*`) ou `InvalidDesignForWriteError` | 422 |
+| `DesignWriteError` : sauvegarde **incertaine**, à relire | 500 |
+
+Une requête porte **exactement** les champs de son action : un champ manquant,
+en trop (deux propriétés), dupliqué ou de plus de 64 Kio donne 400. Toutes
+les pages sont `Cache-Control: no-store`. Toutes les valeurs du projet sont
+échappées par Jinja, sans `|safe`.
+
+### Hors périmètre
+
+Pas de JavaScript, de drag-and-drop, de canvas, d'autosave du template, de
+génération implicite, d'undo, de session ni de Tool. L'indentation de l'arbre
+utilise des listes imbriquées : la CSP de Forge (`style-src 'self'`) interdit
+les styles inline.

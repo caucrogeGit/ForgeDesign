@@ -98,3 +98,15 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .template-tree, .template-tree ul { padding-inline-start: 1.5rem; }
 .template-tree ul { border-inline-start: 1px solid currentColor; }
 .template-tree li { overflow-wrap: anywhere; }
+
+/* Éditeur de Design : arbre indenté et panneau, sans JavaScript. */
+.editor-layout { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(20rem, 2fr); gap: 2rem; align-items: start; }
+@media (max-width: 50rem) { .editor-layout { grid-template-columns: 1fr; } }
+.editor-nodes { list-style: none; padding-left: 0; }
+.editor-nodes .editor-nodes { padding-left: 1.25rem; border-left: 1px solid #c8cfcb; }
+.editor-node { margin-block: .3rem; }
+.editor-meta { color: #53615b; font-size: .9rem; }
+.editor-panel form { margin-top: 1.25rem; }
+.editor-panel select, .editor-panel textarea { width: 100%; padding: .6rem; border: 1px solid #77847e; border-radius: .3rem; font: inherit; background: white; }
+.editor-panel textarea { font-family: monospace; }
+.editor-panel select:focus-visible, .editor-panel textarea:focus-visible { outline: 3px solid #b64c29; outline-offset: 3px; }

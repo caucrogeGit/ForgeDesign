@@ -17,6 +17,7 @@ from forge_design.project_selector import ProjectSelector
 from forge_design.recent_projects import RecentProjects
 from forge_design.web.debug import show_debug
 from forge_design.web.debug_detail import show_debug_detail
+from forge_design.web.editor import editor_action, editor_save, show_editor
 from forge_design.web.entities import show_entities
 from forge_design.web.inspector import (
     inspect_submission,
@@ -144,6 +145,15 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     def source(request: Request) -> Response:
         return show_source(request, context)
 
+    def editor(request: Request) -> Response:
+        return show_editor(request, context)
+
+    def editor_post(request: Request) -> Response:
+        return editor_action(request, context)
+
+    def editor_write(request: Request) -> Response:
+        return editor_save(request, context)
+
     def open_recent(request: Request) -> Response:
         return recent_action(request, context, registry, store, selector=selector)
 
@@ -188,6 +198,14 @@ def create_application(*, recent_projects: RecentProjects | None = None) -> Appl
     router.add("GET", "/templates", templates, public=True, no_store=True)
     router.add("GET", "/templates/view", template, public=True, no_store=True)
     router.add("GET", "/templates/tree", template_tree, public=True, no_store=True)
+    router.add("GET", "/editor", editor, public=True, no_store=True)
+    # Mutations du .design.json : même contrôle d'origine locale exacte.
+    router.add(
+        "POST", "/editor/action", editor_post, public=True, csrf=False, no_store=True
+    )
+    router.add(
+        "POST", "/editor/save", editor_write, public=True, csrf=False, no_store=True
+    )
     return Application(router, api_routes_module=None)
 
 
