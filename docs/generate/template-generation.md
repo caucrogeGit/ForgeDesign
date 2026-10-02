@@ -648,3 +648,65 @@ commun (HTML, `{`/`}`, CR/LF) et par le budget unique
 `POST` avec `csrf: true` donne `generate.unsupported_csrf` et le formulaire
 est omis. Il n'y a ni jeton, ni script, ni CDN, ni runtime HTMX. La preview
 est inchangée et inerte (pas d'`<input>`, d'`action` ni de `hx-*`).
+
+## Boutons submit — FD-INTERACT-005
+
+Le générateur distingue désormais deux sortes de boutons :
+
+```text
+Button
+├─ binding → action HTMX autonome          (FD-INTERACT-001, inchangé)
+└─ submit  → soumission HTML du form parent (FD-INTERACT-005)
+```
+
+| Bouton | Sortie |
+|---|---|
+| `binding` | `<button type="button" [class] hx-get\|hx-post="…" [hx-*]>Action</button>`, sans changement |
+| `submit` | `<button type="submit" [class="…"]>Libellé</button>` |
+| ni l'un ni l'autre | omis, `generate.button_missing_action` (inchangé) |
+
+```html
+<form action="/contacts" method="post" hx-post="/contacts">
+  <input type="email" name="email">
+  <button type="submit" class="px-4 py-2">Enregistrer</button>
+</form>
+```
+
+### Validation
+
+`validate_submit_buttons(design)` est **réutilisé** dans le pipeline, après
+`validate_form_fields` et avant les tables : nesting, bindings, conditions,
+champs, submits, tables, puis génération. Toute erreur (`submit` hors
+`button`, `binding` et `submit` ensemble, submit qui n'est pas enfant direct
+d'un `form`) donne `generate.invalid_submit` et **bloque** tout le template,
+car la sémantique du bouton serait ambiguë. Une troncature donne
+`generate.analysis_truncated`. Les diagnostics gardent l'ordre préfixe du
+validateur. Un submit n'ayant pas de binding, `validate_design_bindings` ne
+signale rien pour lui ; une action autonome inconnue reste
+`generate.invalid_binding`.
+
+### Submit
+
+- `type="submit"` explicite. Le libellé vient **exclusivement** de
+  `submit.label`, échappé (HTML, `{`/`}`, CR/LF), jamais remplacé par
+  `Action` ni par un libellé inventé.
+- Ordre des attributs : `type`, puis `class` (chaîne).
+- **Aucune action propre** : ni `hx-get`/`hx-post`, ni `action`,
+  `formaction`, `formmethod`, `name` ou `value`. Le `<form>` parent porte
+  l'interaction ; le submit le soumet nativement. Le générateur ne relit pas
+  le plan du formulaire : la position est garantie par le validateur.
+- `hx-target`, `hx-swap`, `hx-confirm`, `tag`, `onclick` ou toute autre prop
+  donnent `generate.unsupported_prop` et ne sont **pas émis** : un `hx-*` sur
+  le submit créerait une seconde action implicite. Le bouton reste généré,
+  et une `class` non textuelle est signalée puis ignorée.
+- `visible_if` réutilise l'enveloppe de `simple.py`. Plusieurs submits sont
+  générés dans l'ordre du Design. Un formulaire omis n'est pas parcouru :
+  son submit n'apparaît jamais seul.
+- Le libellé et la classe consomment le budget
+  `MAX_GENERATED_TEMPLATE_CHARS`.
+
+### Preview
+
+La preview reste **structurelle** et inchangée : un submit y apparaît comme
+un bouton générique (`type="button"`, sans libellé), alors que le template
+généré porte `type="submit"` et le libellé.

@@ -372,3 +372,236 @@ def test_preview_stays_inert() -> None:
     assert "hx-" not in rendered.html and "/contacts" not in rendered.html
     assert '<button data-forge-design-type="button"' in rendered.html
     assert "preview.unsupported_prop" in {issue.code for issue in rendered.issues}
+
+
+# Boutons submit — FD-INTERACT-005.
+
+FORM_ACTIONS = {
+    "create_contact": {"method": "POST", "path": "/contacts"},
+    "cancel": {"method": "GET", "path": "/contacts"},
+}
+EMAIL_FIELD = {"type": "field", "field": {"name": "email", "input_type": "email"}}
+
+
+def save(label: str = "Enregistrer", **extra: Any) -> dict[str, Any]:
+    return {"type": "button", "submit": {"label": label}, **extra}
+
+
+def submit_form(
+    *children: dict[str, Any], context: dict[str, Any] | None = None
+) -> simple.TemplateGenerationResult:
+    holder = {"type": "form", "binding": "create_contact", "children": list(children)}
+    model = design([{"type": "section", "children": [holder]}])
+    return generate_simple_template(
+        model, contract(context or {}, actions=FORM_ACTIONS)
+    )
+
+
+def submit_lines(result: simple.TemplateGenerationResult) -> list[str]:
+    return [line.strip() for line in result.template.splitlines() if "<button" in line]
+
+
+def test_end_criterion_form_with_submit() -> None:
+    result = submit_form(EMAIL_FIELD, save(props={"class": "px-4 py-2"}))
+    assert result.complete and result.issues == ()
+    assert result.template == (
+        "<section>\n"
+        '  <form action="/contacts" method="post" hx-post="/contacts">\n'
+        '    <input type="email" name="email">\n'
+        '    <button type="submit" class="px-4 py-2">Enregistrer</button>\n'
+        "  </form>\n"
+        "</section>\n"
+    )
+    Environment().parse(result.template)
+
+
+def test_submit_minimal() -> None:
+    result = submit_form(save())
+    assert submit_lines(result) == ['<button type="submit">Enregistrer</button>']
+
+
+def test_submit_label_never_action() -> None:
+    result = submit_form(save("Créer le contact"))
+    line = submit_lines(result)[0]
+    assert ">Action<" not in result.template and ">Créer le contact<" in line
+
+
+def test_submit_has_no_own_action() -> None:
+    result = submit_form(save(props={"class": "btn"}))
+    line = submit_lines(result)[0]
+    for token in ("hx-", "action=", "formaction", "formmethod", "name=", "value="):
+        assert token not in line
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["hx-target", "hx-swap", "hx-confirm", "onclick", "tag", "hx-post", "style"],
+)
+def test_submit_refused_props(key: str) -> None:
+    result = submit_form(save(props={key: "x()", "class": "btn"}))
+    assert codes(result) == ["unsupported_prop"]
+    assert submit_lines(result) == [
+        '<button type="submit" class="btn">Enregistrer</button>'
+    ]
+    assert "x()" not in result.template
+
+
+def test_submit_non_string_class() -> None:
+    result = submit_form(save(props={"class": 3}))
+    assert codes(result) == ["unsupported_prop"]
+    assert submit_lines(result) == ['<button type="submit">Enregistrer</button>']
+
+
+@pytest.mark.parametrize(
+    "hostile", ['"><script>alert(1)</script>', "{{ danger }}", "{% if x %}", "a\nb"]
+)
+def test_submit_hostile_label_and_class(hostile: str) -> None:
+    result = submit_form(save(hostile, props={"class": hostile}))
+    assert result.complete
+    assert "<script>" not in result.template
+    for token in ("{{", "{%"):
+        assert token not in result.template
+    assert len(submit_lines(result)) == 1
+    tree = Environment().parse(result.template)
+    assert not list(tree.find_all((nodes.Name, nodes.Getattr, nodes.If)))
+
+
+def test_submit_visible_if() -> None:
+    result = submit_form(
+        save(visible_if="can_save"), context={"can_save": {"type": "boolean"}}
+    )
+    lines = [line.strip() for line in result.template.splitlines()]
+    assert lines[2:5] == [
+        "{% if can_save %}",
+        '<button type="submit">Enregistrer</button>',
+        "{% endif %}",
+    ]
+
+
+def test_several_submits_in_design_order() -> None:
+    result = submit_form(save("Enregistrer"), save("Enregistrer et fermer"))
+    assert submit_lines(result) == [
+        '<button type="submit">Enregistrer</button>',
+        '<button type="submit">Enregistrer et fermer</button>',
+    ]
+
+
+def test_action_and_submit_side_by_side() -> None:
+    result = submit_form(save(), {"type": "button", "binding": "cancel"})
+    assert submit_lines(result) == [
+        '<button type="submit">Enregistrer</button>',
+        '<button type="button" hx-get="/contacts">Action</button>',
+    ]
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"type": "section", "children": [{"type": "container", "children": [save()]}]},
+        {"type": "section", "children": [{"type": "text", "submit": {"label": "x"}}]},
+    ],
+)
+def test_invalid_submit_blocks_everything(block: dict[str, Any]) -> None:
+    model = design([block])
+    result = generate_simple_template(model, contract({}, actions=FORM_ACTIONS))
+    assert codes(result) == ["invalid_submit"] and result.template == ""
+
+
+def test_submit_with_binding_blocks_everything() -> None:
+    result = submit_form(save(binding="cancel"))
+    assert codes(result) == ["invalid_submit"] and result.template == ""
+
+
+def test_submit_errors_in_prefix_order() -> None:
+    holder = {"type": "container", "children": [save(binding="cancel")]}
+    model = design([{"type": "section", "children": [holder]}])
+    result = generate_simple_template(model, contract({}, actions=FORM_ACTIONS))
+    assert codes(result) == ["invalid_submit", "invalid_submit"]
+
+
+def test_submit_truncation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forge_design.design.submit_buttons import (
+        SubmitButtonIssue,
+        SubmitButtonValidationResult,
+    )
+
+    marker = SubmitButtonIssue("design.submit.analysis_truncated", "x", ("root",))
+
+    def truncated(model: DesignFile) -> SubmitButtonValidationResult:
+        return SubmitButtonValidationResult(False, (marker,), truncated=True)
+
+    monkeypatch.setattr(simple, "validate_submit_buttons", truncated)
+    result = submit_form(save())
+    assert codes(result) == ["analysis_truncated"] and result.template == ""
+
+
+def test_uses_existing_submit_validator(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[object] = []
+    real = simple.validate_submit_buttons
+
+    def spy(model: DesignFile) -> Any:
+        calls.append(model)
+        return real(model)
+
+    monkeypatch.setattr(simple, "validate_submit_buttons", spy)
+    submit_form(save())
+    assert len(calls) == 1
+    assert not set(vars(buttons)) & {"outside_form", "validate_submit_buttons"}
+
+
+def test_empty_button_still_missing_action() -> None:
+    result = submit_form({"type": "button"})
+    assert codes(result) == ["button_missing_action"]
+    assert "<button" not in result.template
+
+
+def test_omitted_form_hides_submit() -> None:
+    holder = {"type": "form", "children": [save()]}
+    model = design([{"type": "section", "children": [holder]}])
+    result = generate_simple_template(model, contract({}, actions=FORM_ACTIONS))
+    assert codes(result) == ["form_missing_action"]
+    assert "<button" not in result.template and "Enregistrer" not in result.template
+
+
+def test_submit_budget() -> None:
+    base = submit_form(save("x"))
+    exact = "x" * (MAX_GENERATED_TEMPLATE_CHARS - len(base.template) + 1)
+    fits = submit_form(save(exact))
+    assert fits.complete and len(fits.template) == MAX_GENERATED_TEMPLATE_CHARS
+    over = submit_form(save(exact + "x"))
+    assert codes(over) == ["output_too_large"] and over.template == ""
+
+
+def test_submit_deterministic_and_non_mutating() -> None:
+    holder = {"type": "form", "binding": "create_contact", "children": [save()]}
+    model = design([{"type": "section", "children": [holder]}])
+    c = contract({}, actions=FORM_ACTIONS)
+    before = (copy.deepcopy(model.model_dump()), copy.deepcopy(c.model_dump()))
+    assert generate_simple_template(model, c) == generate_simple_template(model, c)
+    assert (model.model_dump(), c.model_dump()) == before
+
+
+def test_submit_pure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("effet de bord interdit")
+
+    for target, name in (
+        (builtins, "open"),
+        (os, "open"),
+        (socket, "socket"),
+        (subprocess, "Popen"),
+    ):
+        monkeypatch.setattr(target, name, forbidden)
+    result = submit_form(EMAIL_FIELD, save())
+    monkeypatch.undo()
+    assert result.complete
+
+
+def test_submit_preview_still_structural() -> None:
+    from forge_design.preview import generate_preview_data, render_preview
+
+    holder = {"type": "form", "binding": "create_contact", "children": [save()]}
+    model = design([{"type": "section", "children": [holder]}])
+    c = contract({}, actions=FORM_ACTIONS)
+    html = render_preview(model, generate_preview_data(c).data).html
+    assert 'type="submit"' not in html and "Enregistrer" not in html

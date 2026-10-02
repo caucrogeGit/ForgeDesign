@@ -430,15 +430,14 @@ def test_read_write_keep_submit(tmp_path: Path) -> None:
 # Génération et preview reportées.
 
 
-def test_generation_still_treats_submit_as_missing_action() -> None:
+def test_generation_now_emits_submit() -> None:
+    # Limite levée par FD-INTERACT-005 : le submit est généré.
     model = page(
         form({"type": "field", "field": EMAIL}, submit(), binding="create_contact")
     )
     result = generate_simple_template(model, contract({}, actions=ACTIONS))
-    assert [i.code for i in result.issues] == ["generate.button_missing_action"]
-    assert 'type="submit"' not in result.template
-    assert "Enregistrer" not in result.template
-    assert "<form" in result.template
+    assert result.complete and result.issues == ()
+    assert '<button type="submit">Enregistrer</button>' in result.template
 
 
 def test_preview_unchanged() -> None:

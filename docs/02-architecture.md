@@ -1944,8 +1944,15 @@ Design button
 `SubmitDefinition` (modèle et schéma) représente explicitement la
 soumission, et `binding` reste réservé aux actions autonomes. Les deux sont
 exclusifs, et un submit doit être enfant direct d'un `form` :
-`validate_submit_buttons` le vérifie, `set_submit_definition` l'édite. Aucun
-`type="submit"` n'est encore généré.
+`validate_submit_buttons` le vérifie, `set_submit_definition` l'édite.
+
+FD-INTERACT-005 génère le submit : `<button type="submit">Libellé</button>`
+(avec `class` seulement), sans action propre ni `hx-*`, le `form` parent
+portant l'interaction. `validate_submit_buttons` est un garde bloquant du
+générateur (`generate.invalid_submit`), et les boutons d'action restent
+inchangés. Première tranche « formulaire interactif contrôlé » complète :
+`form` porte l'action HTMX, `field` la donnée et `submit` la soumission
+explicite.
 
 ### Formulaires générés — FD-INTERACT-003
 

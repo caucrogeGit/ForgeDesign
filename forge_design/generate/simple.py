@@ -13,6 +13,7 @@ from forge_design.design.conditional_bindings import validate_conditional_bindin
 from forge_design.design.form_fields import validate_form_fields
 from forge_design.design.models import DesignFile, DesignNode, PageRoot
 from forge_design.design.nesting import validate_design_nesting
+from forge_design.design.submit_buttons import validate_submit_buttons
 from forge_design.design.table_bindings import TableBindingInfo, validate_table_bindings
 from forge_design.generate.buttons import ButtonPlan, prepare_button, render_button
 from forge_design.generate.control_flow import (
@@ -314,6 +315,14 @@ def generate_simple_template(
                     else "invalid_field",
                     issue.location,
                 )
+            raise _Stopped
+        submits = validate_submit_buttons(design)
+        if submits.truncated:
+            generator.stop("analysis_truncated", submits.issues[-1].location)
+        if submits.issues:
+            # Validateur de design/ réutilisé : sémantique du bouton ambiguë.
+            for issue in submits.issues:
+                generator.issue("invalid_submit", issue.location)
             raise _Stopped
         tables = validate_table_bindings(design, contract)
         if tables.truncated:
