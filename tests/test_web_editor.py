@@ -211,7 +211,9 @@ def test_selected_node_and_choices(app: WSGIServer) -> None:
     # Section : seule la page peut la contenir.
     assert '<option value="">page (racine)</option>' in html
     assert "page_title (string)" in html and '<option value="can_view"' in html
-    assert " disabled" not in html
+    # Contrat valide : contrôles contractuels actifs.
+    assert '<select id="binding" name="binding">' in html
+    assert '<select id="visible-if" name="visible_if">' in html
 
 
 def test_root_selected_by_default(app: WSGIServer) -> None:
@@ -637,3 +639,210 @@ def test_move_destinations_exclude_subtree_with_wide_rules(
     assert 'value=""' in destinations and 'value="1"' in destinations
     for inside in ('value="0"', 'value="0.0"', 'value="0.0.0"', 'value="0.0.1"'):
         assert inside not in destinations
+
+
+# Classes Tailwind — FD-EDITOR-005.
+
+HERO = {"class": "mx-auto py-8", "tag": "section", "data-test": "hero"}
+
+
+def with_section_props(root: Path, props: dict[str, Any] | None) -> None:
+    data = design_data()
+    section = data["root"]["children"][0]
+    if props is None:
+        section.pop("props")
+    else:
+        section["props"] = props
+    write(root, data)
+
+
+def section_props(root: Path) -> Any:
+    return on_disk(root)["root"]["children"][0].get("props")
+
+
+def test_tailwind_rendering(app: WSGIServer, root: Path) -> None:
+    with_section_props(root, HERO)
+    html = get(app, design=DESIGN, node="0")[1]
+    assert "Classes Tailwind" in html
+    assert 'name="classes" value="mx-auto py-8"' in html
+    for token in ("mx-auto", "py-8"):
+        assert f'<li class="class-token"><code>{token}</code>' in html
+        assert f'aria-label="Retirer {token}"' in html
+    # Suggestions non normatives ; celles déjà présentes sont désactivées.
+    assert 'name="class_token" value="max-w-5xl">' in html
+    assert 'name="class_token" value="mx-auto" disabled>' in html
+    assert '<datalist id="tailwind-suggestions">' in html
+    assert "style=" not in html
+
+
+def test_tailwind_add(app: WSGIServer, root: Path) -> None:
+    with_section_props(root, HERO)
+    status, _, headers = action(
+        app, action="tailwind_add", path="0", class_token="max-w-5xl"
+    )
+    assert status == 303 and location(headers)["node"] == ["0"]
+    assert section_props(root) == {**HERO, "class": "mx-auto py-8 max-w-5xl"}
+    assert list(section_props(root)) == ["class", "tag", "data-test"]
+    html = get(app, design=DESIGN, node="0")[1]
+    assert 'name="classes" value="mx-auto py-8 max-w-5xl"' in html
+
+
+@pytest.mark.parametrize(
+    "token",
+    ["md:grid-cols-2", "hover:bg-slate-100", "w-[37px]", "[mask-type:luminance]"],
+)
+def test_tailwind_add_free_token(app: WSGIServer, root: Path, token: str) -> None:
+    assert action(app, action="tailwind_add", path="0", class_token=token)[0] == 303
+    assert section_props(root)["class"] == "p-4 " + token
+
+
+def test_tailwind_add_on_block_without_props(app: WSGIServer, root: Path) -> None:
+    assert action(app, action="tailwind_add", path="1", class_token="w-full")[0] == 303
+    assert on_disk(root)["root"]["children"][1] == {
+        "type": "table",
+        "binding": "contacts",
+        "props": {"class": "w-full"},
+    }
+
+
+@pytest.mark.parametrize("token", ["a b", "a\tb", "a\nb", "", "a\x00b"])
+def test_tailwind_token_with_blank_400(app: WSGIServer, root: Path, token: str) -> None:
+    before = snapshot(root)
+    assert action(app, action="tailwind_add", path="0", class_token=token)[0] == 400
+    assert action(app, action="tailwind_remove", path="0", class_token=token)[0] == 400
+    assert snapshot(root) == before
+
+
+def test_tailwind_remove_all_occurrences(app: WSGIServer, root: Path) -> None:
+    with_section_props(root, {**HERO, "class": "mx-auto py-8 mx-auto"})
+    assert (
+        action(app, action="tailwind_remove", path="0", class_token="mx-auto")[0] == 303
+    )
+    assert section_props(root) == {**HERO, "class": "py-8"}
+    html = get(app, design=DESIGN, node="0")[1]
+    assert "<code>mx-auto</code>" not in html
+
+
+def test_tailwind_remove_last_keeps_empty_mapping(app: WSGIServer, root: Path) -> None:
+    with_section_props(root, {"class": "p-4"})
+    assert action(app, action="tailwind_remove", path="0", class_token="p-4")[0] == 303
+    assert section_props(root) == {}
+
+
+def test_tailwind_set_only_changes_class(app: WSGIServer, root: Path) -> None:
+    with_section_props(root, HERO)
+    status = action(app, action="tailwind_set", path="0", classes="  b\ta  c ")[0]
+    assert status == 303
+    assert section_props(root) == {**HERO, "class": "b a c"}
+    assert on_disk(root)["root"]["children"][1] == design_data()["root"]["children"][1]
+
+
+def test_tailwind_set_clear(app: WSGIServer, root: Path) -> None:
+    with_section_props(root, HERO)
+    assert action(app, action="tailwind_set", path="0", classes="")[0] == 303
+    assert section_props(root) == {"tag": "section", "data-test": "hero"}
+
+
+@pytest.mark.parametrize(
+    ("props", "fields"),
+    [
+        (HERO, {"action": "tailwind_set", "path": "0", "classes": "mx-auto  py-8"}),
+        (HERO, {"action": "tailwind_add", "path": "0", "class_token": "py-8"}),
+        (HERO, {"action": "tailwind_remove", "path": "0", "class_token": "flex"}),
+        (None, {"action": "tailwind_set", "path": "0", "classes": "   "}),
+        (None, {"action": "tailwind_remove", "path": "0", "class_token": "flex"}),
+    ],
+)
+def test_tailwind_noop_never_writes(
+    app: WSGIServer,
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    props: dict[str, Any] | None,
+    fields: dict[str, str],
+) -> None:
+    with_section_props(root, props)
+    calls: list[object] = []
+
+    def spy(*args: Any, **kwargs: Any) -> None:
+        calls.append(args)
+
+    monkeypatch.setattr(web_editor, "write_design", spy)
+    before = snapshot(root)
+    status, _, headers = action(app, **fields)
+    assert status == 303 and location(headers)["notice"] == ["noop"]
+    assert calls == [] and snapshot(root) == before
+
+
+@pytest.mark.parametrize("value", [True, 3])
+def test_tailwind_non_string_class(app: WSGIServer, root: Path, value: Any) -> None:
+    with_section_props(root, {"class": value, "tag": "section"})
+    html = get(app, design=DESIGN, node="0")[1]
+    assert "props.class n'est pas une chaîne" in html
+    assert f"<code>{json.dumps(value)}</code>" in html
+    assert 'value="tailwind_add"' not in html and 'value="tailwind_set"' not in html
+    before = snapshot(root)
+    for fields in (
+        {"action": "tailwind_add", "path": "0", "class_token": "flex"},
+        {"action": "tailwind_remove", "path": "0", "class_token": "flex"},
+        {"action": "tailwind_set", "path": "0", "classes": "flex"},
+    ):
+        assert action(app, **fields)[0] == 422
+    assert snapshot(root) == before
+    fixed = '{"class": "flex", "tag": "section"}'
+    assert action(app, action="props", path="0", props=fixed)[0] == 303
+
+
+def test_tailwind_path_not_found(app: WSGIServer, root: Path) -> None:
+    before = snapshot(root)
+    status, html, _ = action(app, action="tailwind_add", path="9", class_token="flex")
+    assert status == 422 and "Aucun bloc" in html
+    assert snapshot(root) == before
+
+
+def test_tailwind_post_security(app: WSGIServer, root: Path) -> None:
+    before = snapshot(root)
+    fields = {"design": DESIGN, "action": "tailwind_add", "path": "0"}
+    status = request(
+        app,
+        "/editor/action",
+        {**fields, "class_token": "flex"},
+        origin="http://attacker.example",
+    )[0]
+    assert status == 403
+    extra = {**fields, "class_token": "flex", "classes": "flex"}
+    assert request(app, "/editor/action", extra)[0] == 400
+    assert request(app, "/editor/action", fields)[0] == 400  # champ manquant
+    assert snapshot(root) == before
+
+
+def test_tailwind_conflict_409(
+    app: WSGIServer, root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = web_editor.read_design
+
+    def read_then_external_edit(project: Path, path: str) -> Any:
+        result = original(project, path)
+        data = design_data()
+        data["view"] = "external/edit"
+        write(root, data)
+        return result
+
+    monkeypatch.setattr(web_editor, "read_design", read_then_external_edit)
+    status, html, _ = action(app, action="tailwind_add", path="0", class_token="flex")
+    assert status == 409 and "modifié depuis sa lecture" in html
+    assert on_disk(root)["view"] == "external/edit"
+
+
+def test_tailwind_uses_set_design_props(
+    app: WSGIServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[object] = []
+    original = web_editor.set_design_props
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs["props"])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(web_editor, "set_design_props", spy)
+    action(app, action="tailwind_add", path="0", class_token="flex")
+    assert calls == [{"class": "p-4 flex"}]

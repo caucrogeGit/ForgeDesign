@@ -110,3 +110,11 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .editor-panel select, .editor-panel textarea { width: 100%; padding: .6rem; border: 1px solid #77847e; border-radius: .3rem; font: inherit; background: white; }
 .editor-panel textarea { font-family: monospace; }
 .editor-panel select:focus-visible, .editor-panel textarea:focus-visible { outline: 3px solid #b64c29; outline-offset: 3px; }
+.class-tokens { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
+.class-token { display: flex; align-items: center; gap: .4rem; margin: 0; padding: .2rem .2rem .2rem .6rem; border: 1px solid #77847e; border-radius: 1rem; }
+.class-token form, .tailwind-suggestions form { margin-top: 0; }
+.class-token button { padding: .2rem .6rem; border-radius: 1rem; font-size: .85rem; }
+.tailwind-suggestions form { margin-block: .75rem; }
+.tailwind-suggestions p { margin: 0 0 .3rem; font-weight: 600; }
+.tailwind-suggestions button { margin: 0 .3rem .3rem 0; padding: .3rem .7rem; font-family: monospace; font-size: .85rem; }
+.tailwind-suggestions button:disabled { opacity: .45; cursor: default; }

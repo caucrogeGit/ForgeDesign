@@ -1684,7 +1684,10 @@ POST action explicite → lecture Design → mutation Editor → write_design
 → redirect 303 → GET /editor
 ```
 
-Un no-op ou un refus n'écrit rien. Les POST exigent
+Un no-op ou un refus n'écrit rien. L'assistant de classes Tailwind
+(FD-EDITOR-005) suit le même chemin :
+`Web Editor → web/tailwind_classes.py → set_design_props → write_design`, en ne
+modifiant que `props.class` (tokens opaques, sans grammaire Tailwind). Les POST exigent
 `is_local_action` et un formulaire urlencodé. Sans contrat valide, la
 structure et les props restent éditables ; binding, condition et colonnes
 sont refusés côté serveur. Aucun JavaScript ni Tool.

@@ -112,6 +112,58 @@
   <button type="submit">Appliquer les props</button>
 </form>
 
+<section class="tailwind" aria-labelledby="tailwind-title">
+<h3 id="tailwind-title">Classes Tailwind</h3>
+{% if not class_editable %}
+<p class="message error">props.class n'est pas une chaîne (valeur actuelle : <code>{{ class_raw }}</code>). L'assistant est désactivé : corrigez la valeur via le JSON des props.</p>
+{% else %}
+<p>Source réelle : <code>props.class</code>. Les classes sont conservées telles quelles ; Forge Design ne vérifie pas qu'elles existent dans le Tailwind du projet.</p>
+<form action="/editor/action" method="post">
+  <input type="hidden" name="action" value="tailwind_set">
+  <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="path" value="{{ selected.path_value }}">
+  <label for="classes">Classes réelles (vide pour supprimer)</label>
+  <input id="classes" name="classes" value="{{ classes_value }}" autocomplete="off" spellcheck="false">
+  <button type="submit">Remplacer la chaîne</button>
+</form>
+{% if class_tokens %}
+<ul class="class-tokens" aria-label="Classes actuelles">
+{% for token in class_tokens %}
+<li class="class-token"><code>{{ token }}</code>
+<form action="/editor/action" method="post">
+  <input type="hidden" name="action" value="tailwind_remove">
+  <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="path" value="{{ selected.path_value }}">
+  <input type="hidden" name="class_token" value="{{ token }}">
+  <button type="submit" aria-label="Retirer {{ token }}">Retirer</button>
+</form></li>
+{% endfor %}
+</ul>
+{% else %}<p>Aucune classe.</p>{% endif %}
+<form action="/editor/action" method="post">
+  <input type="hidden" name="action" value="tailwind_add">
+  <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="path" value="{{ selected.path_value }}">
+  <label for="class-token">Ajouter une classe (libre : md:grid-cols-2, hover:bg-slate-100, w-[37px]…)</label>
+  <input id="class-token" name="class_token" list="tailwind-suggestions" autocomplete="off" spellcheck="false" required>
+  <button type="submit">Ajouter</button>
+</form>
+<datalist id="tailwind-suggestions">{% for category, tokens in tailwind_suggestions %}{% for token in tokens %}<option value="{{ token }}">{% endfor %}{% endfor %}</datalist>
+<details class="tailwind-suggestions">
+<summary>Suggestions courantes (non exhaustives)</summary>
+{% for category, tokens in tailwind_suggestions %}
+<form action="/editor/action" method="post" aria-label="{{ category }}">
+  <input type="hidden" name="action" value="tailwind_add">
+  <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="path" value="{{ selected.path_value }}">
+  <p>{{ category }}</p>
+  {% for token in tokens %}<button type="submit" name="class_token" value="{{ token }}"{% if token in class_tokens %} disabled{% endif %}>{{ token }}</button> {% endfor %}
+</form>
+{% endfor %}
+</details>
+{% endif %}
+</section>
+
 {% if selected.type == "table" %}
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="columns">

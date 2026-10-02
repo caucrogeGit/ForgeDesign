@@ -32,6 +32,7 @@ from forge_design.design.models import (
     DesignNode,
     DesignNodeType,
     PageRoot,
+    PropValue,
     TableColumn,
 )
 from forge_design.design.nesting import ALLOWED_CHILDREN, can_contain
@@ -61,6 +62,17 @@ from forge_design.limits import (
 )
 from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
+from forge_design.web.tailwind_classes import (
+    CLASS_KEY,
+    SUGGESTIONS,
+    ClassNotEditableError,
+    Props,
+    add_class,
+    current_classes,
+    parse_class_tokens,
+    remove_class,
+    set_classes,
+)
 
 # Champs de formulaire locaux : bien en deçà de la limite de corps Forge (1 Mo).
 MAX_EDITOR_FIELD_CHARS = 64 * 1024
@@ -81,6 +93,9 @@ _ACTION_FIELDS: Mapping[str, frozenset[str]] = {
     "visibility": frozenset({"action", "design", "path", "visible_if"}),
     "props": frozenset({"action", "design", "path", "props"}),
     "columns": frozenset({"action", "design", "path", "columns"}),
+    "tailwind_set": frozenset({"action", "design", "path", "classes"}),
+    "tailwind_add": frozenset({"action", "design", "path", "class_token"}),
+    "tailwind_remove": frozenset({"action", "design", "path", "class_token"}),
 }
 _CONTRACT_ACTIONS = frozenset({"binding", "visibility", "columns"})
 _NOTICES = {
@@ -104,7 +119,7 @@ class EditorNodeView:
     type: DesignNodeType
     binding: str | None
     visible_if: str | None
-    props: tuple[tuple[str, object], ...]
+    props: tuple[tuple[str, PropValue], ...]
     columns: tuple[tuple[str, str], ...] | None
     child_count: int
     # Rendu en listes imbriquées sans récursion Jinja ni style inline (CSP).
@@ -304,6 +319,11 @@ def _selection_context(
         booleans = tuple(name for name, kind in variables if kind == "boolean")
         actions = tuple(sorted(contract.actions or {}))
     props = dict(selected.props)
+    try:
+        classes = current_classes(props)
+        class_editable = True
+    except ClassNotEditableError:
+        classes, class_editable = None, False
     columns = (
         None
         if selected.columns is None
@@ -318,6 +338,11 @@ def _selection_context(
         "booleans": booleans,
         "actions": actions,
         "props_json": json.dumps(props, ensure_ascii=False) if selected.props else "",
+        "class_editable": class_editable,
+        "classes_value": classes or "",
+        "class_tokens": parse_class_tokens(classes or "") if class_editable else (),
+        "class_raw": json.dumps(props.get(CLASS_KEY), ensure_ascii=False),
+        "tailwind_suggestions": SUGGESTIONS,
         "columns_json": ""
         if columns is None
         else json.dumps(columns, ensure_ascii=False, indent=2),
@@ -431,6 +456,42 @@ def _columns(text: str) -> list[TableColumn] | None:
         ) from None
 
 
+def _node_props(design: DesignFile, path: NodePath) -> tuple[bool, Props | None]:
+    """Props réelles (None si absentes, distinct de {}) ; False si introuvable."""
+    node: DesignNode | PageRoot = design.root
+    for index in path:
+        children = node.children or []
+        if not 0 <= index < len(children):
+            return False, None
+        node = children[index]
+    return True, node.props
+
+
+def _tailwind(
+    action: str, fields: Mapping[str, str], design: DesignFile
+) -> DesignEditResult:
+    """Nouvelles props où seule "class" change ; set_design_props reste l'autorité."""
+    path = _path(fields, "path")
+    found, props = _node_props(design, path)
+    if not found:
+        # Chemin refusé par l'éditeur lui-même (editor.path_not_found).
+        return set_design_props(design, path=path, props=None)
+    try:
+        if action == "tailwind_set":
+            updated = set_classes(props, fields["classes"])
+        elif action == "tailwind_add":
+            updated = add_class(props, fields["class_token"])
+        else:
+            updated = remove_class(props, fields["class_token"])
+    except ClassNotEditableError:
+        raise _HttpError(
+            422, "props.class n'est pas une chaîne : corrigez-la via le JSON des props."
+        ) from None
+    except ValueError as error:
+        raise _HttpError(400, "Classes : " + str(error)) from None
+    return set_design_props(design, path=path, props=updated)
+
+
 def _apply(
     action: str,
     fields: Mapping[str, str],
@@ -454,6 +515,9 @@ def _apply(
         "props": lambda: set_design_props(
             design, path=_path(fields, "path"), props=_props(fields["props"])
         ),
+        "tailwind_set": lambda: _tailwind(action, fields, design),
+        "tailwind_add": lambda: _tailwind(action, fields, design),
+        "tailwind_remove": lambda: _tailwind(action, fields, design),
     }
     if contract is not None:
         operations |= {

@@ -1,4 +1,4 @@
-# Éditeur structurel — FD-EDITOR-001 à 004
+# Éditeur structurel — FD-EDITOR-001 à 005
 
 Mutations contrôlées d'un `DesignFile` : **ajouter**, **supprimer** et
 **déplacer** un bloc, puis **configurer ses propriétés**. L'éditeur est un moteur en mémoire, réutilisable par une future UI :
@@ -409,3 +409,90 @@ Pas de JavaScript, de drag-and-drop, de canvas, d'autosave du template, de
 génération implicite, d'undo, de session ni de Tool. L'indentation de l'arbre
 utilise des listes imbriquées : la CSP de Forge (`style-src 'self'`) interdit
 les styles inline.
+
+## Classes Tailwind — FD-EDITOR-005
+
+Assistant Web pour `props.class`, sans changer le modèle Design ni le stockage.
+**`props.class` reste la seule source réelle** : aucune clé `tailwind`,
+`style` ou `classes`, et aucun fichier annexe.
+
+```text
+Web Editor → web/tailwind_classes.py (pur) → set_design_props → write_design
+```
+
+### Tokens opaques
+
+Une classe est un token séparé par des **blancs ASCII** (espace, tabulation,
+CR, LF, FF, VT). Forge Design n'interprète **aucune grammaire Tailwind** : les
+variantes (`md:`, `hover:`, `dark:`, `group-hover:`), les valeurs arbitraires
+(`w-[37px]`, `w-[calc(100%-2rem)]`) et les propriétés arbitraires
+(`[mask-type:luminance]`) sont conservées telles quelles. Un token est refusé
+seulement s'il est vide ou contient un blanc ASCII ou NUL. Forge Design ne
+garantit pas qu'une classe existe dans la version Tailwind du projet, seulement
+qu'elle est conservée explicitement. Il n'y a ni dépendance Tailwind, ni npm,
+ni build CSS, ni JavaScript.
+
+### Actions
+
+| Action | Champs exacts | Effet |
+|---|---|---|
+| `tailwind_set` | `design`, `path`, `classes` | remplace toute la chaîne ; vide supprime la clé `class` |
+| `tailwind_add` | `design`, `path`, `class_token` | ajoute en fin si absent |
+| `tailwind_remove` | `design`, `path`, `class_token` | retire **toutes** les occurrences exactes |
+
+Chaque action ne modifie **que** `props["class"]` : les autres props, leurs
+valeurs et l'ordre des clés sont conservés. Une clé `class` existante garde sa
+position ; une nouvelle est ajoutée en dernier. Si `class` était la seule prop
+et qu'elle disparaît, `props` devient `{}` : l'action porte sur la classe, pas
+sur la propriété `props` entière. Les nouvelles props passent toujours par
+`set_design_props`, qui reste l'autorité, puis par `write_design`.
+
+### Canonicalisation, ordre et doublons
+
+- Toute action qui modifie la chaîne l'écrit sous forme canonique : tokens
+  séparés par **un seul espace**, sans blanc en tête ni en fin.
+- L'ordre est conservé, sans tri, et l'ajout se fait en fin.
+- Les doublons historiques ne sont **pas** nettoyés globalement :
+  `mx-auto mx-auto py-8` plus `text-xl` donne `mx-auto mx-auto py-8 text-xl`.
+  Ajouter un token déjà présent est un no-op ; le retirer enlève toutes ses
+  occurrences.
+- Le JSON générique des props reste disponible pour écrire **exactement** une
+  autre chaîne, non canonique comprise.
+
+### No-op
+
+Aucune écriture (`write_design` non appelé) et 303 avec « Aucune
+modification. » dans trois cas : `tailwind_set` dont la forme canonique est
+égale à celle de la chaîne actuelle, `tailwind_add` d'un token présent, et
+`tailwind_remove` d'un token absent. Les helpers rendent alors le mapping
+d'origine tel quel, même absent, pour que `set_design_props` constate le
+no-op : sans cela, un bloc sans props recevrait `{}`.
+
+### Interface
+
+Sous le JSON des props, la section « Classes Tailwind » affiche :
+- la **chaîne réelle** dans un champ texte visible, copiable et remplaçable ;
+- les tokens actuels, chacun avec un bouton « Retirer » (un formulaire
+  indépendant par token) ;
+- un champ libre « Ajouter » avec une `<datalist>` de suggestions ;
+- des suggestions par catégorie (Layout, Largeur, Espacement, Texte, Couleurs,
+  Bordures), sous forme de boutons d'ajout ; ceux déjà présents sont
+  désactivés.
+
+Les suggestions sont une **courte liste non normative** : une classe absente
+de la liste reste autorisée, et rien n'est téléchargé. Aucun style inline, à
+cause de la CSP.
+
+### `props.class` qui n'est pas une chaîne
+
+Le modèle autorise toute `PropValue` (par exemple `{"class": true}`). Dans ce
+cas, la valeur est affichée, l'assistant est désactivé et ses actions
+répondent 422 sans écrire. Aucune conversion automatique n'est faite :
+la correction passe par le JSON des props.
+
+### Sécurité
+
+Inchangée par rapport à FD-EDITOR-004 : `is_local_action` (403), formulaire
+urlencodé (415), champs exacts par action (400), 64 Kio par champ, révision
+attendue (409 en cas de conflit). Un token invalide donne 400. Après l'action,
+le même bloc reste sélectionné.
