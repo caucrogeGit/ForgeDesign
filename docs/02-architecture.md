@@ -1933,6 +1933,25 @@ annule seulement le diff, conserve contenus/métriques et marque complete=False.
 Aucun état global mutable, I/O, Web, historique ou écriture. Les API sont exportées
 par forge_design.generate, sans nouvelle dépendance ni package setuptools.
 
+### Boutons HTMX — FD-INTERACT-001
+
+```text
+Button Design
+    +
+ViewAction
+    ↓
+controlled interaction generation   (generate/buttons.py)
+    ↓
+HTML + HTMX attributes
+```
+
+`button` est générable : `binding` → `contract.actions`, `GET` → `hx-get`,
+`POST` → `hx-post`, avec URL issue de `ViewAction.path` seulement. Props en
+liste blanche (`class`, `hx-target`, `hx-swap`, `hx-confirm`), valeurs opaques
+échappées. Les autres méthodes et `POST` avec `csrf: true` sont refusés (bouton
+omis). Aucun script, CDN ni runtime HTMX ; la preview reste inerte. Voir
+[template-generation.md](generate/template-generation.md).
+
 ### Journal des succès d'écriture — FD-GENERATE-005
 
 ```text

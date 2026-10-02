@@ -452,3 +452,95 @@ relu, réparé ou compacté. Aucune rotation ni borne de taille totale ici.
 FD-GENERATE-005 fournit seulement History append. La future couche SAFEWRITE
 traitera écriture contrôlée, conflits et modifications externes. Ce journal
 minimal ne contient ni hash, révision, inode ou mtime.
+
+## Boutons HTMX — FD-INTERACT-001
+
+Module interne `forge_design/generate/buttons.py` (`prepare_button`,
+`render_button`), orchestré par `simple.py` comme les tables : le bouton est
+**entièrement préparé avant émission**, condition comprise.
+
+```text
+Button Design (binding + props) + ViewAction du contrat
+   → interaction contrôlée
+   → <button type="button" … hx-get|hx-post="…">Action</button>
+```
+
+### Représentation
+
+Aucun changement de schéma ni de modèle : le bouton est un `DesignNode`
+`button` dont `binding` désigne `contract.actions[binding]` (`ViewAction`
+existant : `method`, `path`, `csrf`). Les attributs HTMX sont des props
+explicites (`"hx-target": "#main"`). La résolution et la vérification de
+l'action restent celles de `validate_design_bindings` : une action inconnue,
+ou un binding vers une variable de contexte, donne `generate.invalid_binding`.
+C'est **bloquant** pour tout le template, comme pour `title` et `text`.
+
+### Méthodes et URL
+
+| `ViewAction.method` | Attribut |
+|---|---|
+| `GET` | `hx-get` |
+| `POST` | `hx-post` |
+| autre (`PUT`, `PATCH`, `DELETE`, `HEAD`…) | `generate.unsupported_action_method`, bouton omis |
+
+L'URL vient **exclusivement** de `ViewAction.path`. Elle n'est jamais déduite
+du nom de l'action, de l'entité ou du bouton, et elle n'est pas vérifiée
+contre le routeur Forge : aucun import ni exécution du projet cible.
+
+### Sortie
+
+Une ligne, avec des attributs dans un **ordre fixe**, indépendant de l'ordre
+des props : `type="button"` (toujours, pour éviter une soumission implicite),
+`class`, `hx-get` ou `hx-post`, `hx-target`, `hx-swap`, `hx-confirm`. Le
+libellé est `Action`, convention de la preview, tant que le Design n'a pas de
+représentation explicite du libellé.
+
+```html
+<button type="button" class="px-4 py-2" hx-get="/contacts/create" hx-target="#content" hx-swap="outerHTML">Action</button>
+```
+
+### Props
+
+Liste blanche fermée : `class`, `hx-target`, `hx-swap`, `hx-confirm`. Les
+valeurs `hx-*` sont **opaques** (`closest tr`, `beforeend swap:1s`…), sans
+analyse de la syntaxe HTMX. Elles doivent être des chaînes non vides, sinon
+`generate.invalid_htmx_prop` et le bouton est omis. Toute autre clé (`tag`,
+`onclick`, `style`, `hx-trigger`, `hx-get`, `data-*`…) donne
+`generate.unsupported_prop` et **n'est pas émise** : les props ne deviennent
+jamais des attributs arbitraires. Une `class` non textuelle suit la politique
+existante (`unsupported_prop`, ignorée).
+
+### Échappement
+
+`class`, le chemin et les valeurs `hx-*` passent par l'échappement commun du
+générateur : `html.escape(quote=True)`, neutralisation de `{` et `}`, CR et LF
+encodés. Une valeur `"><script>…` reste dans l'attribut, et `{{ … }}`,
+`{% … %}` ou `{# … #}` ne deviennent jamais du Jinja. Tous les caractères
+participent au budget `MAX_GENERATED_TEMPLATE_CHARS` : un dépassement donne
+`generate.output_too_large`, sans template partiel.
+
+### Conditions
+
+`visible_if` réutilise l'enveloppe `{% if … %}` existante. Un bouton omis ne
+laisse pas de condition vide. Une condition invalide garde le diagnostic
+historique (`generate.invalid_condition`).
+
+### CSRF
+
+Aucune stratégie CSRF n'est inventée : aucun jeton, champ ni en-tête n'est
+généré.
+- `GET` : généré quel que soit `csrf`.
+- `POST` sans `csrf`, ou avec `csrf: false` : généré (`hx-post`), **sans
+  protection CSRF fournie par Forge Design** ; l'application cible en reste
+  responsable.
+- `POST` avec `csrf: true` : `generate.unsupported_csrf`, bouton omis. Émettre
+  seulement `hx-post` ferait perdre une exigence explicite du contrat, alors
+  que Forge Design ne connaît ni jeton, ni session, ni nom de champ.
+
+### Preview et runtime
+
+La preview reste **inerte** : `render_preview` n'émet ni `hx-get`/`hx-post`
+ni chemin, et les props `hx-*` y produisent `preview.unsupported_prop`. La
+preview ne simule aucune interaction. Forge Design ne génère ni `<script>` ni
+CDN, et ne vérifie pas qu'HTMX est installé : le chargement d'HTMX appartient
+à l'application Forge cible. Pas de dépendance npm.

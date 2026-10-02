@@ -1,18 +1,19 @@
 """Génération HTML/Jinja simple après revalidation, sans moteur de templates."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from html import escape
 from typing import Never
 
 from pydantic import ValidationError
 
-from forge_design.contracts.models import ViewContract
+from forge_design.contracts.models import ViewAction, ViewContract
 from forge_design.design.bindings import validate_design_bindings
 from forge_design.design.conditional_bindings import validate_conditional_bindings
 from forge_design.design.models import DesignFile, DesignNode, PageRoot
 from forge_design.design.nesting import validate_design_nesting
 from forge_design.design.table_bindings import TableBindingInfo, validate_table_bindings
+from forge_design.generate.buttons import ButtonPlan, prepare_button, render_button
 from forge_design.generate.control_flow import (
     indent_line,
     is_safe_jinja_identifier,
@@ -79,6 +80,8 @@ class _Generator:
         self.lines: list[str] = []
         self.length = 0
         self.tables: dict[tuple[str | int, ...], TableBindingInfo] = {}
+        self.actions: Mapping[str, ViewAction] = {}
+        self.buttons: dict[tuple[str | int, ...], ButtonPlan] = {}
 
     def issue(self, code: str, location: tuple[str | int, ...]) -> None:
         if len(self.issues) >= MAX_DESIGN_ISSUES:
@@ -144,11 +147,17 @@ class _Generator:
     def node(
         self, node: DesignNode | PageRoot, path: tuple[str | int, ...], depth: int
     ) -> None:
-        if node.type not in {"page", "table"} and node.type not in _TAGS:
+        if node.type not in {"page", "table", "button"} and node.type not in _TAGS:
             self.issue("unsupported_block", path)
             return
         if node.type == "table" and not prepare_table(node, self.tables[path], self):
             return
+        if node.type == "button":
+            # Préparé avant toute émission, condition comprise.
+            plan = prepare_button(node, path, self.actions, self)
+            if plan is None:
+                return
+            self.buttons[path] = plan
         condition = node.visible_if
         if condition is not None:
             if not is_safe_jinja_identifier(condition):
@@ -165,6 +174,9 @@ class _Generator:
     ) -> None:
         if node.type == "table":
             render_table(node, self.tables[path], depth, self)
+            return
+        if node.type == "button":
+            render_button(self.buttons[path], depth, path, self)
             return
         tag = _TAGS.get(node.type, "")
         classes = ""
@@ -232,8 +244,11 @@ def generate_simple_template(
         bindings = validate_design_bindings(design, contract)
         if bindings.truncated:
             generator.stop("analysis_truncated", bindings.issues[-1].location)
+        # Binding nécessaire à la génération : texte, titre et action de bouton.
         invalid = [
-            issue for issue in bindings.issues if issue.node_type in {"title", "text"}
+            issue
+            for issue in bindings.issues
+            if issue.node_type in {"title", "text", "button"}
         ]
         if invalid:
             for issue in invalid:
@@ -258,6 +273,7 @@ def generate_simple_template(
         if tables.truncated:
             generator.stop("analysis_truncated", tables.issues[-1].location)
         generator.tables = {table.location: table for table in tables.tables}
+        generator.actions = contract.actions or {}
         generator.node(design.root, ("root",), 0)
     except _Stopped:
         template = ""
