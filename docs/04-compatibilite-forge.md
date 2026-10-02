@@ -237,6 +237,19 @@ absent des imports publics du contrat de stabilité : le bootstrap vérifie la
 version `forge-mvc` du projet (`1.0.0rc9`) et la présence du symbole avant
 tout bind.
 
+Confirmé à l'exécution par FD-REALPREVIEW-002, sur des projets synthétiques
+copiés du squelette `forge-mvc` 1.0.0rc9 installé, jamais sur un projet
+utilisateur :
+
+- `import app` construit `application` sans serveur, et
+  `create_wsgi_app(app.application)` sert `GET /health` →
+  `200 application/json {"status": "ok"}` ;
+- `env/dev` est bien chargé dans l'enfant (`APP_HOST=0.0.0.0`,
+  `APP_SSL_ENABLED=true` y sont visibles), sans effet sur l'endpoint ;
+- l'import du squelette exige aussi le dossier `optins/` (`register_optins`),
+  en plus des signatures reconnues par Forge Design. Un projet sans `optins/`
+  échoue à l'import (code 5), avec la trace dans les logs.
+
 ## 8. Évolution
 
 Lorsqu'une évolution Forge casse une hypothèse Forge Design :

@@ -2063,6 +2063,28 @@ FD-REALPREVIEW-001A) ; la sonde `/health` ne sert qu'à la readiness. Cinq
 états (`stopped`, `starting`, `running`, `failed`, `stopping`), arrêt `SIGTERM` puis `SIGKILL` au groupe de processus, logs
 en mémoire bornée, aucun état disque. Seul le template présent sur disque est
 rendu, par une route `GET` publique, statique et unique issue de Route
-Explorer. Un processus séparé n'est pas une sandbox OS. Aucun code encore :
-futur paquet `forge_design/real_preview/`, runner seul en FD-REALPREVIEW-002.
+Explorer. Un processus séparé n'est pas une sandbox OS.
 Contrat normatif : [preview réelle](preview/real-preview-contract.md).
+
+#### Runner implémenté — FD-REALPREVIEW-002
+
+`forge_design/real_preview/` contient le runner seul, sans proxy, iframe, UI
+ni composition Web (le contrôleur n'est pas encore créé par
+`create_application`) :
+
+- `controller.py` : `RealPreviewController.start(project_root)` réutilise
+  `resolve_project_root`, `detect_forge_project` et `open_directory`. Il
+  vérifie `.venv/bin/python`, alloue le port, construit l'environnement en
+  liste blanche, puis lance l'enfant (`shell=False`, nouveau groupe). Un seul
+  thread lit le tube jusqu'à EOF dans un tampon borné, et `start` attend
+  `/health` ou un échec. `status()` détecte une sortie spontanée ; `stop()`
+  envoie `SIGTERM` puis `SIGKILL` au groupe.
+- `child_bootstrap.py` : bibliothèque standard seule. Garde d'audit
+  `socket.bind`, contrôle de `forge-mvc` 1.0.0rc9 et de `create_wsgi_app`,
+  `import app`, garde `Host`, serveur `wsgiref` sur `127.0.0.1:<port>` sans
+  réutilisation d'adresse ni de port. Codes de sortie 2 à 6.
+- `models.py` : configuration bornée et instantané immuable.
+
+Le projet n'est importé que dans l'enfant. Forge Design ne modifie ni son
+`sys.path`, ni son environnement, ni son cwd, et n'écoute sur aucun socket
+pour la preview.

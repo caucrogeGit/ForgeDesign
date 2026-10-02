@@ -3,14 +3,52 @@
 Contrat normatif de FD-REALPREVIEW-001, corrigé par FD-REALPREVIEW-001A
 (confinement réseau garanti avant le bind). Il fixe les décisions dont
 dépendent FD-REALPREVIEW-002 (runner local) et les tickets d'intégration Web
-suivants. Aucun code n'existe encore : ce document décrit ce qui sera
-implémenté.
+suivants. Le runner est implémenté par FD-REALPREVIEW-002 (voir
+« Implémentation du runner ») ; proxy, iframe et UI restent à venir.
 
 Les faits Forge cités ont été vérifiés statiquement dans `forge-mvc==1.0.0rc9`
 (version épinglée par Forge Design), le paquet installé et le dépôt Forge local
 au commit `73a956e587e5f169c028415e0e540c149cbaff56`
 (`v1.0.0-rc.9-7-g73a956e5`, même `version = "1.0.0rc9"`). Aucune application
 Forge n'a été lancée pour les établir.
+
+## Implémentation du runner
+
+FD-REALPREVIEW-002 implémente ce contrat dans `forge_design/real_preview/` :
+
+- `RealPreviewController` (`start(project_root)`, `stop()`, `status()`),
+  synchrone ; `RealPreviewConfig`, `RealPreviewStatus`, `RealPreviewState`,
+  `RealPreviewError` ;
+- `child_bootstrap.py`, exécuté par l'interpréteur du projet, jamais importé
+  ni exporté par Forge Design.
+
+Précisions et écarts découverts en implémentant, sans changer le contrat :
+
+- **Code de sortie 6** : bind impossible pour une autre raison que
+  `EADDRINUSE`, par exemple un refus de la garde d'audit si l'adresse était
+  modifiée.
+- **Survivants du groupe** : dès que le leader se termine (arrêt, échec ou
+  sortie spontanée), `SIGKILL` est envoyé au groupe, *avant* de récolter le
+  leader. Son PID, encore réservé tant qu'il n'est pas récolté, garantit que le
+  groupe visé est bien le sien (`os.waitid(..., WNOWAIT)`). Sans `os.waitid`,
+  le leader est récolté directement : cette garantie n'existe pas.
+- **Arrêt pendant `starting`** : `stop()` interrompt l'attente de readiness de
+  `start()`, qui rend l'état courant, puis arrête le groupe.
+- **Préconditions** : plateforme, racine, projet non reconnu, interpréteur,
+  bootstrap ou port indisponible donnent `failed` avec une raison, sans
+  lancement. Seul un usage incohérent (start pendant
+  `starting`/`running`/`stopping`) lève `RealPreviewError`. Une
+  configuration invalide lève `ValueError` à la construction.
+- **Après `stop()`** : `project_root`, `exit_code` et les logs restent
+  visibles jusqu'au prochain `start()`, qui les réinitialise.
+- **Logs** : lignes sans terminaison, du plus ancien au plus récent ; une
+  ligne trop longue garde ses `max_log_chars` premiers caractères et le reste
+  est lu puis jeté.
+- **Sonde** : ni proxy d'environnement (`http_proxy`…), ni redirection
+  suivie ; corps lu au plus 1 024 octets.
+- **Paquet** : `forge_design.real_preview` est ajouté à la liste explicite des
+  paquets de `pyproject.toml`, faute de quoi la wheel ne contiendrait pas le
+  bootstrap.
 
 ## Définition
 
