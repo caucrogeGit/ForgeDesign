@@ -191,13 +191,12 @@ def test_invalid_binding_is_global(context: dict[str, Any]) -> None:
     )
 
 
-# button est généré depuis FD-INTERACT-001 (tests/test_generate_buttons.py).
-@pytest.mark.parametrize("kind", ["form", "field", "alert"])
+# button (FD-INTERACT-001), form et field (FD-INTERACT-003) sont générés ;
+# voir tests/test_generate_buttons.py et tests/test_generate_forms.py.
+@pytest.mark.parametrize("kind", ["alert"])
 def test_unsupported_branches(kind: str) -> None:
     node: dict[str, Any] = {"type": kind, "binding": "unknown"}
-    if kind == "field":
-        branch = section([{"type": "form", "children": [node]}])
-    elif kind == "empty_state":
+    if kind == "empty_state":
         branch = {"type": "table", "children": [node]}
     else:
         branch = section([node])

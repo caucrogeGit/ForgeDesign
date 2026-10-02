@@ -1933,6 +1933,26 @@ annule seulement le diff, conserve contenus/métriques et marque complete=False.
 Aucun état global mutable, I/O, Web, historique ou écriture. Les API sont exportées
 par forge_design.generate, sans nouvelle dépendance ni package setuptools.
 
+### Formulaires générés — FD-INTERACT-003
+
+```text
+Form Design ──────────────► ViewAction
+    │
+    ├─ FieldDefinition
+    └─ children
+            ↓
+     generate/forms.py   (politique commune : generate/actions.py)
+            ↓
+       HTML + HTMX
+```
+
+`form` et `field` sont générés : `action`/`method` natifs et
+`hx-get`/`hx-post` depuis la même `ViewAction.path`, et des `<input>` issus
+de `FieldDefinition` (libellé englobant, `required`). `validate_form_fields`
+est réutilisé comme garde bloquant. Il n'y a ni `id`, ni `value`, ni submit
+implicite ; `POST` avec `csrf: true` est refusé. Aucun script, ni runtime
+HTMX.
+
 ### Contrat des formulaires — FD-INTERACT-002
 
 ```text

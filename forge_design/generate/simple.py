@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from forge_design.contracts.models import ViewAction, ViewContract
 from forge_design.design.bindings import validate_design_bindings
 from forge_design.design.conditional_bindings import validate_conditional_bindings
+from forge_design.design.form_fields import validate_form_fields
 from forge_design.design.models import DesignFile, DesignNode, PageRoot
 from forge_design.design.nesting import validate_design_nesting
 from forge_design.design.table_bindings import TableBindingInfo, validate_table_bindings
@@ -18,6 +19,15 @@ from forge_design.generate.control_flow import (
     indent_line,
     is_safe_jinja_identifier,
     jinja_condition,
+)
+from forge_design.generate.forms import (
+    FieldPlan,
+    FormPlan,
+    prepare_field,
+    prepare_form,
+    render_field,
+    render_form_close,
+    render_form_open,
 )
 from forge_design.generate.tables import prepare_table, render_table
 from forge_design.limits import (
@@ -35,6 +45,8 @@ _TAGS = {
     "title": "h2",
     "text": "p",
 }
+# Blocs générés par un module dédié, hors balise simple de _TAGS.
+_INTERACTIVE = frozenset({"page", "table", "button", "form", "field"})
 _SAFE_TAGS = frozenset(
     (
         "div",
@@ -82,6 +94,8 @@ class _Generator:
         self.tables: dict[tuple[str | int, ...], TableBindingInfo] = {}
         self.actions: Mapping[str, ViewAction] = {}
         self.buttons: dict[tuple[str | int, ...], ButtonPlan] = {}
+        self.forms: dict[tuple[str | int, ...], FormPlan] = {}
+        self.fields: dict[tuple[str | int, ...], FieldPlan] = {}
 
     def issue(self, code: str, location: tuple[str | int, ...]) -> None:
         if len(self.issues) >= MAX_DESIGN_ISSUES:
@@ -147,7 +161,7 @@ class _Generator:
     def node(
         self, node: DesignNode | PageRoot, path: tuple[str | int, ...], depth: int
     ) -> None:
-        if node.type not in {"page", "table", "button"} and node.type not in _TAGS:
+        if node.type not in _INTERACTIVE and node.type not in _TAGS:
             self.issue("unsupported_block", path)
             return
         if node.type == "table" and not prepare_table(node, self.tables[path], self):
@@ -158,6 +172,14 @@ class _Generator:
             if plan is None:
                 return
             self.buttons[path] = plan
+        if node.type == "form":
+            # Balise entière préparée : un formulaire omis l'est avec son sous-arbre.
+            form = prepare_form(node, path, self.actions, self)
+            if form is None:
+                return
+            self.forms[path] = form
+        if node.type == "field":
+            self.fields[path] = prepare_field(node, path, self)
         condition = node.visible_if
         if condition is not None:
             if not is_safe_jinja_identifier(condition):
@@ -177,6 +199,17 @@ class _Generator:
             return
         if node.type == "button":
             render_button(self.buttons[path], depth, path, self)
+            return
+        if node.type == "field":
+            render_field(self.fields[path], depth, path, self)
+            return
+        if node.type == "form":
+            children = node.children or []
+            render_form_open(self.forms[path], depth, path, self, empty=not children)
+            if children:
+                for index, child in enumerate(children):
+                    self.node(child, (*path, "children", index), depth + 1)
+                render_form_close(depth, path, self)
             return
         tag = _TAGS.get(node.type, "")
         classes = ""
@@ -244,11 +277,11 @@ def generate_simple_template(
         bindings = validate_design_bindings(design, contract)
         if bindings.truncated:
             generator.stop("analysis_truncated", bindings.issues[-1].location)
-        # Binding nécessaire à la génération : texte, titre et action de bouton.
+        # Binding nécessaire à la génération : texte, titre, actions bouton et form.
         invalid = [
             issue
             for issue in bindings.issues
-            if issue.node_type in {"title", "text", "button"}
+            if issue.node_type in {"title", "text", "button", "form"}
         ]
         if invalid:
             for issue in invalid:
@@ -266,6 +299,19 @@ def generate_simple_template(
                     "analysis_truncated"
                     if issue.code.endswith("analysis_truncated")
                     else "invalid_condition",
+                    issue.location,
+                )
+            raise _Stopped
+        fields = validate_form_fields(design)
+        if fields.truncated:
+            generator.stop("analysis_truncated", fields.issues[-1].location)
+        if fields.issues:
+            # Validateur de design/ réutilisé, sans recopie de ses règles.
+            for issue in fields.issues:
+                generator.issue(
+                    "duplicate_field_name"
+                    if issue.code == "design.field.duplicate_name"
+                    else "invalid_field",
                     issue.location,
                 )
             raise _Stopped

@@ -260,11 +260,14 @@ def test_pure_and_deterministic() -> None:
 # Génération et preview reportées.
 
 
-def test_generation_still_unsupported() -> None:
+def test_contract_now_generated() -> None:
+    # Reporté par FD-INTERACT-002, généré depuis FD-INTERACT-003.
     model = page(form(field(EMAIL), binding="create_contact"))
     result = generate_simple_template(model, contract({}, actions=ACTIONS))
-    assert {i.code for i in result.issues} == {"generate.unsupported_block"}
-    assert "<form" not in result.template and "<input" not in result.template
+    assert result.complete
+    assert '<form action="/contacts" method="post" hx-post="/contacts">' in (
+        result.template
+    )
 
 
 def test_preview_ignores_definition() -> None:

@@ -544,3 +544,107 @@ ni chemin, et les props `hx-*` y produisent `preview.unsupported_prop`. La
 preview ne simule aucune interaction. Forge Design ne génère ni `<script>` ni
 CDN, et ne vérifie pas qu'HTMX est installé : le chargement d'HTMX appartient
 à l'application Forge cible. Pas de dépendance npm.
+
+## Formulaires HTML/HTMX — FD-INTERACT-003
+
+Module interne `forge_design/generate/forms.py` (`prepare_form`,
+`render_form_open`/`render_form_close`, `prepare_field`, `render_field`),
+orchestré par `simple.py`. La politique d'interaction commune aux boutons et
+aux formulaires (verbes, CSRF, props HTMX) est factorisée dans
+`generate/actions.py` (`prepare_interaction`) : `buttons.py` l'utilise aussi,
+sans changement de sortie.
+
+```text
+Form Design ──────────────► ViewAction
+    │
+    ├─ FieldDefinition
+    └─ children
+            ↓
+     generate/forms.py
+            ↓
+       HTML + HTMX
+```
+
+### Validation avant émission
+
+`validate_form_fields(design)` est **réutilisé** tel quel, avant toute
+émission, et bloque la génération entière (aucun template) :
+
+| Diagnostic design | Génération |
+|---|---|
+| `design.field.missing_definition`, `design.field.unsupported_definition` | `generate.invalid_field` |
+| `design.field.duplicate_name` | `generate.duplicate_field_name` |
+| `design.field.analysis_truncated` | `generate.analysis_truncated` |
+
+`form` rejoint les bindings bloquants : une action inconnue donne
+`generate.invalid_binding` et aucun template. Chaque formulaire est
+**entièrement préparé** avant l'émission de sa balise ouvrante.
+
+### Formulaire
+
+`form.binding` désigne une `ViewAction`. La balise porte à la fois le HTML
+natif (`action`, `method`, pour une dégradation sans HTMX) et l'attribut
+HTMX, avec la **même URL**, issue de `ViewAction.path` :
+
+```html
+<form action="/contacts" method="post" class="space-y-4" hx-post="/contacts" hx-target="#content">
+  <label>Adresse e-mail<input type="email" name="email" required></label>
+</form>
+```
+
+- `GET` donne `method="get" hx-get` ; `POST` donne `method="post" hx-post`.
+  Les autres verbes donnent `generate.unsupported_action_method`.
+- Ordre fixe : `action`, `method`, `class`, `hx-get`/`hx-post`, `hx-target`,
+  `hx-swap`, `hx-confirm`.
+- Props : `class` et `hx-target`, `hx-swap`, `hx-confirm` (chaînes non vides,
+  sinon `generate.invalid_htmx_prop`). Toute autre prop (`style`, `onclick`,
+  `hx-trigger`, `hx-vals`, `hx-headers`, `tag`, `id`…) donne
+  `generate.unsupported_prop` et n'est pas émise.
+- `form` sans binding : `generate.form_missing_action`. Le formulaire **et
+  son sous-arbre** sont omis, et ses champs ne sont jamais rendus hors d'un
+  `<form>`. Il en va de même pour une méthode non supportée, `csrf: true` en
+  `POST` ou une prop HTMX invalide.
+- Un formulaire sans enfant donne `<form …></form>`.
+
+### Champs
+
+Chaque champ vient exclusivement de `FieldDefinition` :
+
+- `<input type="…" name="…">` : `type` parmi les six `FieldInputType`
+  (liste fermée revalidée), `name` opaque et échappé (`contact.email`,
+  `items[0].name`) ;
+- `label` présent : `<label>Libellé<input …></label>`. Le libellé englobant
+  évite d'inventer un `id`/`for`. Libellé absent : `<input …>` seul, sans
+  `<label>` vide ;
+- `required: true` donne l'attribut booléen `required` ; `false` ou absent :
+  rien (la distinction reste dans le Design) ;
+- props : seule `class` (chaîne) est émise. Les autres (`placeholder`, `min`,
+  `autocomplete`…) ou une `class` non textuelle donnent
+  `generate.unsupported_prop`, ignorée sans bloquer le champ ;
+- aucun `id`, `for`, `value`, `placeholder`, `min`/`max`/`step` ni
+  `autocomplete` n'est inventé ; une checkbox n'a ni `value` ni champ caché
+  compagnon.
+
+### Enfants, boutons et soumission
+
+`field` et `button` sont générés sous un `form`, et `alert` reste
+`generate.unsupported_block`. Un `button` enfant reste `type="button"` avec
+**sa propre** action (FD-INTERACT-001). **Aucun bouton de soumission n'est
+ajouté ni déduit** : un formulaire généré peut donc ne pas avoir de bouton
+d'envoi. La représentation d'un vrai `submit` sera décidée séparément.
+
+### Conditions, échappement et budget
+
+`visible_if` sur un `form` ou un `field` réutilise l'enveloppe `{% if %}` de
+`simple.py`, et un bloc omis ne laisse pas de condition vide. Le chemin, les
+classes, les valeurs HTMX, les noms et les libellés passent par l'échappement
+commun (HTML, `{`/`}`, CR/LF) et par le budget unique
+`MAX_GENERATED_TEMPLATE_CHARS`.
+
+### CSRF et runtime
+
+`GET` est généré quel que soit `csrf` ; `POST` sans `csrf` ou avec
+`csrf: false` est généré **sans protection fournie par Forge Design** ;
+`POST` avec `csrf: true` donne `generate.unsupported_csrf` et le formulaire
+est omis. Il n'y a ni jeton, ni script, ni CDN, ni runtime HTMX. La preview
+est inchangée et inerte (pas d'`<input>`, d'`action` ni de `hx-*`).

@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from forge_design.app import create_tool_registry
+from forge_design.design.models import DesignNode
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -237,8 +238,21 @@ def test_official_examples_and_documentation(schema: dict[str, Any]) -> None:
         ],
     }
     doc = (ROOT / "docs/design/design-json.md").read_text()
-    blocks = re.findall(r"```json\n(.*?)\n```", doc, re.DOTALL)
-    assert [json.loads(block) for block in blocks] == [minimal, contacts]
+    blocks = [
+        json.loads(block)
+        for block in re.findall(r"```json\n(.*?)\n```", doc, re.DOTALL)
+    ]
+    # Un Design complet documenté est une fixture officielle ; les fragments de
+    # bloc (exemple form/field de FD-INTERACT-002) sont validés par le modèle.
+    designs = [block for block in blocks if "version" in block]
+    assert designs == [minimal, contacts]
+    fragments = [block for block in blocks if "version" not in block]
+    assert fragments, "exemple form/field attendu dans la documentation"
+    for fragment in fragments:
+        assert (
+            DesignNode.model_validate(fragment).model_dump(exclude_unset=True)
+            == fragment
+        )
 
 
 def test_packaging_and_no_new_dependency_or_tool() -> None:
