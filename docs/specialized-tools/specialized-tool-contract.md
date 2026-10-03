@@ -1,9 +1,9 @@
 # Contrat des outils spécialisés
 
-Contrat normatif de FD-SPECIALIZED-001 (Phase 9). Il décrit ce dont Forge
+Contrat normatif de FD-SPECIALIZED-001 (Phase 9), mis en œuvre partiellement par
+FD-SPECIALIZED-002 (voir « Implémentation minimale »). Il décrit ce dont Forge
 Design a besoin pour héberger un futur outil spécialisé (Circuit, Network,
-3D…) **sans connaître son domaine**. Il est purement descriptif : aucun code,
-registre ni outil n'existe encore.
+3D…) **sans connaître son domaine**. Aucun registre ni outil livré n'existe encore.
 
 Il a été confronté à un cas réel, DrawCiel intégré à SéquenCiel (voir « Cas de
 référence DrawCiel »). Trois marqueurs distinguent la nature des affirmations :
@@ -49,6 +49,62 @@ distinctes : ils ne tiennent pas dans un `run(project_root)` en lecture
 seule. Un outil spécialisé pourra en revanche *fournir*, plus tard, un Tool
 d'inspection (par exemple lister ses ressources d'un projet). Ce Tool
 respecterait alors le contrat existant.
+
+## Implémentation minimale — FD-SPECIALIZED-002
+
+Le paquet `forge_design.specialized` implémente la partie de ce contrat qu'un
+premier outil peut exercer sans runtime. Il est éprouvé par un outil témoin qui
+n'existe que dans les tests : il n'est ni livré, ni enregistré, ni visible.
+
+**Codé et testé** :
+
+- les déclarations gelées, validées à la construction :
+  `SpecializedToolDefinition`, `SpecializedResourceType`,
+  `SpecializedCapability` (vocabulaire plateforme fermé en `Literal`,
+  capacités d'outil en kebab-case et distinctes de la plateforme),
+  `OptionalDependency`, `UiEntry`, `SpecializedIssue` et
+  `SpecializedValidationResult` (borné par `MAX_SPECIALIZED_ISSUES`, avec
+  indicateur `truncated`) ;
+- `SpecializedResourceCodec` : détection de version, décodage, encodage et
+  validation, sur des octets et une ressource en mémoire seulement ;
+- `read_specialized_resource` : chemin confiné, taille bornée avant lecture,
+  version détectée **avant** tout décodage (une version inconnue donne
+  `unsupported-version` sans appel à `decode`), issues structurées, révision ;
+- `write_specialized_resource` : encodage, borne, validation bloquante par
+  niveau, contrôle de la version produite par le codec, révision attendue
+  (création exclusive, conflit sinon), publication atomique, journalisation
+  dans `history.jsonl` ;
+- les catégories `resource-not-found`, `resource-refused`,
+  `unsupported-version`, `invalid-resource`, `conflict` et
+  `capability-unavailable`.
+
+**Encore descriptif** (représentable, jamais exécuté) :
+- `interactive-runtime` et le protocole runtime ↔ hôte ;
+- l'autosave réel ;
+- `export` et les formats d'export ;
+- les dépendances optionnelles et leur sonde de disponibilité ;
+- l'entrée UI ;
+- les capacités propres à un outil ;
+- les catégories `dependency-unavailable` et `runtime-error`.
+
+**Précisions apportées par l'implémentation**, sans changer les décisions
+ci-dessous :
+
+1. Une issue porte aussi son **niveau de validation** (`level`). C'est
+   nécessaire pour appliquer les niveaux bloquants. Un niveau non déclaré par
+   le type est un défaut du codec (exception), pas un diagnostic.
+2. Une validation **tronquée** bloque l'écriture : l'absence d'erreur
+   bloquante ne peut pas être prouvée.
+3. Le niveau `structure` est obligatoire et toujours bloquant. Un type non
+   éditable ne peut déclarer ni `create`, ni `edit`, ni `save`. Les capacités
+   d'un type sont incluses dans celles de son outil.
+4. Une défaillance d'entrée/sortie de l'hôte (disque, `fsync`) n'est pas une
+   catégorie de ressource : elle lève `SpecializedResourceError` avec
+   `category = None`. Il faut alors relire la ressource avant de réessayer.
+5. L'espace de sources doit exister : l'hôte ne crée aucun dossier. La
+   création sécurisée d'arborescences relève d'un ticket ultérieur.
+6. La détection de version peut lire le conteneur (par exemple parser JSON),
+   mais jamais décoder le domaine.
 
 ## Définitions
 

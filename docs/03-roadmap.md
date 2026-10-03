@@ -281,8 +281,9 @@ Valider le modèle avec un Tool simple si nécessaire.
 
 Démarche retenue : cas réel DrawCiel → contrat minimal (FD-SPECIALIZED-001,
 [contrat](specialized-tools/specialized-tool-contract.md)) → validation par un outil
-spécialisé volontairement simple (FD-SPECIALIZED-002) → registre et intégration
-seulement ensuite.
+spécialisé volontairement simple (FD-SPECIALIZED-002 : socle exécutable
+`forge_design.specialized`, éprouvé par un outil témoin limité aux tests) →
+registre et intégration seulement ensuite, si un besoin réel les justifie.
 
 ## Phase 10 — Circuit
 

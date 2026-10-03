@@ -1,0 +1,63 @@
+"""Socle des ressources d'outils spécialisés (FD-SPECIALIZED-002).
+
+Déclarations gelées du contrat FD-SPECIALIZED-001 et hôte de lecture/écriture
+contrôlée. Aucun outil, registre, UI, runtime ni export n'est fourni ici.
+"""
+
+from forge_design.specialized.models import (
+    PLATFORM_CAPABILITIES,
+    ErrorCategory,
+    OptionalDependency,
+    PlatformCapability,
+    SpecializedCapability,
+    SpecializedIssue,
+    SpecializedResourceType,
+    SpecializedToolDefinition,
+    SpecializedValidationResult,
+    UiEntry,
+)
+from forge_design.specialized.resource import (
+    InvalidSpecializedResourceError,
+    SpecializedCapabilityError,
+    SpecializedFormatError,
+    SpecializedReadResult,
+    SpecializedResourceCodec,
+    SpecializedResourceConflictError,
+    SpecializedResourceError,
+    SpecializedResourceHistoryError,
+    SpecializedResourceRef,
+    SpecializedResourceRefusedError,
+    SpecializedResourceRevision,
+    SpecializedWriteResult,
+    UnsupportedSpecializedVersionError,
+    read_specialized_resource,
+    write_specialized_resource,
+)
+
+__all__ = [
+    "PLATFORM_CAPABILITIES",
+    "ErrorCategory",
+    "InvalidSpecializedResourceError",
+    "OptionalDependency",
+    "PlatformCapability",
+    "SpecializedCapability",
+    "SpecializedCapabilityError",
+    "SpecializedFormatError",
+    "SpecializedIssue",
+    "SpecializedReadResult",
+    "SpecializedResourceCodec",
+    "SpecializedResourceConflictError",
+    "SpecializedResourceError",
+    "SpecializedResourceHistoryError",
+    "SpecializedResourceRef",
+    "SpecializedResourceRefusedError",
+    "SpecializedResourceRevision",
+    "SpecializedResourceType",
+    "SpecializedToolDefinition",
+    "SpecializedValidationResult",
+    "SpecializedWriteResult",
+    "UiEntry",
+    "UnsupportedSpecializedVersionError",
+    "read_specialized_resource",
+    "write_specialized_resource",
+]

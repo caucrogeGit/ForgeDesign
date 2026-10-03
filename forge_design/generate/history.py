@@ -7,12 +7,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from stat import S_ISREG
-from typing import Literal
+from typing import Literal, get_args
 
 from forge_design.forge.filesystem import open_directory
 from forge_design.limits import MAX_HISTORY_EVENT_BYTES
 
-HistoryAction = Literal["generate_template"]
+# Même structure de ligne pour toutes les actions (format inchangé, version 1) ;
+# write_specialized_resource : FD-SPECIALIZED-002.
+HistoryAction = Literal["generate_template", "write_specialized_resource"]
+HISTORY_ACTIONS: frozenset[str] = frozenset(get_args(HistoryAction))
 
 # Version du format de ligne (docs/storage/storage-contract.md) ; écrite en tête
 # de chaque événement, jamais fournie par l'appelant.
@@ -104,7 +107,7 @@ def append_generation_history(
     timestamp: datetime | None = None,
 ) -> GenerationHistoryEvent:
     """Consigner un succès déjà acquis ; un échec peut laisser une ligne sur disque."""
-    if action != "generate_template":
+    if action not in HISTORY_ACTIONS:
         raise ValueError("Action de journal inconnue.")
     _validate_file(file)
     instant = datetime.now(UTC) if timestamp is None else timestamp

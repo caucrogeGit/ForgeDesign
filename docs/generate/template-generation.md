@@ -372,7 +372,9 @@ file: str, timestamp: datetime | None = None)` ajoute un événement dans
 `<project_root>/.forge-design/history.jsonl` et retourne une
 GenerationHistoryEvent gelée : timestamp, action, file. Ces types et la fonction
 sont exportés depuis forge_design.generate. HistoryAction accepte seulement
-generate_template, y compris au runtime.
+generate_template et, depuis FD-SPECIALIZED-002, write_specialized_resource
+(écriture d'une ressource d'outil spécialisé), y compris au runtime. La structure
+de ligne et sa version (1) sont inchangées.
 
 **L'appelant doit appeler ce service après une écriture autorisée et réussie.**
 Le journal ne prouve pas lui-même cette écriture, n'autorise rien et ne crée aucun

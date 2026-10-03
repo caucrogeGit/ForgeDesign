@@ -64,7 +64,7 @@ qui met à jour ce tableau :
 
 | Chemin | Format | Version courante | Écrit par | Lu par |
 |---|---|---|---|---|
-| `history.jsonl` | JSONL, un objet par ligne | `1` | `append_generation_history` | — |
+| `history.jsonl` | JSONL, un objet par ligne | `1` | `append_generation_history` (actions `generate_template`, `write_specialized_resource`) | — |
 
 Pas de manifeste global : chaque fichier porte sa propre version (section 4),
 ce qui évite toute transaction entre deux fichiers.

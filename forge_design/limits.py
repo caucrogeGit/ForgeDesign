@@ -67,3 +67,9 @@ MAX_TEMPLATE_DIFF_CHARS = 1_000_000
 
 # Une entrée JSONL du journal projet, LF et UTF-8 compris.
 MAX_HISTORY_EVENT_BYTES = 16_384
+
+# Ressources d'outils spécialisés : borne haute d'un max_size déclaré, issues
+# par validation (sans marqueur, indicateur truncated) et profondeur de location.
+MAX_SPECIALIZED_RESOURCE_BYTES = 64 * 1024 * 1024
+MAX_SPECIALIZED_ISSUES = 512
+MAX_SPECIALIZED_LOCATION_DEPTH = 64

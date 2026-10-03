@@ -498,6 +498,26 @@ registre, plugin ni outil n'est encore implémenté. Les dépendances lourdes
 d'un outil (moteur de simulation, moteur 3D) sont optionnelles par capacité
 et ne sont jamais installées automatiquement.
 
+### Socle exécutable — FD-SPECIALIZED-002
+
+```text
+forge_design.specialized
+├── models.py     déclarations gelées : SpecializedToolDefinition, SpecializedResourceType,
+│                 SpecializedCapability, OptionalDependency, UiEntry, SpecializedIssue,
+│                 SpecializedValidationResult
+└── resource.py   hôte : SpecializedResourceCodec (octets ↔ mémoire, sans filesystem),
+                  read_specialized_resource, write_specialized_resource
+→ futur outil spécialisé (Circuit…) : déclarations + codec propres
+```
+
+L'hôte confine le chemin (espace de sources, suffixe, `unsafe_relative_path`,
+`open_directory`, aucun lien, fichier ordinaire, taille du type), détecte la
+version avant tout décodage, applique la validation bloquante par niveau, écrit
+atomiquement avec révision attendue (création exclusive par `link`, mise à jour
+par `replace`) et journalise dans `history.jsonl` (`write_specialized_resource`).
+Aucun registre, UI, runtime, export ni outil livré : la validation passe par un
+outil témoin limité aux tests. `Tool` et son registre restent inchangés.
+
 ## 14. Écriture
 
 Principe :
