@@ -7,6 +7,7 @@ import pytest
 from circuit_support import (
     R1,
     SAMPLE,
+    circuit_document,
     sample,
     sample_document,
     to_bytes,
@@ -42,7 +43,7 @@ def _codes(data: bytes) -> set[str]:
 
 
 def test_nominal_round_trip() -> None:
-    document = sample_document()
+    document = circuit_document()
     encoded = CODEC.encode(document)
     assert CODEC.detect_version(encoded) == "0.1"
     decoded = CODEC.decode(encoded)

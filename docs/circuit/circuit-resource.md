@@ -200,8 +200,8 @@ l'éditeur en aura besoin.
 
 Objet `clé → scalaire`, au plus 64 entrées, ordre du document conservé :
 
-- clés `^[A-Za-z][A-Za-z0-9_]*$`, ≤ 64 (compatibles avec les clés des contrats
-  DrawCiel comme `resistanceOhms`) ;
+- clés `^[A-Za-z][A-Za-z0-9_]*$`, ≤ 64 au niveau du format ; le catalogue V1
+  n'autorise que des noms snake_case par type ([domaine](circuit-domain.md#propriétés)) ;
 - valeurs : chaîne de 1 à 256 caractères, booléen, entier sûr
   `|n| ≤ 2⁵³ − 1` (exactement représentable par le Graphic Core en JavaScript),
   ou nombre décimal fini ;
@@ -211,7 +211,7 @@ Objet `clé → scalaire`, au plus 64 entrées, ordre du document conservé :
 
 Exposées en lecture seule (`MappingProxyType`), sérialisées comme objet JSON.
 Les propriétés autorisées par type, leurs unités et contraintes relèvent du
-catalogue (FD-CIRCUIT-003).
+catalogue ([domaine Circuit V1](circuit-domain.md), FD-CIRCUIT-003).
 
 ## État exclu
 
@@ -220,10 +220,10 @@ historique, `dirty`, réseau (`net`), tension, courant, température, dommage,
 état de simulation, mesures, préférences d'interface, données pédagogiques ou
 élèves. Tout champ inconnu est refusé à tous les niveaux.
 
-**Limite assumée** : FD-CIRCUIT-002 interdit les champs runtime structurels
-mais ne peut pas encore interdire une clé arbitraire placée dans `properties` ;
-cette garantie viendra de l'allowlist de propriétés par type de FD-CIRCUIT-003.
-Aucune liste noire de clés n'est ajoutée au codec.
+**Limite fermée par FD-CIRCUIT-003** : le format seul accepte une clé
+arbitraire dans `properties` ; le domaine refuse toute clé non autorisée par le
+type (`circuit.unknown-property`, niveau `structure`, bloquant). Aucune liste
+noire de clés n'existe.
 
 ## Limites
 
@@ -267,10 +267,10 @@ chemin réel dans le document (étiquettes internes de Pydantic retirées) :
 
 Au plus 512 issues (une de plus signale la troncature au socle).
 `CircuitCodec.validate` revalide une copie sérialisée du modèle (utile pour un
-modèle construit sans validation). Seul le niveau `structure` est déclaré et
-implémenté ; `topology` et `electrical-readiness` seront déclarés par
-FD-CIRCUIT-003 avec leurs validateurs : un niveau déclaré est un niveau
-implémenté.
+modèle construit sans validation), puis applique le
+[domaine Circuit V1](circuit-domain.md#diagnostics) : structure de domaine,
+`topology`, `electrical-readiness` (FD-CIRCUIT-003). Les trois niveaux sont
+déclarés et implémentés ; `structure` et `topology` bloquent l'écriture.
 
 La détection de version, le contrôle JSON strict et la validation Pydantic
 analysent chacun le texte (jusqu'à trois analyses) ; c'est accepté pour une
@@ -309,7 +309,8 @@ une fonction limitée aux tests ; aucun `GraphicScene` n'existe en produit.
 CIRCUIT_TOOL           id circuit, nom Circuit, aucune dépendance, aucune entrée UI
 CIRCUIT_RESOURCE_TYPE  id schematic, format circuit-json, suffixe .circuit.json,
                        préfixe mvc/circuit, versions {0.1} / 0.1, éditable,
-                       max_size 4 Mio, niveaux (structure), bloquant {structure}
+                       max_size 4 Mio, niveaux (structure, topology,
+                       electrical-readiness), bloquants {structure, topology}
 capacités              create, open, validate, save
 ```
 
@@ -333,8 +334,8 @@ Aucune compatibilité de fichier en V0.1. Les décisions récentes de DrawCiel
 sont respectées : bornes contractuelles hors de l'instance, aucun état
 d'exécution dans le document, liste fermée des champs (comme la validation des
 composants UNO R4, `aac36b27`), définitions versionnées, aucune sémantique
-déduite d'un nom. Les clés de propriétés admettent les clés des contrats
-DrawCiel ; leur alignement effectif est décidé par FD-CIRCUIT-003.
+déduite d'un nom. Les correspondances des bornes et propriétés DrawCiel vers
+le catalogue Circuit sont documentées dans le [domaine](circuit-domain.md#référence-drawciel).
 
 ## Évolution du format
 

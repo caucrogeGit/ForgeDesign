@@ -1,12 +1,13 @@
 """Déclarations spécialisées de Circuit V0.1 : descriptives, jamais enregistrées.
 
 Seules les capacités réellement disponibles sont déclarées (pas d'edit tant
-qu'aucun éditeur n'existe) et seul le niveau de validation implémenté
-(structure) ; topology et electrical-readiness arriveront avec le domaine.
+qu'aucun éditeur n'existe). Les trois niveaux de validation sont implémentés
+(FD-CIRCUIT-003) ; structure et topology bloquent l'écriture.
 """
 
 from forge_design.circuit.limits import MAX_CIRCUIT_RESOURCE_BYTES
 from forge_design.circuit.models import FORMAT_VERSION
+from forge_design.circuit.validation import CIRCUIT_VALIDATION_LEVELS
 from forge_design.specialized import (
     SpecializedCapability,
     SpecializedResourceType,
@@ -31,8 +32,9 @@ CIRCUIT_RESOURCE_TYPE = SpecializedResourceType(
     editable=True,
     max_size=MAX_CIRCUIT_RESOURCE_BYTES,
     capabilities=_CAPABILITIES,
-    validation_levels=("structure",),
-    blocking_validation_levels=frozenset({"structure"}),
+    validation_levels=CIRCUIT_VALIDATION_LEVELS,
+    # La préparation électrique n'émet que des avertissements et ne bloque pas.
+    blocking_validation_levels=frozenset({"structure", "topology"}),
     persistent_state=("page", "components", "connections", "junctions", "annotations"),
     runtime_only_state=("selection", "viewport", "history", "dirty", "simulation"),
 )

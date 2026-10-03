@@ -581,8 +581,26 @@ forge_design.circuit
 Ressource en zone C (`mvc/circuit/**/*.circuit.json`), lue et écrite par
 `read_specialized_resource` / `write_specialized_resource`, journalisée sous
 `write_specialized_resource`. Le document adopte les conventions de champs
-Graphics sans `GraphicsDocument` ; aucun catalogue, topologie, Graphics, rendu,
-éditeur ni simulation. Circuit n'est enregistré dans aucun registre.
+Graphics sans `GraphicsDocument`. Circuit n'est enregistré dans aucun registre.
+
+### Domaine Circuit V1 — FD-CIRCUIT-003
+
+Contrat : [Domaine Circuit V1](circuit/circuit-domain.md).
+
+```text
+forge_design.circuit
+├── catalog.py     CIRCUIT_CATALOG : 8 types, bornes (rôle, polarité, direction),
+│                  propriétés autorisées (type, unité SI, domaine, requise)
+├── domain.py      structure de domaine : type connu, propriétés autorisées et valides
+├── topology.py    CircuitTopology : union-find, réseaux canoniques, masses fusionnées
+└── validation.py  validate_circuit : structure → topology → electrical-readiness
+```
+
+Pur et déterministe : le document n'est jamais modifié, la topologie ignore
+géométrie, routes et ordre des collections. `CircuitCodec.validate` applique le
+domaine ; le socle bloque les erreurs `structure` et `topology`, jamais les
+avertissements de préparation électrique. Aucun Graphics, rendu, éditeur ni
+simulation.
 Les graphes en lecture seule existants (Route Explorer, Entity Explorer, Debug
 Center) restent inchangés ; leur convergence éventuelle est à étudier.
 

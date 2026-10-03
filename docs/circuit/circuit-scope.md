@@ -507,7 +507,7 @@ fixe les restrictions ci-dessous.
 | Niveau | Contenu | Bloque l'écriture |
 |---|---|---|
 | `structure` | Format, version, champs, types connus, identités uniques, propriétés connues et bien typées, coordonnées entières, rotation admise | Oui (obligatoire) |
-| `topology` | Extrémités existantes, borne déclarée par le type, pas d'auto-connexion, route orthogonale sur grille ; avertissements : connexion doublée, jonction de degré ≤ 1 | Oui pour les erreurs |
+| `topology` | Extrémités existantes, borne déclarée par le type, pas d'auto-connexion ; avertissements : connexion doublée, jonction de degré ≤ 1. La vérification géométrique des routes (orthogonalité sur grille) n'est pas de la topologie : FD-GRAPHICS-003 / adaptateur Circuit (FD-CIRCUIT-003) | Oui pour les erreurs |
 | `electrical-readiness` | Valeurs requises absentes, borne non connectée, source court-circuitée, absence de masse | **Non** (avertissements) |
 
 - La préparation électrique ne bloque jamais la sauvegarde : un schéma en
@@ -781,7 +781,7 @@ ce tableau sont renumérotés) :
 | FD-CIRCUIT-002 | Contrat de ressource Circuit : format, version, identités, espace de sources, limites ; adopte les conventions de champs Graphics | Tout le reste lit ce format |
 | FD-GRAPHICS-002 | Primitives géométriques pures, transformations exactes, ports | Base commune ; règles de grille et de direction utiles à la conversion du catalogue |
 | FD-GRAPHICS-003 | Routage orthogonal extrait de DrawCiel, témoins portés | Algorithme éprouvé, référence encore fraîche |
-| FD-CIRCUIT-003 | Domaine, catalogue V1 (inventaire et conversion contrôlée), codec, validation `structure`/`topology`/`electrical-readiness`, topologie | Exactitude testable avant tout rendu |
+| FD-CIRCUIT-003 | Domaine, catalogue V1 (conversion contrôlée), validation `structure`/`topology`/`electrical-readiness`, topologie — **fait** ([domaine](circuit-domain.md)) | Exactitude testable avant tout rendu |
 | FD-GRAPHICS-004 | Étude du renderer et de l'interaction (choix) | Choix éclairé par un modèle stable |
 | FD-GRAPHICS-005 | Scène, projection, sélection, commandes, historique, éprouvés par un domaine témoin non électrique limité aux tests | Généricité prouvée avant Circuit |
 | FD-CIRCUIT-004 | Projection Circuit → scène, commandes Circuit | Circuit sur le noyau |
@@ -833,7 +833,7 @@ politique de découpe d'une connexion, limites.
 
 | Question | Ticket attendu |
 |---|---|
-| Positions locales exactes des bornes et sorties de route par type | FD-GRAPHICS-002 / FD-CIRCUIT-003 |
+| Positions locales exactes des bornes (directions déclarées par FD-CIRCUIT-003) | FD-GRAPHICS-002 |
 | Frontend, rendu, isolation iframe/Worker du runtime | FD-GRAPHICS-004 / FD-CIRCUIT-005 |
 | Registre d'outils spécialisés | FD-CIRCUIT-005 |
 | Autosave | FD-CIRCUIT-005 ou ultérieur |

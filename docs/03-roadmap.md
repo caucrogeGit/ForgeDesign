@@ -306,7 +306,7 @@ FD-CIRCUIT-001   besoins et périmètre
 → FD-CIRCUIT-002   contrat de ressource Circuit V0.1 (fait : forge_design.circuit, mvc/circuit/**/*.circuit.json)
 → FD-GRAPHICS-002  primitives géométriques pures, transformations exactes, ports
 → FD-GRAPHICS-003  routage orthogonal extrait de DrawCiel, témoins portés
-→ FD-CIRCUIT-003   domaine, catalogue V1 (conversion contrôlée), codec, validation, topologie
+→ FD-CIRCUIT-003   domaine, catalogue V1, validation, topologie (fait : catalog, domain, topology, validation)
 → FD-GRAPHICS-004  étude du renderer et de l'interaction (choix)
 → FD-GRAPHICS-005  scène, projection, sélection, commandes, historique (domaine témoin non électrique)
 → FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit

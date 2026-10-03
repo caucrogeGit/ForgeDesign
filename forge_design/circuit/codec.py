@@ -13,7 +13,9 @@ from collections.abc import Iterator
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails, PydanticSerializationError
 
+from forge_design.circuit.catalog import CIRCUIT_CATALOG, CircuitCatalog
 from forge_design.circuit.models import CircuitDocument
+from forge_design.circuit.validation import validate_circuit
 from forge_design.json_strict import loads_strict_json
 from forge_design.limits import MAX_SPECIALIZED_ISSUES, MAX_SPECIALIZED_LOCATION_DEPTH
 from forge_design.specialized import (
@@ -104,6 +106,9 @@ def _strict_json(data: bytes) -> tuple[str, object]:
 class CircuitCodec:
     """Implémente SpecializedResourceCodec[CircuitDocument]."""
 
+    def __init__(self, catalog: CircuitCatalog = CIRCUIT_CATALOG) -> None:
+        self.catalog = catalog
+
     def detect_version(self, data: bytes) -> str | None:
         # Lecture du seul champ format_version, sans validation métier.
         try:
@@ -139,7 +144,8 @@ class CircuitCodec:
         return (text + "\n").encode("utf-8")
 
     def validate(self, resource: CircuitDocument) -> SpecializedValidationResult:
-        """Niveau structure seulement : revalide une copie sérialisée du modèle."""
+        """Format (copie sérialisée revalidée) puis domaine : structure, topologie,
+        préparation électrique. Un format invalide n'est pas évalué plus loin."""
         try:
             text = resource.model_dump_json(exclude_none=True)
         except (PydanticSerializationError, AttributeError, TypeError, ValueError):
@@ -147,7 +153,7 @@ class CircuitCodec:
                 (_issue("circuit.validation-error", "Document non sérialisable."),)
             )
         try:
-            CircuitDocument.model_validate_json(text)
+            document = CircuitDocument.model_validate_json(text)
         except ValidationError as error:
             return SpecializedValidationResult.bounded(_issues(error, json.loads(text)))
-        return SpecializedValidationResult(())
+        return validate_circuit(document, self.catalog)

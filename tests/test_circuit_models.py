@@ -214,8 +214,9 @@ def test_extra_fields_refused(path: tuple[Any, ...], field: str) -> None:
     assert ("extra_forbidden", (*path, field)) in _errors(data)
 
 
-def test_runtime_like_property_keys_are_not_yet_refused() -> None:
-    # Limite documentée : l'allowlist par type arrive avec FD-CIRCUIT-003.
+def test_runtime_like_property_keys_are_format_valid() -> None:
+    # Le format ne connaît pas le catalogue : l'allowlist par type (FD-CIRCUIT-003)
+    # refuse ces clés au niveau domaine (tests/test_circuit_domain.py).
     data = sample()
     data["components"][0]["properties"] = {"simulation_state": "x", "voltage": 1.5}
     assert _validate(data).components[0].properties["voltage"] == 1.5
@@ -420,14 +421,22 @@ def test_public_api() -> None:
         "new_connection_id",
         "new_junction_id",
         "new_annotation_id",
+        "CircuitCatalog",
+        "CircuitComponentDefinition",
+        "CircuitTerminalDefinition",
+        "CircuitPropertyDefinition",
+        "CIRCUIT_CATALOG",
+        "CircuitTopology",
+        "CircuitNet",
+        "TerminalRef",
+        "validate_circuit",
+        "build_circuit_topology",
     }
     for absent in (
         "GraphicScene",
         "Node",
         "Port",
         "Edge",
-        "CircuitTopology",
-        "CircuitCatalog",
         "CircuitRenderer",
         "CircuitRuntimeState",
     ):

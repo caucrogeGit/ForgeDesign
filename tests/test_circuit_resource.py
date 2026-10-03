@@ -6,9 +6,9 @@ from typing import Any
 
 import pytest
 from circuit_support import (
+    circuit_document,
     make_project,
     sample,
-    sample_document,
     to_bytes,
     unchecked,
 )
@@ -96,7 +96,12 @@ def test_declarations() -> None:
     assert not resource_type.has_capability("edit")
     assert not resource_type.has_capability("export")
     assert not resource_type.has_capability("interactive-runtime")
-    assert resource_type.validation_levels == ("structure",)
+    assert resource_type.validation_levels == (
+        "structure",
+        "topology",
+        "electrical-readiness",
+    )
+    assert resource_type.blocking_validation_levels == {"structure", "topology"}
     assert CIRCUIT_TOOL.optional_dependencies == () and CIRCUIT_TOOL.ui_entry is None
 
 
@@ -110,10 +115,10 @@ def test_create_read_update_and_history(root: Path) -> None:
 
     component = CircuitComponent(
         id=new_component_id(),
-        type="placeholder",
+        type="resistor",
         position=CircuitPoint(x=4, y=4),
         rotation=180,
-        properties={},
+        properties={"resistance": 1000.0},
     )
     assert result.resource is not None
     updated = result.resource.model_copy(
@@ -127,6 +132,13 @@ def test_create_read_update_and_history(root: Path) -> None:
     reread = read(root)
     assert reread.resource is not None and reread.resource.page.width == 120
     assert reread.resource.components == (component,)
+    # Résistance non connectée et sans masse : avertissements, écriture admise.
+    assert reread.error is None
+    assert {issue.code for issue in reread.issues} == {
+        "circuit.unconnected-terminal",
+        "circuit.missing-ground",
+    }
+    assert {issue.severity for issue in reread.issues} == {"warning"}
     lines = history(root)
     assert [(line["action"], line["file"]) for line in lines] == [
         ("write_specialized_resource", PATH),
@@ -136,27 +148,27 @@ def test_create_read_update_and_history(root: Path) -> None:
 
 
 def test_round_trip_is_byte_exact(root: Path) -> None:
-    write(root, sample_document(), None)
+    write(root, circuit_document(), None)
     data = (root / PATH).read_bytes()
     result = read(root)
-    assert result.resource == sample_document() and result.resource is not None
+    assert result.resource == circuit_document() and result.resource is not None
     assert CODEC.encode(result.resource) == data
 
 
 def test_create_is_exclusive(root: Path) -> None:
     write(root, new_circuit_document(), None)
     with pytest.raises(SpecializedResourceConflictError):
-        write(root, sample_document(), None)
+        write(root, circuit_document(), None)
     assert read(root).resource == new_circuit_document()
 
 
 def test_external_modification_is_conflict(root: Path) -> None:
     write(root, new_circuit_document(), None)
     revision = read(root).revision
-    (root / PATH).write_bytes(CODEC.encode(sample_document()))
+    (root / PATH).write_bytes(CODEC.encode(circuit_document()))
     with pytest.raises(SpecializedResourceConflictError):
         write(root, new_circuit_document(), revision)
-    assert read(root).resource == sample_document()
+    assert read(root).resource == circuit_document()
     assert len(history(root)) == 1
 
 
@@ -188,7 +200,7 @@ def test_source_space_is_confined(root: Path, path: str) -> None:
 
 def test_symlink_refused(root: Path, tmp_path: Path) -> None:
     outside = tmp_path / "dehors.circuit.json"
-    outside.write_bytes(CODEC.encode(sample_document()))
+    outside.write_bytes(CODEC.encode(circuit_document()))
     (root / PATH).symlink_to(outside)
     assert read(root).error == "resource-refused"
     # Le socle refuse d'écrire à travers un lien, en création comme en mise à jour.
@@ -197,7 +209,7 @@ def test_symlink_refused(root: Path, tmp_path: Path) -> None:
         with pytest.raises(SpecializedResourceConflictError):
             write(root, new_circuit_document(), expected)
     assert (root / PATH).is_symlink()
-    assert outside.read_bytes() == CODEC.encode(sample_document())
+    assert outside.read_bytes() == CODEC.encode(circuit_document())
 
 
 @pytest.mark.parametrize(
@@ -239,7 +251,7 @@ def test_invalid_structure_reported_with_circuit_codes(root: Path) -> None:
 
 
 def test_invalid_document_is_never_written(root: Path) -> None:
-    broken = unchecked(junctions=sample_document().junctions * 2)
+    broken = unchecked(junctions=circuit_document().junctions * 2)
     with pytest.raises(InvalidSpecializedResourceError):
         write(root, broken, None)
     assert not (root / PATH).exists() and history(root) == []
