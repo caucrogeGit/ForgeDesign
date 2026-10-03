@@ -1076,7 +1076,7 @@ def test_graph_interaction_dom_and_resource(
     status, script, headers = request(server, method="GET", target="/route-graph.js")
     assert status == 200 and headers["Content-Type"] == "text/javascript; charset=utf-8"
     assert 'from "./graphics/engine.js"' in script and "fetch" not in script
-    for module in ("engine", "geometry", "model", "scene", "svg-renderer"):
+    for module in ("engine", "geometry", "model", "scene", "svg-renderer", "viewport"):
         status, body, headers = request(
             server, method="GET", target=f"/graphics/{module}.js"
         )

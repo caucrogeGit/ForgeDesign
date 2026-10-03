@@ -130,7 +130,8 @@ test("scène refusée : repli conservé et message", () => {
 test("le client ne contourne pas le moteur", async () => {
   const source = await readFile(new URL("../../../forge_design/web/static/entity-graph.js", import.meta.url), "utf8");
   assert.match(source, /from "\.\/graphics\/engine\.js"/);
-  for (const forbidden of ["createElementNS", "innerHTML", "data-node-id", "classList", "fetch(", "eval("]) {
+  // Ni rendu, ni sélection, ni viewport propres au client : tout passe par le moteur.
+  for (const forbidden of ["createElementNS", "innerHTML", "data-node-id", "classList", "fetch(", "eval(", "viewBox", "zoom", "panBy", "fit(", "home(", "resize(", "wheel", "pointer"]) {
     assert.ok(!source.includes(forbidden), forbidden);
   }
 });

@@ -25,10 +25,10 @@ copie automatique, aucun suivi du HEAD en runtime.
 
 | Champ | Valeur |
 |---|---|
-| Commit | `aac36b27` — feat(drawciel): intégrer et qualifier le profil expérimental UNO R4 |
+| Commit | `3a1753a2` — feat(documents): confirmer chaque page avant transmission |
 | Date du commit | 3 octobre 2026 |
 | Date d'analyse | 3 octobre 2026 |
-| Ticket | FD-GRAPHICS-003 |
+| Ticket | FD-GRAPHICS-004 |
 
 ## Journal des références
 
@@ -41,6 +41,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | FD-CIRCUIT-003 | `aac36b27` | `aac36b27` | Vide (`git fetch` : `origin/main` inchangé) | Contrats des 8 types V1 (`electrical-contracts.js`), identité canonique des réseaux (ADR-262), masse = référence sans source ; correspondances documentées dans le domaine Circuit |
 | FD-GRAPHICS-002 | `aac36b27` | `aac36b27` | Vide (`git fetch` : `origin/main` inchangé) | Principe `createElementNS` / sélection / focus SVG retenu ; `render()` monolithique non repris (REWRITE) ; aucun code DrawCiel copié |
 | FD-GRAPHICS-003 | `aac36b27` | `aac36b27` | Vide (`git fetch` : `origin/main` inchangé) | Aucun : migration d'un client plateforme, aucun élément DrawCiel repris |
+| FD-GRAPHICS-004 | `aac36b27` | `3a1753a2` | Un commit SéquenCiel (confirmation de documents), aucun fichier DrawCiel modifié | Viewport : `zoomAt` (formule du point fixe) ADAPT ; `fit`, `viewportWorld`, `centerWorldPoint` REWRITE ; geste du bouton du milieu repris ; `applyTransform` CSS et état global non repris |
 
 ## Procédure de delta
 

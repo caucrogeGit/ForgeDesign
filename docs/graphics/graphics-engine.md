@@ -16,7 +16,8 @@ ES modules natifs, sans build, sans npm, sans dépendance ni CDN, livrés dans
 | `model.js` | `validateScene`, `GraphicSceneError`, limites, présentations autorisées |
 | `scene.js` | `indexScene`, `neighbourhood`, `createSelection` (sans DOM) |
 | `svg-renderer.js` | `renderScene`, `applySelection` (renderer remplaçable) |
-| `engine.js` | `createGraphicEngine` (instance et cycle de vie) |
+| `viewport.js` | Viewport pur (FD-GRAPHICS-004) : `createViewport`, `fitState`, `zoomAtState`, `panState`, `resizeState`, `viewBox`, `wheelFactor`, bornes |
+| `engine.js` | `createGraphicEngine` (instance, barre d'outils, interactions, cycle de vie) |
 
 Aucun module ne connaît un domaine, Route Explorer, un projet Forge ou un
 stockage ; aucun état global (pas de singleton, pas de variable de module
@@ -100,12 +101,35 @@ analyse transitive. Rendu : classes `gx-selected`, `gx-related`,
 Interaction : clic, Entrée, Espace (bascule), Échap (efface et rend le focus
 au nœud).
 
+## Viewport
+
+État runtime de l'instance `{ scale, x, y }` : `(x, y)` est le point monde au
+coin supérieur gauche de la zone, `scale` le nombre de pixels écran par unité
+monde. Seule autorité d'affichage : l'attribut `viewBox` du SVG
+(`x y largeur/scale hauteur/scale`), le SVG occupant toute la zone par CSS
+(`.gx-viewport`, 30 rem de haut, redimensionnable verticalement). La scène
+n'est jamais modifiée ; rien n'est persisté (ni stockage navigateur, ni cookie).
+
+| Élément | Règle |
+|---|---|
+| Fit | Scène entière, centrée, marge écran de 16 px, jamais agrandie au-delà de 100 % |
+| Home | = fit |
+| Zoom | Pas symétrique 1,25 ; boutons autour du centre ; bornes 0,02 à 4 |
+| Zoom au point | Le point monde sous le point écran y reste (formule DrawCiel adaptée) |
+| Molette | Seule : défilement normal de la page ; Ctrl/Cmd + molette (et pincement) : zoom sous le pointeur, un pas au plus par événement |
+| Pan | Glisser au bouton principal sur le fond (jamais sur un nœud), ou bouton du milieu ; Pointer Events et capture ; Maj + flèches (15 % de la zone) |
+| Resize | Avant toute interaction (ou après Ajuster) : le fit suit la zone ; ensuite échelle et centre visibles conservés. `ResizeObserver` si disponible, sinon taille initiale ; `engine.resize()` pour remesurer |
+| Zone non mesurée | État neutre et viewBox de la scène : jamais NaN ni Infinity |
+| Barre d'outils | `role="toolbar"`, boutons natifs « Ajuster », « + », « − » (titre et nom accessible), échelle courante en texte |
+
 ## Instance lifecycle
 
 ```js
 const engine = createGraphicEngine(container, scene, { onSelectionChange(state) {} });
 engine.select(id); engine.clearSelection(); engine.focus(id);
 engine.selection(); engine.node(id); engine.edge(id); engine.scene();
+engine.fit(); engine.home(); engine.zoomIn(); engine.zoomOut();
+engine.zoomAt({x, y}, factor); engine.panBy(dx, dy); engine.resize(); engine.viewport();
 engine.render();   // re-rendu, écouteurs précédents retirés
 engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 ```
@@ -186,6 +210,7 @@ et l'annonce.
 ## Current limitations
 
 Prouvé par deux clients réels : graphes positionnés, nœuds, arêtes (y compris
-parallèles), libellés, sélection, voisins directs, SVG. Pas encore : layout
-générique, ports, routage, grille, zoom/pan, glisser, édition, commandes,
-historique, multi-sélection, groupes. Debug Center garde son rendu propre.
+parallèles), libellés, sélection, voisins directs, SVG, viewport (fit, zoom,
+pan, resize). Pas encore : layout générique, ports, routage, grille, glisser
+de nœuds, édition, commandes, historique, multi-sélection, groupes, minicarte,
+niveaux de détail. Debug Center garde son rendu propre.

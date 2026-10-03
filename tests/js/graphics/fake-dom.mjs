@@ -29,6 +29,24 @@ export class FakeElement {
     this._text = "";
     this.hidden = false;
     this.focused = false;
+    // Mise en page simulée : taille client et position fixées par le test.
+    this.clientWidth = 0;
+    this.clientHeight = 0;
+    this.left = 0;
+    this.top = 0;
+    this.captured = new Set();
+  }
+  get parentNode() {
+    return this.parent;
+  }
+  getBoundingClientRect() {
+    return { left: this.left, top: this.top, width: this.clientWidth, height: this.clientHeight };
+  }
+  setPointerCapture(id) {
+    this.captured.add(id);
+  }
+  releasePointerCapture(id) {
+    this.captured.delete(id);
   }
   setAttribute(name, value) {
     if (name === "style" || name.startsWith("on")) throw new Error(`attribut interdit : ${name}`);
@@ -71,9 +89,30 @@ export class FakeElement {
     }
     this.listeners.push(entry);
   }
+  // Événement simulé ; il remonte aux ancêtres comme dans le DOM réel.
   dispatch(type, init = {}) {
-    const event = { type, key: init.key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
-    for (const { type: kind, handler } of [...this.listeners]) if (kind === type) handler(event);
+    const event = {
+      type,
+      target: this,
+      button: 0,
+      pointerId: 1,
+      clientX: 0,
+      clientY: 0,
+      deltaY: 0,
+      deltaMode: 0,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+      ...init,
+      defaultPrevented: false,
+      preventDefault() {
+        this.defaultPrevented = true;
+      },
+    };
+    for (let node = this; node; node = node.parent) {
+      for (const { type: kind, handler } of [...node.listeners]) if (kind === type) handler(event);
+    }
     return event;
   }
   focus() {
@@ -117,6 +156,14 @@ export class FakeDocument {
 
 export function container() {
   return new FakeDocument().createElement("div");
+}
+
+// Donne une taille à la zone de vue d'une instance puis la remesure.
+export function sized(host, engine, width, height) {
+  const area = host.querySelector(".gx-viewport");
+  area.clientWidth = width;
+  area.clientHeight = height;
+  return engine.resize();
 }
 
 // Éléments rendus d'une instance, par rôle.

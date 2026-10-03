@@ -648,6 +648,24 @@ Route Explorer et Entity Explorer partagent exactement les mêmes modules
 moteur ; chacun garde son adaptateur, son client, ses données opaques et son
 panneau. Les SVG serveur restent des replis statiques sans JavaScript.
 
+### Viewport — FD-GRAPHICS-004
+
+```text
+Forge MVC (create_application, Router, Jinja)
+   ↓ HTML + GraphicScene (JSON inerte) + modules /graphics/*.js (routes fixes)
+Graphic Core navigateur (engine.js)
+   ↓
+Viewport runtime (viewport.js, état { scale, x, y }, sans DOM)
+   ↓ viewBox
+SVG (taille visible fixée par la CSS .gx-viewport)
+```
+
+Le viewport est entièrement client : aucune route métier, aucun point d'accès
+JSON, aucun serveur, aucune persistance ; seul `viewport.js` rejoint la liste
+fermée `GRAPHICS_MODULES` servie par le Router Forge. Route et Entity
+utilisent le même viewport sans code propre ; sans JavaScript, le SVG serveur
+complet et défilable reste le repli.
+
 ## 14. Écriture
 
 Principe :

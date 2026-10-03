@@ -208,5 +208,5 @@ test("deux clients de formes différentes, simultanés et isolés", () => {
   assert.equal(b.selection().nodeId, "M");
   a.destroy();
   assert.equal(b.selection().nodeId, "M");
-  assert.equal(rendered(second).svg.parent, second);
+  assert.ok([...second.walk()].includes(rendered(second).svg));
 });

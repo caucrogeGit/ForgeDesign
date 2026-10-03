@@ -697,6 +697,23 @@ sur les arêtes et `engine.edge(id)`, pour qu'un panneau décrive les arêtes
 incidentes. Le moteur ne connaît ni entité, ni relation, ni pivot (test de
 vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 
+## Viewport — FD-GRAPHICS-004
+
+- **État runtime** : `{ scale, x, y }` par instance, jamais dans la scène, un
+  document, un cookie ou un stockage navigateur ; un rechargement repart du fit.
+- **Autorité unique** : le `viewBox` du SVG (pas de groupe transformé
+  concurrent), la taille visible étant fixée par la CSS de la zone.
+- **Fit** (= home) : scène entière, centrée, marge écran 16 px, plafond 100 %.
+- **Zoom** : pas 1,25 symétrique, bornes 0,02 à 4, invariant du point sous le
+  pointeur ; Ctrl/Cmd + molette seulement.
+- **Pan** : glisser sur le fond ou au bouton du milieu, Maj + flèches ; aucun
+  déplacement de nœud ; sélection conservée.
+- **Resize** : fit suivi avant interaction, centre et échelle conservés après.
+- **Interaction** : barre d'outils générique (`gx-toolbar-*`), boutons natifs
+  accessibles au clavier.
+- Les mathématiques (`viewport.js`) sont pures et testées hors DOM ; les
+  écouteurs appartiennent à l'instance et sont libérés par `destroy()`.
+
 ## Questions reportées
 
 | Question | Ticket attendu |

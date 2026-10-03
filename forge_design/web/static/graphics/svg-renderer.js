@@ -62,9 +62,8 @@ export function renderScene(container, scene) {
   const document = container.ownerDocument;
   const svg = element(document, "svg", {
     class: "gx-scene",
+    // Taille visible fixée par la CSS ; le viewport pilote ensuite le viewBox.
     viewBox: `0 0 ${scene.width} ${scene.height}`,
-    width: scene.width,
-    height: scene.height,
     role: "group",
     "aria-label": scene.title || "Graphe",
   });

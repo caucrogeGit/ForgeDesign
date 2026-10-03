@@ -9,7 +9,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "forge_design/web/static"
-GRAPHICS = ("engine", "geometry", "model", "scene", "svg-renderer")
+GRAPHICS = ("engine", "geometry", "model", "scene", "svg-renderer", "viewport")
 SUITES = sorted((ROOT / "tests/js/graphics").glob("*.test.mjs"))
 
 
@@ -65,7 +65,7 @@ def test_node_check(path: Path) -> None:
 
 
 def test_node_suites() -> None:
-    assert len(SUITES) == 5
+    assert len(SUITES) == 7
     result = subprocess.run(
         [_node(), "--test", *map(str, SUITES)],
         capture_output=True,

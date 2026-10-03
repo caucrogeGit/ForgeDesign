@@ -317,8 +317,9 @@ fait      FD-GRAPHICS-002  premier noyau graphique JS (scène, validation, rende
                            sélection) ; Route Explorer premier client
 fait      FD-GRAPHICS-003  Entity Explorer deuxième client ; API validée par deux clients,
                            seule extension : données opaques d'arête et edge(id)
-suivant   FD-GRAPHICS-004  à décider sur l'usage observé (voir rapport FD-GRAPHICS-003) :
-                           troisième client (Debug Center) ou viewport / zoom / pan
+fait      FD-GRAPHICS-004  viewport générique (fit, zoom, pan, home, resize) pour Route et
+                           Entity ; première capacité interactive capitalisée de DrawCiel
+suivant   FD-GRAPHICS-005  à décider sur l'usage observé (voir rapport FD-GRAPHICS-004)
 ensuite   ports et routage orthogonal extrait de DrawCiel, commandes et historique
 en attente du socle Graphics :
           FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit

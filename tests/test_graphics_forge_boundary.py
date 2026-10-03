@@ -30,7 +30,14 @@ def test_single_forge_mvc_composition() -> None:
 
 def test_graphics_assets_are_fixed_forge_routes() -> None:
     server = (PACKAGE / "web/server.py").read_text()
-    assert GRAPHICS_MODULES == ("engine", "geometry", "model", "scene", "svg-renderer")
+    assert GRAPHICS_MODULES == (
+        "engine",
+        "geometry",
+        "model",
+        "scene",
+        "svg-renderer",
+        "viewport",
+    )
     assert 'router.add(\n            "GET", f"/graphics/{module}.js"' in server
     static = PACKAGE / "web/static/graphics"
     assert sorted(p.stem for p in static.glob("*.js")) == sorted(GRAPHICS_MODULES)
