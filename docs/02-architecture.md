@@ -601,8 +601,31 @@ géométrie, routes et ordre des collections. `CircuitCodec.validate` applique l
 domaine ; le socle bloque les erreurs `structure` et `topology`, jamais les
 avertissements de préparation électrique. Aucun Graphics, rendu, éditeur ni
 simulation.
-Les graphes en lecture seule existants (Route Explorer, Entity Explorer, Debug
-Center) restent inchangés ; leur convergence éventuelle est à étudier.
+Les graphes en lecture seule existants (Entity Explorer, Debug Center) restent
+inchangés ; Route Explorer est devenu le premier client du moteur
+(FD-GRAPHICS-002).
+
+### Premier noyau graphique — FD-GRAPHICS-002
+
+API : [Moteur graphique — API JavaScript](graphics/graphics-engine.md).
+
+```text
+forge_design/web/static/graphics/   ES modules, routes fixes /graphics/<module>.js
+├── geometry.js       Point, Rect, flèches
+├── model.js          validateScene : contenu non fiable → copie gelée, limites
+├── scene.js          index d'incidence O(V + E), sélection simple runtime
+├── svg-renderer.js   SVG par createElementNS / textContent (remplaçable)
+└── engine.js         createGraphicEngine(container, scene, options) : instance, destroy()
+
+Route Explorer : RoutesResult → RouteGraph → RouteGraphLayout
+  → route_graph_scene.build_route_graphic_scene (adaptateur pur)
+  → <script type="application/json" data-graphic-scene> (échappé)
+  → /route-graph.js (client) → createGraphicEngine ; SVG serveur conservé en repli sans JS
+```
+
+Le moteur ne connaît ni Route Explorer, ni un projet, ni un stockage ; il ne
+persiste rien. Bridge, Tool et registre (cinq Tools) inchangés ; CSP
+inchangée.
 
 ## 14. Écriture
 
@@ -1132,6 +1155,13 @@ y compris sur les réponses 400. Une URL reproduit la sélection sur les donnée
 courantes, sans garantie d'instantané si le projet change entre deux GET.
 
 ### Interaction locale du graphe
+
+> **Remplacé par FD-GRAPHICS-002** : la sélection de Route Explorer est
+> désormais assurée par le Graphic Core (voir « Premier noyau graphique ») ;
+> le SVG serveur ne porte plus d'attribut d'interaction et sert de repli sans
+> JavaScript. Les garanties ci-dessous (CSP, textContent, incidence directe,
+> clavier, panneau, repli) sont conservées ; la description reste ici à titre
+> historique.
 
 `RouteGraph → RouteGraphLayout → SVG serveur → amélioration JavaScript locale`.
 Le fichier packagé `static/route-graph.js` est servi par GET /route-graph.js en

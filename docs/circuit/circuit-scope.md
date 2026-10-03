@@ -772,7 +772,10 @@ de moteurs qui n'a de sens qu'une fois le document exact et stable.
 
 Ordre retenu pour la Phase 10, révisé par FD-GRAPHICS-001 (numéros
 indicatifs ; les tickets FD-CIRCUIT-003 et suivants de la première version de
-ce tableau sont renumérotés) :
+ce tableau sont renumérotés). **Révision FD-GRAPHICS-002** : priorité au
+Graphic Core et à ses clients plateforme ; FD-CIRCUIT-003 est réalisé et
+conservé, la suite Circuit (FD-CIRCUIT-004 et au-delà) attend le socle
+Graphics ; ordre courant dans la [roadmap](../03-roadmap.md#phase-10--circuit) :
 
 | Ticket | Contenu | Justification de l'ordre |
 |---|---|---|

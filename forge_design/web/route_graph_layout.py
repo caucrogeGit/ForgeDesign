@@ -22,6 +22,8 @@ class PositionedEdge:
     path: str
     label_x: int
     label_y: int
+    # Polyligne orthogonale dont path est la forme SVG (repli serveur).
+    points: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -74,8 +76,16 @@ def layout_route_graph(graph: RouteGraph) -> RouteGraphLayout:
         sx, sy = source.x + source.width, source.y + source.height // 2
         tx, ty = target.x, target.y + target.height // 2
         lane = 30 + index * 24
+        points = (
+            (sx, sy),
+            (sx + 20, sy),
+            (sx + 20, lane),
+            (tx - 20, lane),
+            (tx - 20, ty),
+            (tx, ty),
+        )
         path = f"M {sx} {sy} H {sx + 20} V {lane} H {tx - 20} V {ty} H {tx}"
-        edges.append(PositionedEdge(edge, path, (sx + tx) // 2, lane - 5))
+        edges.append(PositionedEdge(edge, path, (sx + tx) // 2, lane - 5, points))
     return RouteGraphLayout(
         tuple(nodes),
         tuple(edges),

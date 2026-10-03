@@ -660,11 +660,38 @@ positions exactes), déplacement de nœud (routes incidentes seulement),
 stabilité de route, croisement sans relation, édition de segment ; sélection
 simple, multiple, rectangle, suppression, copie.
 
+## Implémentation minimale — FD-GRAPHICS-002
+
+Première tranche exécutable, API détaillée dans
+[Moteur graphique — API JavaScript](graphics-engine.md) :
+
+```text
+RouteGraph / RouteGraphLayout ─(adaptateur Route Explorer, Python)─▶ GraphicScene (JSON inerte)
+      ─▶ validateScene ─▶ indexScene / createSelection ─▶ renderScene (SVG) ─▶ navigateur
+```
+
+- **Décidé** : ES modules natifs (`engine`, `geometry`, `model`, `scene`,
+  `svg-renderer`), sans build ni dépendance, servis par routes fixes ; testés
+  hors DOM par `node --test` piloté par pytest. CSP inchangée.
+- Implémenté : `GraphicScene` (nœuds, arêtes), validation stricte d'un contenu
+  non fiable, géométrie `Point`/`Rect`, renderer SVG sans balisage injecté,
+  sélection simple (clic, Entrée, Espace, Échap), incidence directe, instances
+  isolées avec cycle de vie explicite (`destroy`).
+- `Node` porte `rect`, `lines`, présentation bornée et `data` opaque ; `Port`,
+  routes calculées, grille, transformations, commandes et historique restent à
+  implémenter (tickets suivants).
+- Premier client : Route Explorer, par un adaptateur qui garde tout le
+  vocabulaire métier ; un témoin générique test-only (A → B, A → C) prouve
+  l'indépendance du moteur.
+- Le layout reste fourni par le client (scène déjà positionnée) ; aucun
+  layout universel.
+
 ## Questions reportées
 
 | Question | Ticket attendu |
 |---|---|
-| Langage et forme des modules (confirmation JavaScript sans build, modules ES) | FD-GRAPHICS-002 |
+| Langage et forme des modules | **Tranché par FD-GRAPHICS-002** : ES modules natifs, sans build |
+| Layout générique (hiérarchique, force, orthogonal) | Ultérieur |
 | Représentation des entrées d'historique (inverse ou instantané) | FD-GRAPHICS-005 |
 | Choix du renderer (SVG, Canvas, hybride) | FD-GRAPHICS-004 |
 | Re-projection complète ou incrémentale | FD-GRAPHICS-005 |

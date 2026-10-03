@@ -25,6 +25,10 @@ from forge_design.tools.route_graph import build_route_graph
 from forge_design.web.rendering import render_page
 from forge_design.web.route_filters import parse_route_filter
 from forge_design.web.route_graph_layout import layout_route_graph
+from forge_design.web.route_graph_scene import (
+    build_route_graphic_scene,
+    scene_json_payload,
+)
 from forge_design.web.source import source_url
 
 
@@ -78,6 +82,7 @@ def show_routes(
                 for cycle in closure.cycles:
                     cycles.setdefault(cycle.key, cycle)
     graph = build_route_graph(result) if result is not None and result.routes else None
+    layout = layout_route_graph(graph) if graph else None
     return render_page(
         "routes.html",
         {
@@ -93,7 +98,12 @@ def show_routes(
             "template_cycles": tuple(cycles.values()),
             "cycles_partial": partial,
             "graph": graph,
-            "graph_layout": layout_route_graph(graph) if graph else None,
+            "graph_layout": layout,
+            "graph_scene": (
+                scene_json_payload(build_route_graphic_scene(layout))
+                if layout
+                else None
+            ),
             "graph_nodes": {node.id: node for node in graph.nodes} if graph else {},
         },
         status=status,

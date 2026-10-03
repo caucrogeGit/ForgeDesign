@@ -1,4 +1,4 @@
-"""Contrats statiques et exécution JS légère sur un double DOM explicite."""
+"""Graphic Core JavaScript et client Route Explorer : contrats statiques et Node."""
 
 import shutil
 import subprocess
@@ -7,53 +7,71 @@ from pathlib import Path
 
 import pytest
 
-
-def test_script_static_contract() -> None:
-    script = files("forge_design.web").joinpath("static/route-graph.js").read_text()
-    for forbidden in (
-        "fetch",
-        "XMLHttpRequest",
-        "localStorage",
-        "sessionStorage",
-        "innerHTML",
-        "https://",
-        "http://",
-        "history.",
-        "location.",
-        "document.cookie",
-        "eval(",
-        "new Function",
-        ".style.",
-    ):
-        assert forbidden not in script
-    for expected in (
-        "textContent",
-        '"Enter"',
-        '" "',
-        '"Escape"',
-        "preventDefault()",
-        "data-route-graph",
-        "dataset.sourceId",
-        "dataset.targetId",
-        "aria-pressed",
-    ):
-        assert expected in script
+ROOT = Path(__file__).resolve().parents[1]
+STATIC = ROOT / "forge_design/web/static"
+GRAPHICS = ("engine", "geometry", "model", "scene", "svg-renderer")
+SUITES = sorted((ROOT / "tests/js/graphics").glob("*.test.mjs"))
 
 
-def test_script_dom_interaction() -> None:
+def _node() -> str:
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node indisponible ; contrats statiques conservés.")
-    root = Path(__file__).resolve().parents[1]
+    return node
+
+
+def test_packaged_modules_and_static_contract() -> None:
+    package = files("forge_design.web")
+    for name in GRAPHICS:
+        source = package.joinpath(f"static/graphics/{name}.js").read_text()
+        assert source.startswith("// Graphic Core")
+        for forbidden in (
+            "innerHTML",
+            "outerHTML",
+            "insertAdjacentHTML",
+            "eval(",
+            "new Function",
+            "fetch(",
+            "XMLHttpRequest",
+            "localStorage",
+            "sessionStorage",
+            "document.cookie",
+            "http://",
+            "https://",
+            ".style",
+            "window.",
+            "globalThis",
+        ):
+            assert forbidden not in source.replace("http://www.w3.org/2000/svg", ""), (
+                name,
+                forbidden,
+            )
+    client = package.joinpath("static/route-graph.js").read_text()
+    assert 'import { createGraphicEngine } from "./graphics/engine.js";' in client
+    assert "textContent" in client and "innerHTML" not in client
+    assert "JSON.parse(source.textContent)" in client
+
+
+@pytest.mark.parametrize(
+    "path",
+    [STATIC / f"graphics/{name}.js" for name in GRAPHICS]
+    + [STATIC / "route-graph.js"]
+    + SUITES
+    + [ROOT / "tests/js/graphics/fake-dom.mjs", ROOT / "tests/js/graphics/scenes.mjs"],
+    ids=lambda path: path.name,
+)
+def test_node_check(path: Path) -> None:
+    subprocess.run([_node(), "--check", str(path)], check=True, timeout=30)
+
+
+def test_node_suites() -> None:
+    assert len(SUITES) == 4
     result = subprocess.run(
-        [
-            node,
-            str(root / "tests/js/route_graph_dom.cjs"),
-            str(root / "forge_design/web/static/route-graph.js"),
-        ],
+        [_node(), "--test", *map(str, SUITES)],
         capture_output=True,
         text=True,
-        timeout=10,
-        check=True,
+        timeout=120,
+        cwd=ROOT,
     )
-    assert "isolation : OK" in result.stdout
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "ℹ fail 0" in result.stdout

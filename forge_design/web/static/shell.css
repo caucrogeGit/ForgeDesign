@@ -56,11 +56,26 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .filter-actions { display: flex; align-items: center; gap: 1rem; }
 .filter-count { margin-block: 1.5rem; font-weight: 600; }
 
-.graph-node[role="button"] { cursor: pointer; }
-.graph-node.is-selected rect { stroke: #824029; stroke-width: 5; }
-.graph-node.is-related rect { stroke-width: 3; }
-.graph-edge.is-related { stroke: #824029; stroke-width: 4; }
-.graph-node:focus-visible rect { stroke-width: 4; stroke-dasharray: 4 3; }
+/* Graphic Core (FD-GRAPHICS-002) : présentations génériques ; jamais la couleur seule. */
+.gx-scene { display: block; }
+.gx-node { cursor: pointer; }
+.gx-node-box { fill: #fff; stroke: #667085; stroke-width: 1.5; }
+.gx-node-text { font: 12px monospace; fill: #172033; }
+.gx-variant-category-1 .gx-node-box { fill: #f5f8fc; }
+.gx-variant-category-2 .gx-node-box { fill: #f7f5fb; }
+.gx-variant-category-3 .gx-node-box { fill: #f4f9f6; }
+.gx-variant-category-4 .gx-node-box { fill: #fcf8f2; }
+.gx-tone-warning .gx-node-box { stroke: #9a3412; stroke-dasharray: 6 3; }
+.gx-tone-muted .gx-node-text { fill: #475467; }
+.gx-node.gx-selected .gx-node-box { stroke: #824029; stroke-width: 5; stroke-dasharray: none; }
+.gx-node.gx-related .gx-node-box { stroke-width: 3; }
+.gx-node:focus-visible .gx-node-box { stroke-width: 4; stroke-dasharray: 4 3; }
+.gx-edge-path { fill: none; stroke: #667085; stroke-width: 1.5; }
+.gx-edge-arrow { fill: #667085; }
+.gx-line-dashed .gx-edge-path { stroke-dasharray: 7 4; }
+.gx-edge-label { font: 12px sans-serif; fill: #172033; text-anchor: middle; }
+.gx-edge.gx-related .gx-edge-path { stroke: #824029; stroke-width: 4; }
+.gx-edge.gx-related .gx-edge-arrow { fill: #824029; }
 .graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .graph-details dd { margin-bottom: .75rem; }
 

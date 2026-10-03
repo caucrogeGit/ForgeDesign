@@ -1,5 +1,6 @@
 """HTTP réel : formulaire, contexte runtime, registre et rendu Forge."""
 
+import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from html import escape
@@ -541,7 +542,8 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     assert graph_html.count("<title>HomeController.index</title>") == 1
     assert graph_html.count(">handles</text>") == 2
     assert "<svg " in graph_html and graph_html.count("<marker ") == 1
-    assert 'role="group"' in graph_html and "viewBox=" in graph_html
+    # Repli statique sans JavaScript ; la vue interactive vient du Graphic Core.
+    assert 'role="img"' in graph_html and "viewBox=" in graph_html
     assert "dynamic_name" not in graph_html and "dynamique" not in graph_html
     assert "<script>" not in graph_html and "<table>" in html
     assert "<td>Présent</td><td>Valide</td>" in html
@@ -691,7 +693,8 @@ def test_web_transitive_graph(
     assert status == 200 and headers.get("Cache-Control") == "no-store"
     graph_html = html.split('class="route-graph"', 1)[1]
     assert "<title>&lt;script&gt;.html</title>" in graph_html
-    assert 'data-node-label="&lt;script&gt;.html"' in graph_html
+    # Scène JSON inerte : libellé hostile échappé, jamais de balise brute.
+    assert '"label":"\\u003cscript\\u003e.html"' in graph_html
     assert 'x="1830"' in graph_html
     assert "graph-edge-cycle" in graph_html and "(cycle)</text>" in graph_html
     assert ">Absent</text>" in graph_html
@@ -1050,27 +1053,35 @@ def test_graph_interaction_dom_and_resource(
     parser = Tags()
     parser.feed(html)
     scripts = [attrs for tag, attrs in parser.tags if tag == "script"]
-    assert scripts == [{"src": "/route-graph.js", "defer": None}]
-    assert '<script src="/route-graph.js" defer></script>' in html
-    nodes = [attrs for _tag, attrs in parser.tags if "data-node-id" in attrs]
-    edges = [attrs for _tag, attrs in parser.tags if "data-source-id" in attrs]
-    ids = {attrs["data-node-id"] for attrs in nodes}
-    assert len(ids) == len(nodes) and len(nodes) > 3
-    assert all(
-        a["role"] == "button" and a["tabindex"] == "0" and a["aria-pressed"] == "false"
-        for a in nodes
-    )
-    assert all(a["data-source-id"] in ids and a["data-target-id"] in ids for a in edges)
-    assert all("data-node-label" in a and "data-node-presence" in a for a in nodes)
-    assert (
-        "Sélectionnez un élément du graphe." in html
-        and "data-selection-details hidden" in html
-    )
-    assert "<table>" in html and "/source?path=" in html and "<noscript>" in html
-    assert "application/json" not in html and "application/ld+json" not in html
+    assert scripts == [
+        {"type": "application/json", "data-graphic-scene": None},
+        {"type": "module", "src": "/route-graph.js"},
+    ]
+    # Repli serveur statique : aucun attribut d'interaction ni identité exposée.
+    assert not any("data-node-id" in attrs for _tag, attrs in parser.tags)
+    assert not any(attrs.get("role") == "button" for _tag, attrs in parser.tags)
+    assert "data-graphic-fallback" in html and "data-graphic-host" in html
+    payload = html.split("data-graphic-scene>", 1)[1].split("</script>", 1)[0]
+    scene = json.loads(payload)
+    ids = {node["id"] for node in scene["nodes"]}
+    assert len(ids) == len(scene["nodes"]) > 3
+    assert all(e["source"] in ids and e["target"] in ids for e in scene["edges"])
+    assert all(len(e["points"]) >= 2 for e in scene["edges"])
+    assert "<" not in payload and ">" not in payload and "&" not in payload
+    assert "data-selection-details hidden" in html
+    assert "La sélection nécessite JavaScript." in html
+    assert "<table>" in html and "/source?path=" in html
     status, script, headers = request(server, method="GET", target="/route-graph.js")
     assert status == 200 and headers["Content-Type"] == "text/javascript; charset=utf-8"
-    assert "textContent" in script and "fetch" not in script
+    assert 'from "./graphics/engine.js"' in script and "fetch" not in script
+    for module in ("engine", "geometry", "model", "scene", "svg-renderer"):
+        status, body, headers = request(
+            server, method="GET", target=f"/graphics/{module}.js"
+        )
+        assert status == 200 and body.startswith("// Graphic Core")
+        assert headers["Content-Type"] == "text/javascript; charset=utf-8"
+    assert request(server, method="GET", target="/graphics/absent.js")[0] == 404
+    assert request(server, method="GET", target="/graphics/../server.py")[0] == 404
     status, empty, _ = request(server, method="GET", target="/routes?q=absentzzzz")
     assert status == 200 and "<svg " not in empty and "<script" not in empty
     assert request(server, method="POST", target="/route-graph.js")[0] == 405

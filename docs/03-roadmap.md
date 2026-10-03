@@ -298,32 +298,38 @@ routage, sélection, commandes, historique) et Circuit (sémantique électrique)
 Il capitalise sur DrawCiel, suivi par une [procédure de référence](graphics/drawciel-reference.md)
 appliquée à chaque ticket concerné. Les phases globales ne sont pas renumérotées.
 
-Ordre retenu (numéros indicatifs, révisé par FD-GRAPHICS-001) :
+**Changement de priorité (FD-GRAPHICS-002).** Forge Design porte l'analyse de
+projet, Platform, le moteur graphique générique et l'infrastructure des modules
+spécialisés ; il ne devient pas lui-même l'application métier (Circuit,
+Network, Flowchart…), qui utilisera le moteur ensuite. Ordre désormais retenu :
 
 ```text
-FD-CIRCUIT-001   besoins et périmètre
-→ FD-GRAPHICS-001  contrat du noyau graphique commun, capitalisation DrawCiel
-→ FD-CIRCUIT-002   contrat de ressource Circuit V0.1 (fait : forge_design.circuit, mvc/circuit/**/*.circuit.json)
-→ FD-GRAPHICS-002  primitives géométriques pures, transformations exactes, ports
-→ FD-GRAPHICS-003  routage orthogonal extrait de DrawCiel, témoins portés
-→ FD-CIRCUIT-003   domaine, catalogue V1, validation, topologie (fait : catalog, domain, topology, validation)
-→ FD-GRAPHICS-004  étude du renderer et de l'interaction (choix)
-→ FD-GRAPHICS-005  scène, projection, sélection, commandes, historique (domaine témoin non électrique)
-→ FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
-→ FD-CIRCUIT-005   intégration hôte, session, éditeur Web minimal
-→ FD-CIRCUIT-006   export SVG depuis le modèle
-→ FD-CIRCUIT-007   qualification du premier jalon en navigateur
-→ FD-CIRCUIT-008   étude des moteurs et de l'IR Circuit (compatibilité SimulationIR DrawCiel)
-→ FD-CIRCUIT-009   adaptateur et simulation DC minimale
-→ FD-CIRCUIT-010   mesures
-→ ultérieur        instruments, transitoires, extension du catalogue, import DrawCiel
+Graphics solide → preuve sur la plateforme → autres clients plateforme → modules spécialisés
 ```
 
-Par rapport à l'ordre indicatif initial, la validation structurelle est
-avancée avec le modèle, géométrie et routage deviennent des tickets Graphics
-communs, le choix du rendu est une étude explicite et la généricité du noyau
-est prouvée par un domaine témoin avant Circuit. Le moteur de simulation n'est
-pas choisi avant une étude dédiée.
+```text
+fait      FD-CIRCUIT-001   besoins et périmètre
+fait      FD-GRAPHICS-001  contrat du noyau graphique commun, capitalisation DrawCiel
+fait      FD-CIRCUIT-002   ressource Circuit V0.1 (forge_design.circuit, mvc/circuit/**/*.circuit.json)
+fait      FD-CIRCUIT-003   domaine Circuit V1 (catalogue, topologie, validation), réalisé avant
+                           le changement de priorité et conservé ; suite Circuit en attente
+fait      FD-GRAPHICS-002  premier noyau graphique JS (scène, validation, renderer SVG,
+                           sélection) ; Route Explorer premier client
+suivant   FD-GRAPHICS-003  à choisir après la preuve : géométrie, viewport, zoom/pan et
+                           transformations, ou Entity Explorer comme deuxième client
+ensuite   autres clients plateforme (Entity Explorer, Debug Center), ports et routage
+          orthogonal extrait de DrawCiel, commandes et historique
+en attente du socle Graphics :
+          FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
+          FD-CIRCUIT-005   intégration hôte, session, éditeur Web minimal
+          FD-CIRCUIT-006   export SVG depuis le modèle
+          FD-CIRCUIT-007   qualification du premier jalon en navigateur
+          FD-CIRCUIT-008+  moteurs et IR de simulation, simulation DC, mesures
+```
+
+Le contenu prévu initialement pour FD-GRAPHICS-002 (primitives géométriques,
+transformations exactes, ports) est reporté aux tickets Graphics suivants.
+Le moteur de simulation n'est pas choisi avant une étude dédiée.
 
 Premier jalon de la phase : créer, éditer, valider, enregistrer avec
 révision, rouvrir à l'identique et exporter en SVG un schéma exact, sans

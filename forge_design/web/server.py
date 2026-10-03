@@ -59,6 +59,21 @@ def _graph_script(request: Request) -> Response:
     )
 
 
+# Graphic Core : liste fermée de modules ES, servis par routes fixes (aucun
+# serveur de fichiers générique).
+GRAPHICS_MODULES = ("engine", "geometry", "model", "scene", "svg-renderer")
+
+
+def _graphics_module(name: str) -> Callable[[Request], Response]:
+    def serve(request: Request) -> Response:
+        script = files("forge_design.web").joinpath(f"static/graphics/{name}.js")
+        return Response(
+            body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
+        )
+
+    return serve
+
+
 def _editor_preview_style(request: Request) -> Response:
     css = files("forge_design.web").joinpath("static/editor-preview.css")
     return Response(body=css.read_bytes(), content_type="text/css; charset=utf-8")
@@ -209,6 +224,10 @@ def create_application(
     router.add("GET", "/shell.css", _style, public=True)
     router.add("GET", "/route-graph.js", _graph_script, public=True)
     router.add("GET", "/entity-graph.js", _entity_graph_script, public=True)
+    for module in GRAPHICS_MODULES:
+        router.add(
+            "GET", f"/graphics/{module}.js", _graphics_module(module), public=True
+        )
     router.add("GET", "/inspector", show, public=True, no_store=True)
     # Ces actions runtime sans session exigent une origine locale exacte.
     router.add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
