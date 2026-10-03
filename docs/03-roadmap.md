@@ -287,23 +287,36 @@ registre et intégration seulement ensuite, si un besoin réel les justifie.
 
 ## Phase 10 — Circuit
 
-Ordre indicatif :
+Périmètre normatif : [Circuit — besoins et périmètre](circuit/circuit-scope.md)
+(FD-CIRCUIT-001). Circuit V1 est un éditeur de schémas électriques exacts ;
+la simulation est une capacité optionnelle future, hors du premier jalon.
+
+Ordre retenu (numéros indicatifs) :
 
 ```text
-besoins pédagogiques et techniques
-→ modèle de ressource
-→ composants minimaux
-→ connexions
-→ rendu
-→ validation structurelle
-→ étude des moteurs de simulation
-→ adaptateur
-→ simulation
-→ mesures
-→ instrumentation
+FD-CIRCUIT-001  besoins et périmètre
+→ FD-CIRCUIT-002  contrat de ressource Circuit (format, version, identités, espace de sources)
+→ FD-CIRCUIT-003  modèle de domaine, catalogue V1, codec, validation structure/topologie/préparation
+→ FD-CIRCUIT-004  géométrie et routage orthogonal (opérations pures)
+→ FD-CIRCUIT-005  étude du rendu et de l'interaction (choix frontend)
+→ FD-CIRCUIT-006  intégration hôte et session d'édition (registre minimal si nécessaire)
+→ FD-CIRCUIT-007  éditeur Web minimal : commandes, historique, dirty, sauvegarde, conflit
+→ FD-CIRCUIT-008  export SVG exact
+→ FD-CIRCUIT-009  qualification du premier jalon en navigateur
+→ FD-CIRCUIT-010  étude des moteurs de simulation et de la frontière IR
+→ FD-CIRCUIT-011  adaptateur et simulation DC minimale
+→ FD-CIRCUIT-012  mesures
+→ ultérieur       instruments, transitoires, extension du catalogue, import DrawCiel
 ```
 
-Le moteur n'est pas choisi avant une étude dédiée.
+Par rapport à l'ordre indicatif initial, la validation structurelle est
+avancée avec le modèle, le modèle géométrique précède le rendu et le choix
+frontend devient une étude explicite. Le moteur n'est pas choisi avant une
+étude dédiée.
+
+Premier jalon de la phase : créer, éditer, valider, enregistrer avec
+révision, rouvrir à l'identique et exporter en SVG un schéma exact, sans
+simulation.
 
 ## Phase 11 — 3D
 

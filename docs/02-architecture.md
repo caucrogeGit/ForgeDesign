@@ -518,6 +518,25 @@ par `replace`) et journalise dans `history.jsonl` (`write_specialized_resource`)
 Aucun registre, UI, runtime, export ni outil livré : la validation passe par un
 outil témoin limité aux tests. `Tool` et son registre restent inchangés.
 
+### Frontière conceptuelle de Circuit — FD-CIRCUIT-001
+
+Périmètre normatif : [Circuit — besoins et périmètre](circuit/circuit-scope.md).
+**Rien de ce qui suit n'est implémenté** : les noms désignent des
+responsabilités, pas des classes existantes.
+
+```text
+CircuitDocument        ressource persistante en zone C, seule source de vérité
+│                      composants, bornes (par type), connexions, jonctions, routes, annotations
+├── topologie          dérivée, autorité électrique ; exclut géométrie et routes
+├── CircuitRuntimeState   session d'édition : sélection, vue, historique, dirty — jamais persistée
+└── (futur) SimulationSession → SimulationResult   lit un instantané, n'écrit jamais le document
+```
+
+Circuit utilisera le socle `forge_design.specialized` (lecture, validation par
+niveaux `structure`, `topology`, `electrical-readiness`, écriture avec
+révision). Format, frontend et moteur de simulation restent à décider par les
+tickets de la Phase 10. Circuit n'est enregistré nulle part.
+
 ## 14. Écriture
 
 Principe :
