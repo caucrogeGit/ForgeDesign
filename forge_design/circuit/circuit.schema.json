@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Forge Design Circuit Resource",
+  "description": "Ressource Circuit V0.1 (mvc/circuit/**/*.circuit.json). Les identités forment un espace de noms global unique dans le document (règle d'exécution, non exprimable ici). Aucun état runtime, réseau, simulation ou donnée pédagogique.",
+  "additionalProperties": false,
+  "properties": {
+    "format_version": {
+      "const": "0.1",
+      "type": "string"
+    },
+    "page": {
+      "$ref": "#/$defs/CircuitPage"
+    },
+    "components": {
+      "items": {
+        "$ref": "#/$defs/CircuitComponent"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "connections": {
+      "items": {
+        "$ref": "#/$defs/CircuitConnection"
+      },
+      "maxItems": 8192,
+      "type": "array"
+    },
+    "junctions": {
+      "items": {
+        "$ref": "#/$defs/CircuitJunction"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "annotations": {
+      "items": {
+        "$ref": "#/$defs/CircuitTextAnnotation"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    }
+  },
+  "required": [
+    "format_version",
+    "page",
+    "components",
+    "connections",
+    "junctions",
+    "annotations"
+  ],
+  "type": "object",
+  "$defs": {
+    "CircuitComponent": {
+      "description": "Instance d'un type de composant ; les bornes appartiennent au type, jamais à l'instance. reference est omise en l'absence de référence (null refusé).",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 66,
+          "pattern": "^c_[A-Za-z0-9_-]{8,64}$",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$",
+          "type": "string"
+        },
+        "reference": {
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/CircuitPoint"
+        },
+        "rotation": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "type": "integer"
+        },
+        "properties": {
+          "type": "object",
+          "patternProperties": {
+            "^[A-Za-z][A-Za-z0-9_]*$": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[^\\x00-\\x08\\x0b-\\x1f\\x7f]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "maxProperties": 64,
+          "additionalProperties": false,
+          "description": "Propriétés scalaires ; absence = clé omise. Un entier JSON hors de l'intervalle sûr est refusé et jamais converti en nombre décimal (règle d'exécution). Les clés autorisées par type relèvent du catalogue (FD-CIRCUIT-003)."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "position",
+        "rotation",
+        "properties"
+      ],
+      "type": "object"
+    },
+    "CircuitConnection": {
+      "description": "Liaison électrique entre exactement deux extrémités.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 66,
+          "pattern": "^e_[A-Za-z0-9_-]{8,64}$",
+          "type": "string"
+        },
+        "a": {
+          "$ref": "#/$defs/CircuitEndpoint"
+        },
+        "b": {
+          "$ref": "#/$defs/CircuitEndpoint"
+        },
+        "route": {
+          "$ref": "#/$defs/CircuitRoute"
+        }
+      },
+      "required": [
+        "id",
+        "a",
+        "b",
+        "route"
+      ],
+      "type": "object"
+    },
+    "CircuitEndpoint": {
+      "description": "Extrémité métier discriminée par kind : borne d'un composant ou jonction. L'existence de la cible n'est pas vérifiée par la structure.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TerminalEndpoint"
+        },
+        {
+          "$ref": "#/$defs/JunctionEndpoint"
+        }
+      ]
+    },
+    "CircuitJunction": {
+      "description": "Jonction électrique Circuit, distincte d'un composant.",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 66,
+          "pattern": "^j_[A-Za-z0-9_-]{8,64}$",
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/CircuitPoint"
+        }
+      },
+      "required": [
+        "id",
+        "position"
+      ],
+      "type": "object"
+    },
+    "CircuitPage": {
+      "description": "Page unique, dimensions en unités de grille Circuit.",
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "type": "object"
+    },
+    "CircuitPoint": {
+      "description": "Point de grille en unités entières ; forme du Point du Graphic Core.",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "maximum": 4096,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "y": {
+          "maximum": 4096,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "CircuitRoute": {
+      "description": "Présentation d'une connexion : points intermédiaires seulement, extrémités dérivées des bornes ou jonctions. Orthogonalité et colinéarité relèvent d'un niveau de validation ultérieur.",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "orthogonal",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/CircuitPoint"
+          },
+          "maxItems": 256,
+          "type": "array"
+        }
+      },
+      "required": [
+        "mode",
+        "points"
+      ],
+      "type": "object"
+    },
+    "CircuitTextAnnotation": {
+      "description": "Texte brut UTF-8, sans interprétation (ni HTML ni Markdown).",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 66,
+          "pattern": "^a_[A-Za-z0-9_-]{8,64}$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "text",
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/CircuitPoint"
+        },
+        "text": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x08\\x0b-\\x1f\\x7f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "position",
+        "text"
+      ],
+      "type": "object"
+    },
+    "JunctionEndpoint": {
+      "description": "Jonction électrique junction_id.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "junction",
+          "type": "string"
+        },
+        "junction_id": {
+          "maxLength": 66,
+          "pattern": "^j_[A-Za-z0-9_-]{8,64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "junction_id"
+      ],
+      "type": "object"
+    },
+    "TerminalEndpoint": {
+      "description": "Borne terminal_id du composant component_id.",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "terminal",
+          "type": "string"
+        },
+        "component_id": {
+          "maxLength": 66,
+          "pattern": "^c_[A-Za-z0-9_-]{8,64}$",
+          "type": "string"
+        },
+        "terminal_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "component_id",
+        "terminal_id"
+      ],
+      "type": "object"
+    }
+  }
+}

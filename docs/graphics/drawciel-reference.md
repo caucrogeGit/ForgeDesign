@@ -25,10 +25,10 @@ copie automatique, aucun suivi du HEAD en runtime.
 
 | Champ | Valeur |
 |---|---|
-| Commit | `c229b2ed` — feat(drawciel): regrouper les annotations en cinq outils |
-| Date du commit | 2 octobre 2026 |
+| Commit | `aac36b27` — feat(drawciel): intégrer et qualifier le profil expérimental UNO R4 |
+| Date du commit | 3 octobre 2026 |
 | Date d'analyse | 3 octobre 2026 |
-| Ticket | FD-GRAPHICS-001 |
+| Ticket | FD-CIRCUIT-002 |
 
 ## Journal des références
 
@@ -37,6 +37,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | FD-SPECIALIZED-001 | — | `5a02277d` (audit DC-016-00) | — | Contrat des outils spécialisés |
 | FD-CIRCUIT-001 | `5a02277d` | `c229b2ed` | DC-015-23 à 32, DC-016-01 à 12 | Graphe unique, contrats de bornes, session isolée, IR ; périmètre Circuit |
 | FD-GRAPHICS-001 | `c229b2ed` | `c229b2ed` | Vide sur `origin/main` ; commit local non publié `aac36b27` (profil UNO R4) examiné, non retenu | Aucun impact sur le noyau graphique ; à reprendre au prochain ticket une fois publié |
+| FD-CIRCUIT-002 | `c229b2ed` | `aac36b27` (publié) | UNO R4 / RA4M1 : ADR-287 à 306, contrats de périphériques (GPIO, ADC, UART, PWM, I²C, SPI, DAC), QEMU/Renode, cosimulation, `drawciel_r4/document.py` | Graphics : aucun. Circuit V0.1 : aucun champ ; principes confirmés (liste fermée de champs de composant, définition versionnée immuable, état d'exécution refusé, aucune sémantique par nom). Simulation future : à conserver. Microcontrôleurs : hors Phase 10 |
 
 ## Procédure de delta
 

@@ -303,7 +303,7 @@ Ordre retenu (numéros indicatifs, révisé par FD-GRAPHICS-001) :
 ```text
 FD-CIRCUIT-001   besoins et périmètre
 → FD-GRAPHICS-001  contrat du noyau graphique commun, capitalisation DrawCiel
-→ FD-CIRCUIT-002   contrat de ressource Circuit (adopte les conventions de champs Graphics)
+→ FD-CIRCUIT-002   contrat de ressource Circuit V0.1 (fait : forge_design.circuit, mvc/circuit/**/*.circuit.json)
 → FD-GRAPHICS-002  primitives géométriques pures, transformations exactes, ports
 → FD-GRAPHICS-003  routage orthogonal extrait de DrawCiel, témoins portés
 → FD-CIRCUIT-003   domaine, catalogue V1 (conversion contrôlée), codec, validation, topologie

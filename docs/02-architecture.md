@@ -563,6 +563,26 @@ sémantique. Il ne possède pas de format persistant propre ; jonctions, réseau
 compatibilité de ports, validation et simulation restent dans les domaines.
 La simulation suit une chaîne parallèle (document → topologie/IR → moteur),
 jamais via Graphics. Le noyau est explicitement 2D ; la 3D aura son moteur.
+
+### Ressource Circuit V0.1 — FD-CIRCUIT-002
+
+Format normatif : [Ressource Circuit V0.1](circuit/circuit-resource.md).
+
+```text
+forge_design.circuit
+├── ids.py              identités <préfixe>_<jeton> (c_, e_, j_, a_), secrets, 96 bits
+├── limits.py           limites Circuit (4 Mio, collections, chaînes, entiers sûrs)
+├── models.py           CircuitDocument et sous-modèles Pydantic stricts, gelés, tuples
+├── circuit.schema.json schéma normatif JSON Schema 2020-12
+├── codec.py            CircuitCodec : JSON strict, issues circuit.*, encodage canonique
+└── contract.py         CIRCUIT_TOOL, CIRCUIT_RESOURCE_TYPE (create, open, validate, save)
+```
+
+Ressource en zone C (`mvc/circuit/**/*.circuit.json`), lue et écrite par
+`read_specialized_resource` / `write_specialized_resource`, journalisée sous
+`write_specialized_resource`. Le document adopte les conventions de champs
+Graphics sans `GraphicsDocument` ; aucun catalogue, topologie, Graphics, rendu,
+éditeur ni simulation. Circuit n'est enregistré dans aucun registre.
 Les graphes en lecture seule existants (Route Explorer, Entity Explorer, Debug
 Center) restent inchangés ; leur convergence éventuelle est à étudier.
 

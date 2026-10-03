@@ -87,6 +87,7 @@ vue source (pas de segment caché, pas de nom sensible, pas de lien) :
 | `*.view.json` | contrat de vue | aucune (voir dette) | lecture seule |
 | `*.design.json` | design de vue | `"version": "0.1"` | `write_design`, révision attendue |
 | `*.html` | template Forge | — | `write_generated_template` (FD-SAFEWRITE-003), révision attendue |
+| `mvc/circuit/**/*.circuit.json` | ressource Circuit ([format](../circuit/circuit-resource.md)) | `"format_version": "0.1"` | `write_specialized_resource` (FD-CIRCUIT-002), révision attendue |
 
 Les temporaires d'écriture `.forge-design-write-<aléatoire>` sont créés dans le
 dossier cible et supprimés en sortie ; le préfixe est réservé.
@@ -103,8 +104,9 @@ jamais en zone B (voir le [contrat des outils spécialisés](../specialized-tool
 Son type déclare un espace de sources (préfixe relatif à la racine et suffixe),
 une version de format observable, ses versions lues et sa version écrite ; il
 suit la même politique de chemins et le même pipeline d'écriture. Le ticket qui
-introduit un type ajoute sa ligne au tableau ci-dessus. Aucun espace n'est
-réservé tant qu'aucun type n'existe.
+introduit un type ajoute sa ligne au tableau ci-dessus. Seul espace réservé à ce
+jour : `mvc/circuit/` pour Circuit (FD-CIRCUIT-002) ; il n'est jamais créé
+automatiquement.
 
 ## 5. Versionnement des formats
 

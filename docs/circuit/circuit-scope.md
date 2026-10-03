@@ -140,7 +140,7 @@ Classes :
 
 | Capacité | DrawCiel (observé) | Classe | Justification / décision |
 |---|---|---|---|
-| Document | Six champs persistés + `version` native filtrée, enveloppe SéquenCiel | CORE | Ressource versionnée, `format_version` observable (à fixer par FD-CIRCUIT-002) |
+| Document | Six champs persistés + `version` native filtrée, enveloppe SéquenCiel | CORE | Ressource versionnée, `format_version` observable (fixé : [ressource V0.1](circuit-resource.md)) |
 | Catalogue | 181 définitions résolues, contrats explicites (DC-015-24) | CORE (réduit) | 8 types exacts en V1 (§ Composants) ; l'étendue de DrawCiel n'est pas un objectif |
 | Placement | Glisser depuis la palette, aimantation à la grille | CORE | Position sur la grille logique |
 | Sélection | Simple, multiple, rectangle | CORE | Simple et multiple ; rectangle en V1 |
@@ -259,8 +259,9 @@ Règles :
    réutilisée dans ce document, indépendante de son indice, de sa position et
    de sa référence. Un indice de tableau est **insuffisant** : il change à la
    suppression et au réordonnancement, et rend l'historique, les diagnostics et
-   le mapping de simulation ambigus. Le schéma de génération des identités est
-   **reporté** à FD-CIRCUIT-002 (aucun choix d'UUID ici).
+   le mapping de simulation ambigus. **Fixé par FD-CIRCUIT-002** : identités
+   `<préfixe>_<jeton>` (`c_`, `e_`, `j_`, `a_`) dans un espace de noms global,
+   générées par `secrets` (voir [ressource V0.1](circuit-resource.md#identités)).
 2. L'identité d'une borne est le couple (identité du composant, identifiant de
    borne déclaré par le type). Elle ne dépend ni de l'ordre des bornes, ni de
    leur position dessinée.
@@ -360,7 +361,7 @@ stocke des grandeurs SI.
 - **Observé (FD-GRAPHICS-001)** : aucune borne du catalogue DrawCiel ne tombe
   sur la grille de 20 px à la taille par défaut ; une conversion de catalogue
   devra renormaliser symboles et bornes sur la grille.
-- **Reporté (FD-CIRCUIT-002/003)** : distinguer identifiant de borne et rôle,
+- **Reporté (FD-CIRCUIT-003)** : distinguer identifiant de borne et rôle,
   comme les contrats DrawCiel (`t1` de rôle `terminal_a`, `positive=t1`…), et
   aligner identifiants, clés et unités de propriétés sur ces contrats lorsque la
   sémantique est identique, afin de préserver l'IR de simulation et un import
@@ -380,8 +381,9 @@ stocke des grandeurs SI.
   commande explicite « insérer une jonction » : elle crée une jonction,
   remplace la connexion A–B par A–J et J–B, et ajoute la nouvelle connexion
   vers J, en **une seule action d'historique**. Le réseau de A–B est inchangé.
-  La conservation d'identité de la connexion découpée est **reportée** à
-  FD-CIRCUIT-002 ; elle devra être déterministe.
+  **Fixé par FD-CIRCUIT-002** : la connexion portant l'extrémité désignée par
+  la commande (A) conserve son identité, l'autre en reçoit une nouvelle ; la
+  fusion d'une jonction de degré 2 suit la même règle explicite.
 - La jonction est un concept **Circuit**, projeté dans la scène comme un nœud
   sans obstacle à un port omnidirectionnel ; elle n'appartient pas au Graphic
   Core (FD-GRAPHICS-001).
@@ -684,8 +686,9 @@ ouvrir (lecture + validation + révision)
   script importé, aucune URL suivie.
 - Aucune ressource externe, aucun CDN : fonctionnement **hors ligne** complet.
 - Aucune donnée pédagogique, personnelle, machine ou runtime dans la ressource.
-- Espace de sources en zone C : **décidé plus tard** (FD-CIRCUIT-002) ; aucun
-  chemin n'est réservé par ce document ni par le contrat de stockage.
+- Espace de sources en zone C : **fixé par FD-CIRCUIT-002**,
+  `mvc/circuit/**/*.circuit.json`, déclaré au contrat de stockage ; jamais créé
+  automatiquement.
 - Frontière iframe / Worker / processus du runtime et d'un futur moteur :
   **reportée** ; un moteur externe éventuel s'exécute isolé, sans shell, sans
   réseau, avec entrées générées sur liste fermée (enseignements DC-015-28 à 31).
@@ -824,11 +827,12 @@ par un domaine témoin non électrique avant la projection Circuit.
 
 ## Questions reportées
 
+Tranchées par FD-CIRCUIT-002 ([ressource V0.1](circuit-resource.md)) : format,
+suffixe `.circuit.json`, version `0.1`, espace `mvc/circuit/`, identités,
+politique de découpe d'une connexion, limites.
+
 | Question | Ticket attendu |
 |---|---|
-| Format, suffixe, version, espace de sources de la ressource | FD-CIRCUIT-002 |
-| Schéma de génération des identités ; identité de la connexion découpée par une jonction | FD-CIRCUIT-002 |
-| Limites (nombre d'éléments, taille) | FD-CIRCUIT-002 |
 | Positions locales exactes des bornes et sorties de route par type | FD-GRAPHICS-002 / FD-CIRCUIT-003 |
 | Frontend, rendu, isolation iframe/Worker du runtime | FD-GRAPHICS-004 / FD-CIRCUIT-005 |
 | Registre d'outils spécialisés | FD-CIRCUIT-005 |
