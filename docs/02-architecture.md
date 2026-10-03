@@ -475,33 +475,28 @@ La stabilité de l'identifiant demeure une obligation du Tool après enregistrem
 Le registre ne copie pas, n'exécute pas et ne découvre pas les Tools.
 `forge_design.app.create_tool_registry()` choisit explicitement les instances intégrées à enregistrer (section 3).
 
-## 13. Outils spécialisés futurs
+## 13. Outils spécialisés
 
-Architecture de principe :
-
-```text
-Forge Design
-    ↓
-Tool Circuit
-    ↓
-adaptateur
-    ↓
-moteur électrique
-```
-
-et :
+Contrat normatif : [contrat des outils spécialisés](specialized-tools/specialized-tool-contract.md)
+(FD-SPECIALIZED-001), établi à partir du cas réel DrawCiel intégré à SéquenCiel.
 
 ```text
-Forge Design
-    ↓
-Tool 3D
-    ↓
-adaptateur
-    ↓
-moteur 3D
+Outil spécialisé (Circuit, Network, 3D…)
+├── SpecializedToolDefinition   identité, capacités, dépendances optionnelles, entrée UI
+├── SpecializedResourceType     source éditable versionnée, en zone C
+├── runtime éventuel            sans accès au système de fichiers
+└── intégration hôte            Forge Design valide, contrôle la révision, écrit et exporte
 ```
 
-Les dépendances lourdes restent attachées au Tool ou à un extra dédié.
+Un outil spécialisé **n'est pas** un `Tool` : le Protocol `Tool` (lecture
+seule, `run(project_root)`) et son registre de cinq Tools restent inchangés.
+Les capacités sont atomiques et déclaratives. La ressource persistante est
+distincte du runtime et des exports. L'écriture suit la discipline de
+révision de SAFEWRITE, autosave compris dans une session ouverte
+explicitement. Le domaine et la pédagogie restent hors du contrat. Aucun
+registre, plugin ni outil n'est encore implémenté. Les dépendances lourdes
+d'un outil (moteur de simulation, moteur 3D) sont optionnelles par capacité
+et ne sont jamais installées automatiquement.
 
 ## 14. Écriture
 

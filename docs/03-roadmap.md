@@ -279,6 +279,11 @@ Avant Circuit, Network ou 3D, définir le minimum réellement nécessaire :
 
 Valider le modèle avec un Tool simple si nécessaire.
 
+Démarche retenue : cas réel DrawCiel → contrat minimal (FD-SPECIALIZED-001,
+[contrat](specialized-tools/specialized-tool-contract.md)) → validation par un outil
+spécialisé volontairement simple (FD-SPECIALIZED-002) → registre et intégration
+seulement ensuite.
+
 ## Phase 10 — Circuit
 
 Ordre indicatif :

@@ -95,6 +95,17 @@ dossier cible et supprimés en sortie ; le préfixe est réservé.
 lecture → validation → diff → décision utilisateur → écriture atomique avec
 révision attendue → journalisation dans `history.jsonl`.
 
+### Ressources d'outils spécialisés
+
+Une ressource d'outil spécialisé (Circuit, Network, 3D…) qui appartient
+fonctionnellement à l'application est une source du projet : elle vit en zone C,
+jamais en zone B (voir le [contrat des outils spécialisés](../specialized-tools/specialized-tool-contract.md)).
+Son type déclare un espace de sources (préfixe relatif à la racine et suffixe),
+une version de format observable, ses versions lues et sa version écrite ; il
+suit la même politique de chemins et le même pipeline d'écriture. Le ticket qui
+introduit un type ajoute sa ligne au tableau ci-dessus. Aucun espace n'est
+réservé tant qu'aucun type n'existe.
+
 ## 5. Versionnement des formats
 
 1. Tout format persistant des zones A et B porte un champ entier `version`,
