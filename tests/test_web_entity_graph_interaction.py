@@ -1,5 +1,6 @@
 """Ressource locale, contrat DOM et interaction sans dépendance navigateur."""
 
+import json
 import shutil
 import subprocess
 from importlib.resources import files
@@ -35,23 +36,23 @@ def test_script_contract() -> None:
         "location.",
         "history.",
         ".style.",
-        "JSON.parse",
+        "createElementNS",
+        "classList",
+        "data-node-id",
+        'addEventListener("keydown"',
     ):
-        assert forbidden not in script
+        assert forbidden not in script, forbidden
     for expected in (
+        'import { createGraphicEngine } from "./graphics/engine.js";',
+        "JSON.parse(source.textContent)",
         "textContent",
         "data-entity-graph",
-        "aria-pressed",
-        '"Enter"',
-        '" "',
-        '"Escape"',
-        "preventDefault()",
-        "dataset.edgeLabel",
+        "engine.edge(",
     ):
         assert expected in script
 
 
-def test_script_execution() -> None:
+def test_client_suites_run_with_the_shared_engine() -> None:
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node indisponible ; contrats HTTP et source conservés.")
@@ -59,13 +60,13 @@ def test_script_execution() -> None:
     script = root / "forge_design/web/static/entity-graph.js"
     subprocess.run([node, "--check", str(script)], check=True, timeout=10)
     result = subprocess.run(
-        [node, str(root / "tests/js/entity_graph_dom.cjs"), str(script)],
+        [node, "--test", str(root / "tests/js/graphics/entity-client.test.mjs")],
         capture_output=True,
         text=True,
-        check=True,
-        timeout=10,
+        timeout=60,
+        cwd=root,
     )
-    assert "isolation : OK" in result.stdout
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_http_interaction_and_asset(tmp_path: Path) -> None:
@@ -90,28 +91,33 @@ def test_http_interaction_and_asset(tmp_path: Path) -> None:
         dom = SvgDocument()
         dom.feed(html)
         scripts = [attrs for tag, attrs in dom.tags if tag == "script"]
-        assert scripts == [{"src": "/entity-graph.js", "defer": None}]
-        assert '<script src="/entity-graph.js" defer></script>' in html
-        nodes = [attrs for _, attrs in dom.tags if "data-node-id" in attrs]
-        edges = [attrs for _, attrs in dom.tags if "data-source-id" in attrs]
+        assert scripts == [
+            {"type": "application/json", "data-graphic-scene": None},
+            {"type": "module", "src": "/entity-graph.js"},
+        ]
+        # Repli statique livré visible ; aucune identité ni interaction exposée.
+        fallback = [a for _, a in dom.tags if "data-graphic-fallback" in a]
+        assert len(fallback) == 1 and "hidden" not in fallback[0]
+        assert not any("data-node-id" in attrs for _, attrs in dom.tags)
+        assert not any(attrs.get("role") == "button" for _, attrs in dom.tags)
+        payload = html.split("data-graphic-scene>", 1)[1].split("</script>", 1)[0]
+        assert "<" not in payload and ">" not in payload and "&" not in payload
+        scene = json.loads(payload)
+        nodes, edges = scene["nodes"], scene["edges"]
         assert len(nodes) == 3 and len(edges) == 2
-        identities = {n["data-node-id"] for n in nodes}
+        identities = {n["id"] for n in nodes}
         assert all(
-            e["data-source-id"] in identities and e["data-target-id"] in identities
-            for e in edges
+            e["source"] in identities and e["target"] in identities for e in edges
         )
-        assert all(
-            n["role"] == "button"
-            and n["tabindex"] == "0"
-            and n["aria-pressed"] == "false"
-            for n in nodes
-        )
-        assert nodes[0]["data-node-label"] == nodes[0]["data-node-table"] == hostile
-        assert edges[0]["data-edge-label"] == hostile
-        assert nodes[-1]["data-node-kind"] == "pivot"
-        assert nodes[0]["aria-label"] == "Entité " + hostile
+        assert nodes[0]["data"]["name"] == nodes[0]["data"]["table"] == hostile
+        assert nodes[0]["label"] == "Entité " + hostile
+        assert edges[0]["data"] == {"kind": "many_to_many_from", "name": hostile}
+        assert nodes[-1]["data"]["kind-label"] == "Pivot"
+        assert nodes[-1]["presentation"]["variant"] == "category-2"
         for attr in (
             "data-entity-graph",
+            "data-graphic-host",
+            "data-graphic-fallback",
             "data-selection-status",
             "data-selection-details",
             "data-selection-clear",
@@ -119,7 +125,8 @@ def test_http_interaction_and_asset(tmp_path: Path) -> None:
         ):
             assert any(attr in attrs for _, attrs in dom.tags)
         assert "<script>alert" not in html and "&lt;script&gt;alert" in html
-        assert "<noscript>" in html and "Désélectionner" in html and "<table>" in html
+        assert "La sélection du graphe nécessite JavaScript." in html
+        assert "Désélectionner" in html and "<table>" in html
         status, script, headers = call(app, "/entity-graph.js")
         assert (
             status == 200

@@ -315,10 +315,11 @@ fait      FD-CIRCUIT-003   domaine Circuit V1 (catalogue, topologie, validation)
                            le changement de priorité et conservé ; suite Circuit en attente
 fait      FD-GRAPHICS-002  premier noyau graphique JS (scène, validation, renderer SVG,
                            sélection) ; Route Explorer premier client
-suivant   FD-GRAPHICS-003  à choisir après la preuve : géométrie, viewport, zoom/pan et
-                           transformations, ou Entity Explorer comme deuxième client
-ensuite   autres clients plateforme (Entity Explorer, Debug Center), ports et routage
-          orthogonal extrait de DrawCiel, commandes et historique
+fait      FD-GRAPHICS-003  Entity Explorer deuxième client ; API validée par deux clients,
+                           seule extension : données opaques d'arête et edge(id)
+suivant   FD-GRAPHICS-004  à décider sur l'usage observé (voir rapport FD-GRAPHICS-003) :
+                           troisième client (Debug Center) ou viewport / zoom / pan
+ensuite   ports et routage orthogonal extrait de DrawCiel, commandes et historique
 en attente du socle Graphics :
           FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
           FD-CIRCUIT-005   intégration hôte, session, éditeur Web minimal

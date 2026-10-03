@@ -6,11 +6,9 @@ from typing import Any
 import pytest
 
 from forge_design.tools.route_graph import GraphEdge, GraphNode, RouteGraph
+from forge_design.web.graphics import scene_json_payload
 from forge_design.web.route_graph_layout import layout_route_graph
-from forge_design.web.route_graph_scene import (
-    build_route_graphic_scene,
-    scene_json_payload,
-)
+from forge_design.web.route_graph_scene import build_route_graphic_scene
 
 
 def _graph() -> RouteGraph:

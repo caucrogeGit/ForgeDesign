@@ -27,6 +27,8 @@ class PositionedEntityEdge:
     label_x: int
     label_y: int
     label: str
+    # Polyligne orthogonale dont path est la forme SVG (repli serveur).
+    points: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -71,10 +73,18 @@ def layout_entity_graph(graph: EntityGraph) -> EntityGraphLayout:
         sx, sy = source.x + source.width, source.y + source.height // 2
         tx, ty = target.x, target.y + target.height // 2
         lane = 30 + index * 26
+        points = (
+            (sx, sy),
+            (sx + 20, sy),
+            (sx + 20, lane),
+            (tx - 20, lane),
+            (tx - 20, ty),
+            (tx, ty),
+        )
         path = f"M {sx} {sy} H {sx + 20} V {lane} H {tx - 20} V {ty} H {tx}"
         edges.append(
             PositionedEntityEdge(
-                edge, path, (sx + tx) // 2, lane - 5, _short(edge.label)
+                edge, path, (sx + tx) // 2, lane - 5, _short(edge.label), points
             )
         )
     return EntityGraphLayout(

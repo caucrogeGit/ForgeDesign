@@ -36,15 +36,17 @@
 <h2 id="entity-graph-heading">Graphe des entités</h2>
 <p>Les flèches suivent les déclarations : entité source vers cible, via un pivot pour many_to_many.</p>
 <div class="entity-graph-scroll" tabindex="0" aria-label="Graphe des entités défilant">
-<svg class="entity-graph" role="group" aria-labelledby="entity-graph-title entity-graph-description" viewBox="0 0 {{ entity_layout.width }} {{ entity_layout.height }}" width="{{ entity_layout.width }}" height="{{ entity_layout.height }}">
+<div data-graphic-host></div>
+<div data-graphic-fallback>
+<svg class="entity-graph" role="img" aria-labelledby="entity-graph-title entity-graph-description" viewBox="0 0 {{ entity_layout.width }} {{ entity_layout.height }}" width="{{ entity_layout.width }}" height="{{ entity_layout.height }}">
 <title id="entity-graph-title">Entités et relations déclarées</title>
 <desc id="entity-graph-description">Entités à gauche, pivots à droite. Les flèches indiquent le sens des relations. Les tableaux suivants présentent tous les détails.</desc>
 <defs><marker id="entity-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
 {% for item in entity_layout.edges %}
-<g class="entity-edge" data-source-id="{{ item.edge.source }}" data-target-id="{{ item.edge.target }}" data-edge-kind="{{ item.edge.kind }}" data-edge-label="{{ item.edge.label }}"><title>{{ item.edge.kind }}{% if item.edge.label %} : {{ item.edge.label }}{% endif %}</title><path d="{{ item.path }}" marker-end="url(#entity-arrow)" />{% if item.label %}<text x="{{ item.label_x }}" y="{{ item.label_y }}">{{ item.label }}</text>{% endif %}</g>
+<g class="entity-edge"><title>{{ item.edge.kind }}{% if item.edge.label %} : {{ item.edge.label }}{% endif %}</title><path d="{{ item.path }}" marker-end="url(#entity-arrow)" />{% if item.label %}<text x="{{ item.label_x }}" y="{{ item.label_y }}">{{ item.label }}</text>{% endif %}</g>
 {% endfor %}
 {% for item in entity_layout.nodes %}
-<g id="entity-node-{{ loop.index0 }}" class="entity-node entity-node-{{ item.node.kind }}" data-node-id="{{ item.node.id }}" data-node-kind="{{ item.node.kind }}" data-node-label="{{ item.node.label }}" data-node-table="{{ item.node.table }}" data-node-field-count="{{ item.node.field_count }}" role="button" tabindex="0" aria-pressed="false" aria-label="{{ 'Pivot' if item.node.kind == 'pivot' else 'Entité' }} {{ item.node.label }}">
+<g id="entity-node-{{ loop.index0 }}" class="entity-node entity-node-{{ item.node.kind }}">
 <title>{{ item.node.label }} — {{ item.node.table }} — {{ item.node.field_count }} champs</title>
 <rect x="{{ item.x }}" y="{{ item.y }}" width="{{ item.width }}" height="{{ item.height }}" rx="{{ 18 if item.node.kind == 'pivot' else 3 }}" />
 <text x="{{ item.x + 12 }}" y="{{ item.y + 20 }}">{{ 'Pivot' if item.node.kind == 'pivot' else 'Entité' }} — {{ item.node.field_count }} champs</text>
@@ -52,10 +54,11 @@
 {% if item.node.kind == 'entity' %}<text x="{{ item.x + 12 }}" y="{{ item.y + 76 }}">{{ item.table }}</text>{% endif %}
 </g>
 {% endfor %}
-</svg></div>
+</svg></div></div>
+<script type="application/json" data-graphic-scene>{{ entity_scene }}</script>
 <div class="entity-graph-details">
 <h3>Détails de la sélection</h3>
-<p data-selection-status role="status" aria-live="polite">Sélectionnez une entité ou un pivot dans le graphe.</p>
+<p data-selection-status role="status" aria-live="polite">La sélection du graphe nécessite JavaScript. Les tableaux restent disponibles.</p>
 <dl data-selection-details hidden>
 <dt>Type</dt><dd data-selection-kind></dd>
 <dt>Nom</dt><dd data-selection-label></dd>
@@ -66,9 +69,8 @@
 <ul data-selection-relations hidden aria-label="Relations directes"></ul>
 <button type="button" data-selection-clear hidden>Désélectionner</button>
 </div>
-<noscript>La sélection du graphe nécessite JavaScript. Les tableaux restent disponibles.</noscript>
 </section>
-<script src="/entity-graph.js" defer></script>
+<script type="module" src="/entity-graph.js"></script>
 {% endif %}
 {% if filters.item_type != 'relation' %}
 {% if view.entities %}

@@ -22,13 +22,11 @@ from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.route_diagnostics import build_route_diagnostics
 from forge_design.tools.route_filters import RouteFilter, filter_route_explorer
 from forge_design.tools.route_graph import build_route_graph
+from forge_design.web.graphics import scene_json_payload
 from forge_design.web.rendering import render_page
 from forge_design.web.route_filters import parse_route_filter
 from forge_design.web.route_graph_layout import layout_route_graph
-from forge_design.web.route_graph_scene import (
-    build_route_graphic_scene,
-    scene_json_payload,
-)
+from forge_design.web.route_graph_scene import build_route_graphic_scene
 from forge_design.web.source import source_url
 
 

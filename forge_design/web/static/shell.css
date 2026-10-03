@@ -79,7 +79,7 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .graph-details dd { margin-bottom: .75rem; }
 
-/* Entity Explorer : SVG serveur et sélection locale. */
+/* Entity Explorer : SVG serveur de repli (sans JavaScript). */
 .entity-graph-scroll { overflow: auto; max-height: 45rem; }
 .entity-graph-scroll:focus-visible { outline: 2px solid currentColor; }
 .entity-graph { display: block; max-width: none; }
@@ -91,11 +91,6 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .entity-node-pivot rect { stroke-dasharray: 6 3; }
 .entity-node-name { font-weight: bold; }
 
-.entity-node[role="button"] { cursor: pointer; }
-.entity-node.is-related rect { stroke-width: 3; }
-.entity-node.is-selected rect { stroke: #824029; stroke-width: 5; }
-.entity-edge.is-related > path { stroke: #824029; stroke-width: 4; }
-.entity-node:focus-visible rect { stroke-width: 4; stroke-dasharray: 4 3; }
 .entity-graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .entity-graph-details dd { margin-bottom: .75rem; }
 

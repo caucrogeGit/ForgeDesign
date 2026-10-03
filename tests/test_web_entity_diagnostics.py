@@ -100,8 +100,10 @@ def test_http_diagnostics(
         assert "aria-live" not in section
         assert "/source?path=" in html and "<script>message" not in html
         assert "<script>source" not in html
+        # Scène JSON inerte puis client module du Graphic Core.
         assert [a.get("src") for tag, a in document.tags if tag == "script"] == [
-            "/entity-graph.js"
+            None,
+            "/entity-graph.js",
         ]
         assert '<svg class="entity-graph"' in html and html.count("<table>") >= 4
         assert "Missing" in html and "Relations" in text and "Timestamps" in text

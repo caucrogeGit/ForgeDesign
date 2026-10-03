@@ -52,3 +52,17 @@ test("incidence en O(degré) : index de plusieurs milliers d'arêtes", () => {
   assert.ok(total <= 2 * edges.length);
   assert.ok(neighbourhood(index, "n0").edgeIds.length < 10);
 });
+
+test("arêtes parallèles : conservées, incidentes, voisin unique", () => {
+  const scene = {
+    width: 10,
+    height: 10,
+    nodes: [node("A"), node("B")],
+    edges: [edge("A-B-1", "A", "B"), edge("A-B-2", "A", "B"), edge("B-A", "B", "A")],
+  };
+  const validated = validateScene(scene);
+  assert.deepEqual(validated.edges.map((item) => item.id), ["A-B-1", "A-B-2", "B-A"]);
+  const index = indexScene(validated);
+  assert.deepEqual(neighbourhood(index, "A"), { nodeId: "A", edgeIds: ["A-B-1", "A-B-2", "B-A"], neighbourIds: ["B"] });
+  assert.deepEqual(neighbourhood(index, "B").edgeIds, ["A-B-1", "A-B-2", "B-A"]);
+});

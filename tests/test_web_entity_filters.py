@@ -1,5 +1,6 @@
 """Contrat HTTP des filtres, sans persistance ni deuxième appel Tool."""
 
+import json
 from dataclasses import replace
 from pathlib import Path
 from urllib.parse import urlencode
@@ -91,11 +92,19 @@ def test_http_filters(
         )
         assert any(tag == "a" and a.get("href") == "/entities" for tag, a in dom.tags)
         assert "Réinitialiser" in html
-        assert sum("data-node-id" in a for _, a in dom.tags) == nodes
+        # Repli statique : un groupe par nœud ; même nombre dans la scène JSON.
+        fallback = [
+            a for _, a in dom.tags if str(a.get("id", "")).startswith("entity-node-")
+        ]
+        assert len(fallback) == nodes
         assert sum(tag == "path" and "marker-end" in a for tag, a in dom.tags) == edges
         assert [a.get("src") for tag, a in dom.tags if tag == "script"] == (
-            ["/entity-graph.js"] if nodes else []
+            [None, "/entity-graph.js"] if nodes else []
         )
+        if nodes:
+            payload = html.split("data-graphic-scene>", 1)[1].split("</script>", 1)[0]
+            scene = json.loads(payload)
+            assert (len(scene["nodes"]), len(scene["edges"])) == (nodes, edges)
         assert ("<th>Entité</th>" in html) == bool(entities)
         assert ("<th>Relation</th>" in html) == bool(relations)
         if not nodes:

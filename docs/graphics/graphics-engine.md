@@ -59,8 +59,10 @@ facultatifs (accessibilité).
 | `points` | Polyligne fournie, 2 à 64 points ; le renderer ne route pas |
 | `label`, `labelAt` | Facultatifs ; texte et position |
 | `presentation` | `line` ∈ `solid`, `dashed` ; `arrow` ∈ `none`, `end` ; `tone` |
+| `data` | Facultatif (FD-GRAPHICS-003), mêmes règles que pour un nœud ; opaque, restitué par `edge(id)` |
 
-Plusieurs arêtes entre deux mêmes nœuds sont admises (identités distinctes).
+Plusieurs arêtes entre deux mêmes nœuds (arêtes parallèles) sont admises et
+conservées : identités distinctes, toutes incidentes, voisin compté une fois.
 
 ## Validation
 
@@ -103,7 +105,7 @@ au nœud).
 ```js
 const engine = createGraphicEngine(container, scene, { onSelectionChange(state) {} });
 engine.select(id); engine.clearSelection(); engine.focus(id);
-engine.selection(); engine.node(id); engine.scene();
+engine.selection(); engine.node(id); engine.edge(id); engine.scene();
 engine.render();   // re-rendu, écouteurs précédents retirés
 engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 ```
@@ -111,6 +113,27 @@ engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 Chaque instance possède sa scène, son index, sa sélection, son rendu et ses
 écouteurs : deux instances sont indépendantes. Après `destroy()`, toute
 opération lève une erreur.
+
+## Clients
+
+| Client | Adaptateur serveur (pur) | Client navigateur |
+|---|---|---|
+| Route Explorer (FD-GRAPHICS-002) | `web/route_graph_scene.py` | `/route-graph.js` |
+| Entity Explorer (FD-GRAPHICS-003) | `web/entity_graph_scene.py` | `/entity-graph.js` |
+
+Sérialisation commune : `web/graphics.py` (`scene_json_payload`). Chaque client
+garde son vocabulaire, ses données opaques et son panneau de détails.
+
+## Entity Explorer adapter
+
+`build_entity_graphic_scene(layout)` projette `EntityGraphLayout` : identités
+de l'`EntityGraph` (`entity:<i>`, `pivot:<i>`, `relation:<i>[:from|:to]`, donc
+relations parallèles distinctes), entité → `category-1`, pivot → `category-2`
+(nœud ordinaire, distingué par sa ligne « Pivot — n champs »), libellé
+accessible « Entité nom » / « Pivot table », données `kind-label`, `name`,
+`table`, `field-count`, `field-label` ; arêtes avec `data` `kind` et `name`,
+libellé seulement s'il existe. Le client liste les relations directes via
+`edge(id)`.
 
 ## Route Explorer adapter
 
@@ -162,7 +185,7 @@ et l'annonce.
 
 ## Current limitations
 
-Pas de layout (scène déjà positionnée), de ports, de routage, de grille, de
-zoom/pan, de glisser, d'édition, de commandes, d'historique, de
-multi-sélection ni de groupes. Un seul client réel (Route Explorer) ; Entity
-Explorer et Debug Center gardent leurs rendus propres.
+Prouvé par deux clients réels : graphes positionnés, nœuds, arêtes (y compris
+parallèles), libellés, sélection, voisins directs, SVG. Pas encore : layout
+générique, ports, routage, grille, zoom/pan, glisser, édition, commandes,
+historique, multi-sélection, groupes. Debug Center garde son rendu propre.

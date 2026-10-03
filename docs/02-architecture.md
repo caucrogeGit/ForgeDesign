@@ -627,6 +627,27 @@ Le moteur ne connaît ni Route Explorer, ni un projet, ni un stockage ; il ne
 persiste rien. Bridge, Tool et registre (cinq Tools) inchangés ; CSP
 inchangée.
 
+### Deuxième client — FD-GRAPHICS-003
+
+**Forge Design dogfoode Forge MVC pour son backend Web** : `create_application()`
+reste l'unique composition HTTP (`Application`, un seul `Router`, `Request`,
+`Response`, rendu Jinja, `create_wsgi_app`), y compris pour les modules
+Graphics servis par routes fixes. **Le Graphic Core s'exécute côté
+navigateur** : Forge MVC produit le HTML et la scène, le moteur la rend ; il
+reste testable dans Node sans Forge.
+
+```text
+EntityExplorerTool (un seul appel par GET /entities) → EntitiesResult
+  → filter_entities → build_entity_graph_from_items → layout_entity_graph
+  → entity_graph_scene.build_entity_graphic_scene (adaptateur pur)
+  → graphics.scene_json_payload → <script type="application/json" data-graphic-scene>
+  → /entity-graph.js (client, panneau Entity) → createGraphicEngine
+```
+
+Route Explorer et Entity Explorer partagent exactement les mêmes modules
+moteur ; chacun garde son adaptateur, son client, ses données opaques et son
+panneau. Les SVG serveur restent des replis statiques sans JavaScript.
+
 ## 14. Écriture
 
 Principe :
@@ -1241,6 +1262,10 @@ sans récursion ni hypothèse d’acyclicité. Coordonnées séparées des modè
 Le template produit le SVG échappé, ses titres accessibles et IDs indexés sûrs.
 CSS local ; les tableaux et anomalies restent présents. Les limites visuelles sont décrites dans le guide Entity Explorer.
 
+
+> **Remplacé par FD-GRAPHICS-003** : l'interaction Entity passe par le
+> Graphic Core ; le SVG serveur est un repli statique. Paragraphe conservé à
+> titre historique.
 
 FD-ENTITIES-004 ajoute une amélioration DOM locale via GET /entity-graph.js,
 ressource fixe packagée, chargée avec defer seulement si le graphe existe.

@@ -137,3 +137,76 @@ test("scène invalide : aucune instance ni rendu", () => {
   assert.throws(() => createGraphicEngine(host, scene), GraphicSceneError);
   assert.equal(host.children.length, 0);
 });
+
+test("données d'arête opaques et accès par identité", () => {
+  const scene = witness();
+  scene.edges[0].data = { kind: "x", "free-text": "<b>texte</b>" };
+  const engine = createGraphicEngine(container(), scene);
+  assert.deepEqual({ ...engine.edge("A-B").data }, { kind: "x", "free-text": "<b>texte</b>" });
+  assert.deepEqual({ ...engine.edge("A-C").data }, {});
+  assert.equal(engine.edge("absent"), null);
+  assert.ok(Object.isFrozen(engine.edge("A-B").data));
+  const host = container();
+  const bad = witness();
+  bad.edges[0].data = { Kind: "x" };
+  assert.throws(() => createGraphicEngine(host, bad), GraphicSceneError);
+});
+
+// Deux formes de graphe sans vocabulaire métier : une chaîne en colonnes et deux
+// colonnes reliées par un intermédiaire avec arêtes parallèles.
+function columns() {
+  return {
+    width: 600,
+    height: 200,
+    nodes: ["P", "Q", "R"].map((id, i) => ({
+      id,
+      label: `Colonne ${id}`,
+      rect: { x: i * 200, y: 20, width: 150, height: 80 },
+      lines: [`Niveau ${i}`, id, "—"],
+      presentation: { variant: `category-${i + 1}` },
+    })),
+    edges: [
+      { id: "P-Q", source: "P", target: "Q", points: [{ x: 150, y: 60 }, { x: 200, y: 60 }], label: "l1", labelAt: { x: 175, y: 55 } },
+      { id: "Q-R", source: "Q", target: "R", points: [{ x: 350, y: 60 }, { x: 400, y: 60 }], presentation: { line: "dashed" } },
+    ],
+  };
+}
+
+function bridged() {
+  return {
+    width: 600,
+    height: 300,
+    nodes: [
+      { id: "U", label: "U", rect: { x: 0, y: 20, width: 100, height: 60 }, presentation: { variant: "category-1" } },
+      { id: "V", label: "V", rect: { x: 0, y: 160, width: 100, height: 60 }, presentation: { variant: "category-1" } },
+      { id: "M", label: "M", rect: { x: 300, y: 90, width: 100, height: 60 }, presentation: { variant: "category-2" } },
+    ],
+    edges: [
+      { id: "U-M:1", source: "U", target: "M", points: [{ x: 100, y: 50 }, { x: 300, y: 120 }], presentation: { arrow: "end" } },
+      { id: "U-M:2", source: "U", target: "M", points: [{ x: 100, y: 60 }, { x: 300, y: 125 }], presentation: { arrow: "end" } },
+      { id: "M-V", source: "M", target: "V", points: [{ x: 300, y: 130 }, { x: 100, y: 190 }] },
+    ],
+  };
+}
+
+test("deux clients de formes différentes, simultanés et isolés", () => {
+  const first = container();
+  const second = container();
+  const a = createGraphicEngine(first, columns());
+  const b = createGraphicEngine(second, bridged());
+  assert.equal(rendered(first).nodes.length, 3);
+  assert.equal(rendered(second).edges.length, 3);
+  assert.ok(rendered(second).nodes[2].classList.contains("gx-variant-category-2"));
+  b.select("M");
+  assert.deepEqual(b.selection().edgeIds, ["U-M:1", "U-M:2", "M-V"]);
+  assert.deepEqual(b.selection().neighbourIds, ["U", "V"]);
+  assert.deepEqual(rendered(second).edges.map((e) => e.classList.contains("gx-related")), [true, true, true]);
+  assert.equal(a.selection(), null);
+  assert.ok(rendered(first).nodes.every((n) => !n.classList.contains("gx-selected")));
+  byLabel(first, "Colonne Q").dispatch("keydown", { key: "Enter" });
+  assert.deepEqual(a.selection().neighbourIds, ["P", "R"]);
+  assert.equal(b.selection().nodeId, "M");
+  a.destroy();
+  assert.equal(b.selection().nodeId, "M");
+  assert.equal(rendered(second).svg.parent, second);
+});

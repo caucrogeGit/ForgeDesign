@@ -1061,6 +1061,8 @@ def test_graph_interaction_dom_and_resource(
     assert not any("data-node-id" in attrs for _tag, attrs in parser.tags)
     assert not any(attrs.get("role") == "button" for _tag, attrs in parser.tags)
     assert "data-graphic-fallback" in html and "data-graphic-host" in html
+    fallback = [a for _tag, a in parser.tags if "data-graphic-fallback" in a]
+    assert len(fallback) == 1 and "hidden" not in fallback[0]
     payload = html.split("data-graphic-scene>", 1)[1].split("</script>", 1)[0]
     scene = json.loads(payload)
     ids = {node["id"] for node in scene["nodes"]}

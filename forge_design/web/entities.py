@@ -17,6 +17,8 @@ from forge_design.tools.entity_filters import EntityFilter, filter_entities
 from forge_design.tools.entity_graph import build_entity_graph_from_items
 from forge_design.web.entity_filters import parse_entity_filter
 from forge_design.web.entity_graph_layout import layout_entity_graph
+from forge_design.web.entity_graph_scene import build_entity_graphic_scene
+from forge_design.web.graphics import scene_json_payload
 from forge_design.web.rendering import render_page
 from forge_design.web.source import source_available, source_url
 
@@ -45,8 +47,12 @@ def show_entities(
             error = str(exc)
         if result is not None and not isinstance(result, EntitiesResult):
             raise TypeError("entity-explorer doit retourner EntitiesResult.")
+    layout = None
     if result is not None:
         view = filter_entities(result, build_entity_diagnostics(result), filters)
+        layout = layout_entity_graph(
+            build_entity_graph_from_items(view.graph_entities, view.relations)
+        )
     return render_page(
         "entities.html",
         {
@@ -59,11 +65,10 @@ def show_entities(
             "source_url": source_url,
             "error": error,
             "diagnostics": (view.diagnostics if view is not None else None),
-            "entity_layout": (
-                layout_entity_graph(
-                    build_entity_graph_from_items(view.graph_entities, view.relations)
-                )
-                if view is not None
+            "entity_layout": layout,
+            "entity_scene": (
+                scene_json_payload(build_entity_graphic_scene(layout))
+                if layout is not None and layout.nodes
                 else None
             ),
         },

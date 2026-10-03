@@ -1,4 +1,4 @@
-"""Graphic Core JavaScript et client Route Explorer : contrats statiques et Node."""
+"""Graphic Core JavaScript et ses clients (Route, Entity) : contrats et Node."""
 
 import shutil
 import subprocess
@@ -55,7 +55,7 @@ def test_packaged_modules_and_static_contract() -> None:
 @pytest.mark.parametrize(
     "path",
     [STATIC / f"graphics/{name}.js" for name in GRAPHICS]
-    + [STATIC / "route-graph.js"]
+    + [STATIC / "route-graph.js", STATIC / "entity-graph.js"]
     + SUITES
     + [ROOT / "tests/js/graphics/fake-dom.mjs", ROOT / "tests/js/graphics/scenes.mjs"],
     ids=lambda path: path.name,
@@ -65,7 +65,7 @@ def test_node_check(path: Path) -> None:
 
 
 def test_node_suites() -> None:
-    assert len(SUITES) == 4
+    assert len(SUITES) == 5
     result = subprocess.run(
         [_node(), "--test", *map(str, SUITES)],
         capture_output=True,

@@ -9,8 +9,6 @@ présentations génériques ; le moteur JavaScript n'en connaît aucune.
 import json
 from typing import Any
 
-from markupsafe import Markup
-
 from forge_design.forge.routes import TemplatePresenceStatus
 from forge_design.tools.route_graph import GraphNodeKind
 from forge_design.web.route_graph_layout import RouteGraphLayout
@@ -109,17 +107,3 @@ def build_route_graphic_scene(layout: RouteGraphLayout) -> dict[str, Any]:
         "nodes": nodes,
         "edges": edges,
     }
-
-
-def scene_json_payload(scene: dict[str, Any]) -> Markup:
-    """JSON pour un <script type="application/json"> inerte.
-
-    <, > et & sont échappés en \\uXXXX : aucun libellé de projet ne peut fermer
-    le bloc (</script>) ni être interprété ; JSON.parse restitue le texte exact.
-    """
-    text = json.dumps(scene, ensure_ascii=False, separators=(",", ":"))
-    for character, escape in (("&", "\\u0026"), ("<", "\\u003c"), (">", "\\u003e")):
-        text = text.replace(character, escape)
-    for character, escape in ((" ", "\\u2028"), (" ", "\\u2029")):
-        text = text.replace(character, escape)
-    return Markup(text)

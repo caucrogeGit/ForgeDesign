@@ -686,6 +686,17 @@ RouteGraph / RouteGraphLayout ─(adaptateur Route Explorer, Python)─▶ Graph
 - Le layout reste fourni par le client (scène déjà positionnée) ; aucun
   layout universel.
 
+## Deuxième client réel — FD-GRAPHICS-003
+
+Entity Explorer passe par le même moteur (mêmes cinq modules) avec son propre
+adaptateur (`web/entity_graph_scene.py`) et son propre client
+(`/entity-graph.js`). Résultat : l'API de FD-GRAPHICS-002 suffisait pour les
+nœuds, arêtes, libellés, pivots (nœuds ordinaires) et **arêtes parallèles**,
+déjà conservées et indexées. Une seule extension, générique : `data` opaque
+sur les arêtes et `engine.edge(id)`, pour qu'un panneau décrive les arêtes
+incidentes. Le moteur ne connaît ni entité, ni relation, ni pivot (test de
+vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
+
 ## Questions reportées
 
 | Question | Ticket attendu |

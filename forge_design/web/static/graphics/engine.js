@@ -106,6 +106,7 @@ export function createGraphicEngine(container, input, options = {}) {
     destroy,
     selection: () => selection.current(),
     node: (nodeId) => index.nodes.get(nodeId) ?? null,
+    edge: (edgeId) => index.edges.get(edgeId) ?? null,
     scene: () => scene,
     isDestroyed: () => destroyed,
   });

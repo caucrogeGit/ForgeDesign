@@ -137,7 +137,7 @@ function nodeOf(value, path) {
 }
 
 function edgeOf(value, path, nodes) {
-  object(value, path, ["id", "source", "target", "points"], ["label", "labelAt", "presentation"]);
+  object(value, path, ["id", "source", "target", "points"], ["label", "labelAt", "presentation", "data"]);
   const source = text(value.source, `${path}.source`, MAX_GRAPHIC_ID_CHARS);
   const target = text(value.target, `${path}.target`, MAX_GRAPHIC_ID_CHARS);
   if (!nodes.has(source)) fail(`${path}.source`, "nœud inexistant");
@@ -158,6 +158,7 @@ function edgeOf(value, path, nodes) {
       arrow: oneOf(presentation.arrow ?? "none", `${path}.presentation.arrow`, EDGE_ARROWS),
       tone: oneOf(presentation.tone ?? "default", `${path}.presentation.tone`, NODE_TONES),
     }),
+    data: dataOf(value.data, `${path}.data`),
   });
 }
 

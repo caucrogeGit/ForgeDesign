@@ -1,5 +1,6 @@
 """Contrat SVG réellement rendu, sans JavaScript ni nouvelle lecture."""
 
+import json
 from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import Path
@@ -69,12 +70,13 @@ def test_http_graph(
         document.feed(html)
         assert [
             attrs.get("src") for tag, attrs in document.tags if tag == "script"
-        ] == (["/entity-graph.js"] if count else [])
+        ] == ([None, "/entity-graph.js"] if count else [])
         svgs = [attrs for tag, attrs in document.tags if tag == "svg"]
         if not count:
             assert svgs == []
         else:
-            assert len(svgs) == 1 and svgs[0]["role"] == "group"
+            # Repli serveur statique (role img) ; la vue interactive vient du moteur.
+            assert len(svgs) == 1 and svgs[0]["role"] == "img"
             assert (
                 svgs[0]["aria-labelledby"]
                 == "entity-graph-title entity-graph-description"
@@ -91,8 +93,14 @@ def test_http_graph(
             ]
             assert len(nodes) == node_count
             assert all(
-                node["tabindex"] == "0" and "onclick" not in node for node in nodes
+                "tabindex" not in node and "role" not in node and "onclick" not in node
+                for node in nodes
             )
+            payload = html.split("data-graphic-scene>", 1)[1].split("</script>", 1)[0]
+            scene = json.loads(payload)
+            assert len(scene["nodes"]) == node_count
+            assert len(scene["edges"]) == edge_count
+            assert "<" not in payload and ">" not in payload
             assert [n["id"] for n in nodes] == [
                 f"entity-node-{i}" for i in range(node_count)
             ]
