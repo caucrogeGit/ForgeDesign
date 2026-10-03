@@ -714,15 +714,34 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 - Les mathématiques (`viewport.js`) sont pures et testées hors DOM ; les
   écouteurs appartiennent à l'instance et sont libérés par `destroy()`.
 
+## Couloirs partagés — FD-GRAPHICS-005
+
+- **Décidé** : une primitive serveur unique, `forge_design/graphics/lanes.py`,
+  attribue les couloirs horizontaux des layouts Route et Entity par partition
+  d'intervalles (déterministe, O(E log E), nombre de couloirs minimal pour un
+  routage par bande supérieure, écart minimal 20, parallèles distinctes).
+- Le placement des nœuds reste propre à chaque client ; la primitive ignore
+  tout type de nœud ou d'arête (identités opaques, abscisses seules).
+- `GraphicScene`, `validateScene` et le moteur JavaScript sont inchangés : la
+  scène reçoit des `points` déjà routés.
+- **Le premier routage partagé n'est pas encore le routeur orthogonal
+  interactif complet** : ni ports, ni obstacles, ni grille, ni A\*, ni
+  stabilité au déplacement ; `OrthogonalRouter` (section Routage) reste à
+  construire, en reprenant les principes de DrawCiel, pas son code.
+- Mesuré : Route 19 → 9 couloirs (hauteur 1306 → 1066, croisements 14 → 0) ;
+  Entity 5 → 5 (deux colonnes : tous les parcours traversent la même
+  gouttière).
+
 ## Questions reportées
 
 | Question | Ticket attendu |
 |---|---|
 | Langage et forme des modules | **Tranché par FD-GRAPHICS-002** : ES modules natifs, sans build |
-| Layout générique (hiérarchique, force, orthogonal) | Ultérieur |
-| Représentation des entrées d'historique (inverse ou instantané) | FD-GRAPHICS-005 |
+| Layout générique (hiérarchique, force, orthogonal) | Ultérieur ; FD-GRAPHICS-005 ne partage que l'allocation de couloirs |
+| Représentation des entrées d'historique (inverse ou instantané) | Avec les commandes (non traité par FD-GRAPHICS-005) |
 | Choix du renderer (SVG, Canvas, hybride) | FD-GRAPHICS-004 |
-| Re-projection complète ou incrémentale | FD-GRAPHICS-005 |
+| Re-projection complète ou incrémentale | Avec les commandes (non traité par FD-GRAPHICS-005) |
+| Lisibilité au fit des grands graphes (niveaux de détail, couloirs entre colonnes) | Selon l'usage observé (rapport FD-GRAPHICS-005) |
 | Routage de recours (A\*) et évitement d'obstacles complet | Après FD-GRAPHICS-003 |
 | Annotations graphiques, rappels, trait libre | Quand un domaine en a besoin |
 | Groupes, verrous, alignement, pivot commun de rotation | FUTUR |

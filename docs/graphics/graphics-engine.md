@@ -173,6 +173,27 @@ panneau de détails passent par `data`.
 Côté navigateur, `/route-graph.js` (module) lit la scène, crée une instance et
 masque le repli serveur ; il ne manipule jamais le SVG lui-même.
 
+## Shared lanes (server layouts)
+
+FD-GRAPHICS-005. Les arêtes des deux layouts serveur montent de leur source
+vers un couloir horizontal au-dessus des nœuds, le parcourent, puis
+redescendent vers leur cible. Les couloirs ne sont plus attribués « une arête,
+un couloir » : `forge_design/graphics/lanes.py` (Python pur, partagé par
+`route_graph_layout.py` et `entity_graph_layout.py`) les répartit.
+
+| Élément | Règle |
+|---|---|
+| Parcours | `HorizontalSpan(edge_id, start, end)` : abscisses du segment de couloir (sortie + 20, entrée − 20) ; une arête de retour occupe `[min, max]` |
+| Allocation | `allocate_horizontal_lanes` : tri stable (gauche, droite, ordre d'entrée), plus petit couloir libre ; O(E log E) ; nombre de couloirs = chevauchement maximal (minimal) |
+| Partage | Deux parcours partagent un couloir seulement s'ils sont séparés d'au moins `gap` = 20 ; deux arêtes parallèles ont toujours deux couloirs |
+| Ordonnées | Pas de 24 ; couloir 0 au plus près des nœuds (empilement vers le haut) |
+| Haut des nœuds | `band_bottom + 30` : dépend du nombre de couloirs, pas du nombre d'arêtes |
+| Géométrie | `route_via_horizontal_lane` (6 points orthogonaux), `svg_path` (repli `M/H/V`), `lane_label_position` (milieu du segment de couloir, 5 au-dessus) |
+
+La GraphicScene, le moteur et les clients JavaScript sont inchangés : seules
+les coordonnées produites par les layouts changent. Ce n'est pas le routeur
+orthogonal interactif (ports, obstacles, A\*), qui reste à construire.
+
 ## Security
 
 - Scène transportée dans un `<script type="application/json"
@@ -211,6 +232,8 @@ et l'annonce.
 
 Prouvé par deux clients réels : graphes positionnés, nœuds, arêtes (y compris
 parallèles), libellés, sélection, voisins directs, SVG, viewport (fit, zoom,
-pan, resize). Pas encore : layout générique, ports, routage, grille, glisser
-de nœuds, édition, commandes, historique, multi-sélection, groupes, minicarte,
-niveaux de détail. Debug Center garde son rendu propre.
+pan, resize), couloirs partagés côté serveur (FD-GRAPHICS-005). Pas encore :
+layout générique, ports, routeur orthogonal interactif (obstacles, A\*,
+stabilité au déplacement), grille, glisser de nœuds, édition, commandes,
+historique, multi-sélection, groupes, minicarte, niveaux de détail. Debug
+Center garde son rendu propre.

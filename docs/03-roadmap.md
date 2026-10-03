@@ -319,7 +319,10 @@ fait      FD-GRAPHICS-003  Entity Explorer deuxième client ; API validée par d
                            seule extension : données opaques d'arête et edge(id)
 fait      FD-GRAPHICS-004  viewport générique (fit, zoom, pan, home, resize) pour Route et
                            Entity ; première capacité interactive capitalisée de DrawCiel
-suivant   FD-GRAPHICS-005  à décider sur l'usage observé (voir rapport FD-GRAPHICS-004)
+fait      FD-GRAPHICS-005  allocation générique de couloirs partagée par Route et Entity
+                           (Route : 19 → 9 couloirs, hauteur −18 %, 0 croisement ;
+                           Entity : aucun gain possible à deux colonnes)
+suivant   FD-GRAPHICS-006  à décider sur l'usage observé (voir rapport FD-GRAPHICS-005)
 ensuite   ports et routage orthogonal extrait de DrawCiel, commandes et historique
 en attente du socle Graphics :
           FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit

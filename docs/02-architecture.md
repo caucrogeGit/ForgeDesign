@@ -543,6 +543,9 @@ Contrat normatif : [Graphic Core](graphics/graphics-core-contract.md) ;
 suivi de DrawCiel : [Référence DrawCiel](graphics/drawciel-reference.md).
 **Rien n'est implémenté** ; aucun module `forge_design/graphics/`.
 
+> Depuis FD-GRAPHICS-005, `forge_design/graphics/` existe et ne contient que
+> la primitive serveur d'allocation de couloirs (voir « Couloirs partagés »).
+
 ```text
 Document métier (Circuit, Flowchart, Network…)   source de vérité, ressource spécialisée
       │  adaptateur de domaine : project(document) → scène ; apply(intention) → document
@@ -665,6 +668,27 @@ JSON, aucun serveur, aucune persistance ; seul `viewport.js` rejoint la liste
 fermée `GRAPHICS_MODULES` servie par le Router Forge. Route et Entity
 utilisent le même viewport sans code propre ; sans JavaScript, le SVG serveur
 complet et défilable reste le repli.
+
+### Couloirs partagés — FD-GRAPHICS-005
+
+```text
+forge_design/graphics/            Python pur, géométrie seule (aucun HTTP, Jinja, projet)
+└── lanes.py   HorizontalSpan, allocate_horizontal_lanes → LanePlan,
+               route_via_horizontal_lane, lane_label_position, svg_path
+
+route_graph_layout.layout_route_graph  ┐  colonnes et rangs (propres à chaque client)
+entity_graph_layout.layout_entity_graph┘  → parcours horizontaux → même allocation
+                                          → haut des nœuds = bande réellement utilisée
+                                          → points + path du repli + position du libellé
+```
+
+Le placement (colonnes, rangs) reste propre à chaque layout ; seuls le
+partage des couloirs, la polyligne orthogonale, le chemin SVG du repli et la
+position du libellé sont communs (test statique : une seule copie). Les
+couloirs sont attribués par partition d'intervalles (O(E log E), nombre
+minimal) ; la scène `GraphicScene`, le moteur JavaScript et les clients sont
+inchangés. Ce paquet serveur ne doit pas être confondu avec
+`forge_design/web/static/graphics/` (moteur navigateur).
 
 ## 14. Écriture
 

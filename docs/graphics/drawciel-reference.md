@@ -25,10 +25,10 @@ copie automatique, aucun suivi du HEAD en runtime.
 
 | Champ | Valeur |
 |---|---|
-| Commit | `3a1753a2` — feat(documents): confirmer chaque page avant transmission |
+| Commit | `88f95b75` — feat(drawciel): intégrer Circuit au tunnel de l’activité |
 | Date du commit | 3 octobre 2026 |
 | Date d'analyse | 3 octobre 2026 |
-| Ticket | FD-GRAPHICS-004 |
+| Ticket | FD-GRAPHICS-005 |
 
 ## Journal des références
 
@@ -42,6 +42,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | FD-GRAPHICS-002 | `aac36b27` | `aac36b27` | Vide (`git fetch` : `origin/main` inchangé) | Principe `createElementNS` / sélection / focus SVG retenu ; `render()` monolithique non repris (REWRITE) ; aucun code DrawCiel copié |
 | FD-GRAPHICS-003 | `aac36b27` | `aac36b27` | Vide (`git fetch` : `origin/main` inchangé) | Aucun : migration d'un client plateforme, aucun élément DrawCiel repris |
 | FD-GRAPHICS-004 | `aac36b27` | `3a1753a2` | Un commit SéquenCiel (confirmation de documents), aucun fichier DrawCiel modifié | Viewport : `zoomAt` (formule du point fixe) ADAPT ; `fit`, `viewportWorld`, `centerWorldPoint` REWRITE ; geste du bouton du milieu repris ; `applyTransform` CSS et état global non repris |
+| FD-GRAPHICS-005 | `3a1753a2` | `88f95b75` | Un commit (ADR-309, Circuit dans le tunnel d'activité : mode aperçu en lecture seule, essai d'aperçu non persisté dans `tp.js`, adaptateurs hôte) ; `app.js` inchangé | Aucun sur le routage. Routage étudié (`cleanRoute`, `routeObstructed`, `astarGrid`, `simplifyExact`) : routage fil par fil sur grille avec obstacles, sans allocation globale de couloirs ; principes seulement, aucun code repris. Dette encore vraie : cas particulier par type de composant dans `routeObstructed`, non reproduit |
 
 ## Procédure de delta
 

@@ -3,7 +3,18 @@
 from collections import deque
 from dataclasses import dataclass
 
+from forge_design.graphics.lanes import (
+    DEFAULT_STUB,
+    HorizontalSpan,
+    allocate_horizontal_lanes,
+    lane_label_position,
+    route_via_horizontal_lane,
+    svg_path,
+)
 from forge_design.tools.route_graph import GraphEdge, GraphNode, RouteGraph
+
+NODE_WIDTH = 260
+NODE_HEIGHT = 100
 
 
 @dataclass(frozen=True)
@@ -22,7 +33,7 @@ class PositionedEdge:
     path: str
     label_x: int
     label_y: int
-    # Polyligne orthogonale dont path est la forme SVG (repli serveur).
+    # Polyligne orthogonale (couloirs partagés) dont path est la forme SVG.
     points: tuple[tuple[int, int], ...] = ()
 
 
@@ -57,35 +68,45 @@ def layout_route_graph(graph: RouteGraph) -> RouteGraphLayout:
                 queue.append(target)
     columns = {"route": 0, "handler": 1, "controller": 2}
     counts: dict[int, int] = {}
-    nodes: list[PositionedNode] = []
-    top = 60 + 24 * len(graph.edges)
+    # Première passe : colonnes et rangs ; les abscisses suffisent aux couloirs.
+    slots: list[tuple[GraphNode, int, int]] = []
     for node in graph.nodes:
         column = (
             levels.get(node.id, 4) if node.kind == "template" else columns[node.kind]
         )
         row = counts.get(column, 0)
+        slots.append((node, 30 + column * 360, row))
+        counts[column] = row + 1
+    x_of = {node.id: x for node, x, _ in slots}
+    plan = allocate_horizontal_lanes(
+        [
+            HorizontalSpan(
+                str(index),
+                x_of[edge.source] + NODE_WIDTH + DEFAULT_STUB,
+                x_of[edge.target] - DEFAULT_STUB,
+            )
+            for index, edge in enumerate(graph.edges)
+        ]
+    )
+    # Les nœuds se placent sous les couloirs réellement utilisés.
+    top = plan.band_bottom + 30
+    nodes: list[PositionedNode] = []
+    for node, x, row in slots:
         label = node.label if len(node.label) <= 30 else node.label[:29] + "…"
         nodes.append(
-            PositionedNode(node, 30 + column * 360, top + row * 132, 260, 100, label)
+            PositionedNode(node, x, top + row * 132, NODE_WIDTH, NODE_HEIGHT, label)
         )
-        counts[column] = row + 1
     positions = {item.node.id: item for item in nodes}
     edges: list[PositionedEdge] = []
     for index, edge in enumerate(graph.edges):
         source, target = positions[edge.source], positions[edge.target]
-        sx, sy = source.x + source.width, source.y + source.height // 2
-        tx, ty = target.x, target.y + target.height // 2
-        lane = 30 + index * 24
-        points = (
-            (sx, sy),
-            (sx + 20, sy),
-            (sx + 20, lane),
-            (tx - 20, lane),
-            (tx - 20, ty),
-            (tx, ty),
+        points = route_via_horizontal_lane(
+            (source.x + source.width, source.y + source.height // 2),
+            (target.x, target.y + target.height // 2),
+            plan.y(str(index)),
         )
-        path = f"M {sx} {sy} H {sx + 20} V {lane} H {tx - 20} V {ty} H {tx}"
-        edges.append(PositionedEdge(edge, path, (sx + tx) // 2, lane - 5, points))
+        label_x, label_y = lane_label_position(points)
+        edges.append(PositionedEdge(edge, svg_path(points), label_x, label_y, points))
     return RouteGraphLayout(
         tuple(nodes),
         tuple(edges),
