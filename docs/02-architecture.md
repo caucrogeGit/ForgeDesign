@@ -537,6 +537,35 @@ niveaux `structure`, `topology`, `electrical-readiness`, écriture avec
 révision). Format, frontend et moteur de simulation restent à décider par les
 tickets de la Phase 10. Circuit n'est enregistré nulle part.
 
+### Noyau graphique commun — FD-GRAPHICS-001
+
+Contrat normatif : [Graphic Core](graphics/graphics-core-contract.md) ;
+suivi de DrawCiel : [Référence DrawCiel](graphics/drawciel-reference.md).
+**Rien n'est implémenté** ; aucun module `forge_design/graphics/`.
+
+```text
+Document métier (Circuit, Flowchart, Network…)   source de vérité, ressource spécialisée
+      │  adaptateur de domaine : project(document) → scène ; apply(intention) → document
+      ▼
+GraphicScene (projection en mémoire, jamais persistée)
+├── Node / Port / Edge / Route / TextAnnotation
+├── géométrie, grille, transformations
+├── sélection, hit-testing
+├── commandes, historique, dirty
+└── OrthogonalRouter (service pur)
+      │
+      ▼
+Renderer adapter (SVG candidat naturel 2D, non choisi)
+```
+
+Graphics présente et manipule une ressource métier ; il n'en définit pas la
+sémantique. Il ne possède pas de format persistant propre ; jonctions, réseaux,
+compatibilité de ports, validation et simulation restent dans les domaines.
+La simulation suit une chaîne parallèle (document → topologie/IR → moteur),
+jamais via Graphics. Le noyau est explicitement 2D ; la 3D aura son moteur.
+Les graphes en lecture seule existants (Route Explorer, Entity Explorer, Debug
+Center) restent inchangés ; leur convergence éventuelle est à étudier.
+
 ## 14. Écriture
 
 Principe :

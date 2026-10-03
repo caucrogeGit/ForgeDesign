@@ -17,6 +17,16 @@ Circuit est un **outil spécialisé** au sens du
 il en respecte la séparation ressource / runtime / export, la validation par
 niveaux, la discipline de révision et l'absence de pédagogie.
 
+**Frontière Graphics (FD-GRAPHICS-001).** La géométrie, la grille, les
+transformations, les nœuds, ports, arêtes et routes, le routage, le texte, la
+sélection, les commandes génériques et l'historique relèvent du
+[Graphic Core](../graphics/graphics-core-contract.md). Circuit en **configure**
+les règles (grille obligatoire, quarts de tour, routes orthogonales) et garde
+toute la **sémantique** : types, bornes et rôles, polarité, propriétés,
+jonction électrique, topologie, réseaux, validation, simulation. Les décisions
+de ce document restent valides ; seules leurs responsabilités d'implémentation
+sont réparties entre Graphics et Circuit.
+
 ## Objectif
 
 **Décidé.** Circuit permet de produire, dans un projet Forge, des **schémas
@@ -345,6 +355,16 @@ stocke des grandeurs SI.
   jonction n'est pas obligatoire sur une borne).
 - Une borne non connectée est valide structurellement ; elle produit au plus
   un avertissement `electrical-readiness`.
+- Une borne est projetée en `Port` du Graphic Core ; sa **direction de sortie
+  est déclarée** par le type.
+- **Observé (FD-GRAPHICS-001)** : aucune borne du catalogue DrawCiel ne tombe
+  sur la grille de 20 px à la taille par défaut ; une conversion de catalogue
+  devra renormaliser symboles et bornes sur la grille.
+- **Reporté (FD-CIRCUIT-002/003)** : distinguer identifiant de borne et rôle,
+  comme les contrats DrawCiel (`t1` de rôle `terminal_a`, `positive=t1`…), et
+  aligner identifiants, clés et unités de propriétés sur ces contrats lorsque la
+  sémantique est identique, afin de préserver l'IR de simulation et un import
+  futur. Les noms de rôles du tableau précédent restent valables.
 
 ## Connexions
 
@@ -362,6 +382,9 @@ stocke des grandeurs SI.
   vers J, en **une seule action d'historique**. Le réseau de A–B est inchangé.
   La conservation d'identité de la connexion découpée est **reportée** à
   FD-CIRCUIT-002 ; elle devra être déterministe.
+- La jonction est un concept **Circuit**, projeté dans la scène comme un nœud
+  sans obstacle à un port omnidirectionnel ; elle n'appartient pas au Graphic
+  Core (FD-GRAPHICS-001).
 - Supprimer une jonction de degré 2 peut fusionner ses deux connexions
   (commande explicite) ; jamais par nettoyage automatique.
   (**Observé** : DrawCiel crée des jonctions automatiques et découpe les fils
@@ -397,7 +420,10 @@ Invariants (**décidé**, testables) :
 
 ## Routage
 
-**Décidé.**
+**Décidé.** Le routage est fourni par le service `OrthogonalRouter` du
+[Graphic Core](../graphics/graphics-core-contract.md#routage), extrait de
+DrawCiel ; Circuit impose le mode orthogonal et la grille. Les règles
+suivantes sont celles que Circuit exige de ce service.
 
 - La topologie est l'autorité électrique ; la route est une **présentation**.
   Une route invalide ou absente ne change jamais les réseaux.
@@ -425,7 +451,10 @@ Invariants (**décidé**, testables) :
 
 ## Géométrie
 
-**Décidé.** L'exactitude prime sur la liberté au pixel.
+**Décidé.** L'exactitude prime sur la liberté au pixel. Les primitives,
+transformations et positions monde des ports sont celles du
+[Graphic Core](../graphics/graphics-core-contract.md#géométrie) ; Circuit
+fixe les restrictions ci-dessous.
 
 - **Coordonnées monde** en unités de grille **entières**, indépendantes du
   viewport, du zoom et de la densité d'écran. Le pas d'affichage de la grille
@@ -584,7 +613,9 @@ Candidats à évaluer, **sans décision** :
 
 ## Historique
 
-**Décidé.**
+**Décidé.** Le mécanisme d'historique est celui du
+[Graphic Core](../graphics/graphics-core-contract.md#historique) ; Circuit y
+ajoute ses commandes de domaine (relier, insérer ou supprimer une jonction).
 
 - Toute modification persistante passe par une **commande atomique** :
   un geste utilisateur = une entrée (un glisser complet, une rotation,
@@ -736,27 +767,33 @@ de moteurs qui n'a de sens qu'une fois le document exact et stable.
 
 ## Roadmap technique
 
-Ordre retenu pour la Phase 10 (numéros indicatifs) :
+Ordre retenu pour la Phase 10, révisé par FD-GRAPHICS-001 (numéros
+indicatifs ; les tickets FD-CIRCUIT-003 et suivants de la première version de
+ce tableau sont renumérotés) :
 
 | Ticket | Contenu | Justification de l'ordre |
 |---|---|---|
 | FD-CIRCUIT-001 | Besoins et périmètre (ce document) | Cadrage |
-| FD-CIRCUIT-002 | Contrat de ressource Circuit : format, version, identités, espace de sources, limites | Tout le reste lit ce format |
-| FD-CIRCUIT-003 | Modèle de domaine, catalogue V1, codec, validation `structure`/`topology`/`electrical-readiness` (sans UI) | Exactitude testable avant tout rendu |
-| FD-CIRCUIT-004 | Géométrie et routage orthogonal (opérations pures, invariants) | Indépendant du frontend |
-| FD-CIRCUIT-005 | Étude du rendu et de l'interaction (choix frontend) | Choix éclairé par un modèle déjà stable |
-| FD-CIRCUIT-006 | Intégration hôte et session d'édition (registre minimal d'outils spécialisés si nécessaire) | Prérequis de l'éditeur |
-| FD-CIRCUIT-007 | Éditeur Web minimal : commandes, historique, dirty, sauvegarde, conflit | Premier usage réel |
-| FD-CIRCUIT-008 | Export SVG exact | Complète le premier jalon |
-| FD-CIRCUIT-009 | Qualification du premier jalon en navigateur | Preuve du jalon |
-| FD-CIRCUIT-010 | Étude des moteurs de simulation et de la frontière IR | Seulement après le jalon |
-| FD-CIRCUIT-011 | Adaptateur et simulation DC minimale | Après décision de l'étude |
-| FD-CIRCUIT-012 | Mesures (multimètre, ohmmètre) | Après la simulation |
+| FD-GRAPHICS-001 | Contrat du noyau graphique commun, capitalisation DrawCiel | Répartir Graphics / Circuit avant de figer le format |
+| FD-CIRCUIT-002 | Contrat de ressource Circuit : format, version, identités, espace de sources, limites ; adopte les conventions de champs Graphics | Tout le reste lit ce format |
+| FD-GRAPHICS-002 | Primitives géométriques pures, transformations exactes, ports | Base commune ; règles de grille et de direction utiles à la conversion du catalogue |
+| FD-GRAPHICS-003 | Routage orthogonal extrait de DrawCiel, témoins portés | Algorithme éprouvé, référence encore fraîche |
+| FD-CIRCUIT-003 | Domaine, catalogue V1 (inventaire et conversion contrôlée), codec, validation `structure`/`topology`/`electrical-readiness`, topologie | Exactitude testable avant tout rendu |
+| FD-GRAPHICS-004 | Étude du renderer et de l'interaction (choix) | Choix éclairé par un modèle stable |
+| FD-GRAPHICS-005 | Scène, projection, sélection, commandes, historique, éprouvés par un domaine témoin non électrique limité aux tests | Généricité prouvée avant Circuit |
+| FD-CIRCUIT-004 | Projection Circuit → scène, commandes Circuit | Circuit sur le noyau |
+| FD-CIRCUIT-005 | Intégration hôte, session, éditeur Web minimal (registre minimal si nécessaire) | Premier usage réel |
+| FD-CIRCUIT-006 | Export SVG depuis le modèle | Complète le premier jalon |
+| FD-CIRCUIT-007 | Qualification du premier jalon en navigateur | Preuve du jalon |
+| FD-CIRCUIT-008 | Étude des moteurs et de l'IR Circuit (compatibilité avec la SimulationIR DrawCiel) | Seulement après le jalon |
+| FD-CIRCUIT-009 | Adaptateur et simulation DC minimale | Après décision de l'étude |
+| FD-CIRCUIT-010 | Mesures (multimètre, ohmmètre) | Après la simulation |
 | ultérieur | Instruments, transitoires, extension du catalogue, import DrawCiel | Selon besoins |
 
-Différence avec l'ordre indicatif initial : la validation structurelle est
-avancée avec le modèle (elle protège le format), le rendu est précédé du modèle
-géométrique, et le choix frontend devient une étude explicite.
+Différences avec l'ordre initial : la validation structurelle est avancée avec
+le modèle, la géométrie et le routage deviennent des tickets Graphics communs,
+le choix du rendu est une étude explicite et la généricité du noyau est prouvée
+par un domaine témoin non électrique avant la projection Circuit.
 
 ## Décisions
 
@@ -792,13 +829,13 @@ géométrique, et le choix frontend devient une étude explicite.
 | Format, suffixe, version, espace de sources de la ressource | FD-CIRCUIT-002 |
 | Schéma de génération des identités ; identité de la connexion découpée par une jonction | FD-CIRCUIT-002 |
 | Limites (nombre d'éléments, taille) | FD-CIRCUIT-002 |
-| Positions locales exactes des bornes et sorties de route par type | FD-CIRCUIT-003 / 004 |
-| Frontend, rendu, isolation iframe/Worker du runtime | FD-CIRCUIT-005 / 006 |
-| Registre d'outils spécialisés | FD-CIRCUIT-006 |
-| Autosave | FD-CIRCUIT-007 ou ultérieur |
-| Emplacement des exports | FD-CIRCUIT-008 |
-| Moteur de simulation ; IR ou traduction directe | FD-CIRCUIT-010 |
-| Modèles diode/LED/lampe | FD-CIRCUIT-010 / 011 |
+| Positions locales exactes des bornes et sorties de route par type | FD-GRAPHICS-002 / FD-CIRCUIT-003 |
+| Frontend, rendu, isolation iframe/Worker du runtime | FD-GRAPHICS-004 / FD-CIRCUIT-005 |
+| Registre d'outils spécialisés | FD-CIRCUIT-005 |
+| Autosave | FD-CIRCUIT-005 ou ultérieur |
+| Emplacement des exports | FD-CIRCUIT-006 |
+| Moteur de simulation ; IR ou traduction directe | FD-CIRCUIT-008 |
+| Modèles diode/LED/lampe | FD-CIRCUIT-008 / 009 |
 | Effets physiques | Étude ultérieure |
 | Presse-papiers système | Ultérieur |
 | Étiquettes de réseau nommées, multipage, cartouche | Ultérieur |

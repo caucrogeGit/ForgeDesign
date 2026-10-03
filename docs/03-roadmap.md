@@ -291,28 +291,39 @@ Périmètre normatif : [Circuit — besoins et périmètre](circuit/circuit-scop
 (FD-CIRCUIT-001). Circuit V1 est un éditeur de schémas électriques exacts ;
 la simulation est une capacité optionnelle future, hors du premier jalon.
 
-Ordre retenu (numéros indicatifs) :
+Sous-phase Graphics (FD-GRAPHICS-001) : avant de figer le format Circuit, le
+[noyau graphique commun](graphics/graphics-core-contract.md) répartit les
+responsabilités entre Graphics (géométrie, nœuds, ports, arêtes, routes,
+routage, sélection, commandes, historique) et Circuit (sémantique électrique).
+Il capitalise sur DrawCiel, suivi par une [procédure de référence](graphics/drawciel-reference.md)
+appliquée à chaque ticket concerné. Les phases globales ne sont pas renumérotées.
+
+Ordre retenu (numéros indicatifs, révisé par FD-GRAPHICS-001) :
 
 ```text
-FD-CIRCUIT-001  besoins et périmètre
-→ FD-CIRCUIT-002  contrat de ressource Circuit (format, version, identités, espace de sources)
-→ FD-CIRCUIT-003  modèle de domaine, catalogue V1, codec, validation structure/topologie/préparation
-→ FD-CIRCUIT-004  géométrie et routage orthogonal (opérations pures)
-→ FD-CIRCUIT-005  étude du rendu et de l'interaction (choix frontend)
-→ FD-CIRCUIT-006  intégration hôte et session d'édition (registre minimal si nécessaire)
-→ FD-CIRCUIT-007  éditeur Web minimal : commandes, historique, dirty, sauvegarde, conflit
-→ FD-CIRCUIT-008  export SVG exact
-→ FD-CIRCUIT-009  qualification du premier jalon en navigateur
-→ FD-CIRCUIT-010  étude des moteurs de simulation et de la frontière IR
-→ FD-CIRCUIT-011  adaptateur et simulation DC minimale
-→ FD-CIRCUIT-012  mesures
-→ ultérieur       instruments, transitoires, extension du catalogue, import DrawCiel
+FD-CIRCUIT-001   besoins et périmètre
+→ FD-GRAPHICS-001  contrat du noyau graphique commun, capitalisation DrawCiel
+→ FD-CIRCUIT-002   contrat de ressource Circuit (adopte les conventions de champs Graphics)
+→ FD-GRAPHICS-002  primitives géométriques pures, transformations exactes, ports
+→ FD-GRAPHICS-003  routage orthogonal extrait de DrawCiel, témoins portés
+→ FD-CIRCUIT-003   domaine, catalogue V1 (conversion contrôlée), codec, validation, topologie
+→ FD-GRAPHICS-004  étude du renderer et de l'interaction (choix)
+→ FD-GRAPHICS-005  scène, projection, sélection, commandes, historique (domaine témoin non électrique)
+→ FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
+→ FD-CIRCUIT-005   intégration hôte, session, éditeur Web minimal
+→ FD-CIRCUIT-006   export SVG depuis le modèle
+→ FD-CIRCUIT-007   qualification du premier jalon en navigateur
+→ FD-CIRCUIT-008   étude des moteurs et de l'IR Circuit (compatibilité SimulationIR DrawCiel)
+→ FD-CIRCUIT-009   adaptateur et simulation DC minimale
+→ FD-CIRCUIT-010   mesures
+→ ultérieur        instruments, transitoires, extension du catalogue, import DrawCiel
 ```
 
 Par rapport à l'ordre indicatif initial, la validation structurelle est
-avancée avec le modèle, le modèle géométrique précède le rendu et le choix
-frontend devient une étude explicite. Le moteur n'est pas choisi avant une
-étude dédiée.
+avancée avec le modèle, géométrie et routage deviennent des tickets Graphics
+communs, le choix du rendu est une étude explicite et la généricité du noyau
+est prouvée par un domaine témoin avant Circuit. Le moteur de simulation n'est
+pas choisi avant une étude dédiée.
 
 Premier jalon de la phase : créer, éditer, valider, enregistrer avec
 révision, rouvrir à l'identique et exporter en SVG un schéma exact, sans
