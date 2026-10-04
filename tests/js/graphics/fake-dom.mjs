@@ -75,6 +75,10 @@ export class FakeElement {
       this.children.push(node);
     }
   }
+  prepend(...nodes) {
+    for (const node of nodes) node.parent = this;
+    this.children.unshift(...nodes);
+  }
   remove() {
     if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);
     this.parent = null;
@@ -168,7 +172,7 @@ export function sized(host, engine, width, height) {
 
 // Éléments rendus d'une instance, par rôle.
 export function rendered(host) {
-  const svg = host.querySelector("svg");
+  const svg = host.querySelector(".gx-scene");
   return {
     svg,
     nodes: svg ? svg.querySelectorAll(".gx-node") : [],

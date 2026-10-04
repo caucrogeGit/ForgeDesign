@@ -703,6 +703,21 @@ Tout se passe dans le navigateur : aucune route métier, aucun point d'accès,
 aucune persistance. Seul `detail-level.js` rejoint la liste fermée
 `GRAPHICS_MODULES` servie par le Router Forge. Le repli serveur reste complet.
 
+### Minicarte — FD-GRAPHICS-007
+
+```text
+GraphicScene ──┬──▶ renderer SVG principal ──▶ viewport { scale, x, y }
+               │                                      │ visibleWorldRect
+               └──▶ minimap.js (structure, une fois) ◀─┘ rectangle visible (O(1))
+                         │ clic / glisser
+                         └──▶ viewport.centerAt(point monde)
+```
+
+Une seule scène, un seul viewport, une minicarte dérivée par instance.
+Entièrement côté navigateur ; seul `minimap.js` rejoint `GRAPHICS_MODULES`.
+Sans JavaScript, pas de minicarte : le repli statique reste défilable et
+complet.
+
 ## 14. Écriture
 
 Principe :

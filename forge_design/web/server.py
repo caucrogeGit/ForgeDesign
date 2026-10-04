@@ -65,6 +65,7 @@ GRAPHICS_MODULES = (
     "detail-level",
     "engine",
     "geometry",
+    "minimap",
     "model",
     "scene",
     "svg-renderer",

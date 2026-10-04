@@ -17,7 +17,8 @@ ES modules natifs, sans build, sans npm, sans dépendance ni CDN, livrés dans
 | `scene.js` | `indexScene`, `neighbourhood`, `createSelection` (sans DOM) |
 | `svg-renderer.js` | `renderScene`, `applySelection`, `applyDetailLevel` (renderer remplaçable) |
 | `detail-level.js` | Niveau de détail pur (FD-GRAPHICS-006) : `detailLevelForScale`, `DETAIL_LEVELS`, `THRESHOLDS`, tailles écran de référence |
-| `viewport.js` | Viewport pur (FD-GRAPHICS-004) : `createViewport`, `fitState`, `zoomAtState`, `panState`, `resizeState`, `viewBox`, `wheelFactor`, bornes |
+| `viewport.js` | Viewport pur (FD-GRAPHICS-004) : `createViewport`, `fitState`, `zoomAtState`, `panState`, `resizeState`, `viewBox`, `wheelFactor`, bornes ; `visibleWorldRect`, `centerState` (FD-GRAPHICS-007) |
+| `minimap.js` | Minicarte (FD-GRAPHICS-007) : `minimapLayout`, `worldToMinimap`, `minimapToWorld`, `sceneCoverage`, `needsMinimap`, `minimapViewportRect`, `describeVisible` (purs) et `renderMinimap` (vue SVG) |
 | `engine.js` | `createGraphicEngine` (instance, barre d'outils, interactions, cycle de vie) |
 
 Aucun module ne connaît un domaine, Route Explorer, un projet Forge ou un
@@ -123,6 +124,7 @@ n'est jamais modifiée ; rien n'est persisté (ni stockage navigateur, ni cookie
 | Resize | Avant toute interaction (ou après Ajuster) : le fit suit la zone ; ensuite échelle et centre visibles conservés. `ResizeObserver` si disponible, sinon taille initiale ; `engine.resize()` pour remesurer |
 | Zone non mesurée | État neutre et viewBox de la scène : jamais NaN ni Infinity |
 | Barre d'outils | `role="toolbar"`, boutons natifs « Ajuster », « + », « − » (titre et nom accessible), échelle courante en texte |
+| Recentrage | `centerAt(point)` (FD-GRAPHICS-007) : le point monde au centre de la zone, échelle conservée |
 
 ## Detail levels (semantic zoom)
 
@@ -161,6 +163,27 @@ la CSS masque le reste. Aucun élément n'est recréé, et rien n'est touché ta
 que le niveau ne change pas. `engine.detailLevel()` lit le niveau courant ; il
 n'existe pas de `setDetailLevel`.
 
+## Minimap
+
+FD-GRAPHICS-007. **Une seule scène, un seul viewport, une minicarte dérivée.**
+La minicarte est une projection runtime simplifiée de la `GraphicScene` : elle
+n'a ni topologie, ni document, ni état métier ; elle ne connaît que `node.rect`,
+`node.presentation.variant`, `edge.points`, `scene.width`, `scene.height` et
+l'état du viewport.
+
+| Élément | Règle |
+|---|---|
+| Rendu | SVG à DOM constant : fond, **un** chemin pour toutes les arêtes (polylignes sans flèche), **un** chemin par variante de nœuds, un rectangle de zone visible. Aucun texte, aucun libellé, aucun nœud focalisable |
+| Dimensions | Ajustement uniforme de la scène dans 200 × 140 px au plus, marge interne de 6 px, proportions de la scène (Route 200 × 106,5 ; Entity 146,9 × 140) ; en CSS, au plus 40 % de la largeur de la zone (réduite, conversion inchangée) |
+| Position | Coin supérieur droit de la scène (`.gx-stage`, position relative ; minicarte absolue, jamais `fixed`), hors de la zone de pan, sans couvrir la poignée de redimensionnement |
+| Conversions | `worldToMinimap(p) = marge + p × s`, `minimapToWorld` inverse ; client → minicarte en tenant compte de la mise à l'échelle CSS |
+| Zone visible | `visibleWorldRect` = viewBox courant ; affichée bornée à la minicarte, avec un repère minimal de 4 px au bord si la vue sort de la scène |
+| Affichage | Seulement quand toute la scène n'est pas visible : couverture `min(part de largeur, part de hauteur)` ; apparaît sous 0,97, disparaît à partir de 0,995 (hystérésis). Jamais masquée pendant un glisser ni lorsqu'elle a le focus. Indépendante du niveau de détail |
+| Clic | Recentre la vue sur le point monde pointé ; échelle conservée |
+| Glisser | Depuis le rectangle : il suit le pointeur en gardant le décalage de saisie ; ailleurs : recentrage continu. Pointer Events et capture, `pointercancel` |
+| Clavier | Focalisable (`role="group"`, nom accessible décrivant la zone visible, juste après la barre d'outils) ; flèches seules : même pas que Maj + flèches dans la zone ; Ctrl/Cmd + molette dessus : zoom de la vue, jamais celui de la page |
+| Mise à jour | Structure rendue une fois (O(V + E)) ; à chaque navigation, seuls le rectangle et le nom accessible changent (O(1)) |
+
 ## Instance lifecycle
 
 ```js
@@ -170,6 +193,7 @@ engine.selection(); engine.node(id); engine.edge(id); engine.scene();
 engine.fit(); engine.home(); engine.zoomIn(); engine.zoomOut();
 engine.zoomAt({x, y}, factor); engine.panBy(dx, dy); engine.resize(); engine.viewport();
 engine.detailLevel();   // "overview" | "normal" | "detail", dérivé de l'échelle
+engine.centerAt({x, y}); engine.minimap();   // recentrage ; inspection de la minicarte
 engine.render();   // re-rendu, écouteurs précédents retirés
 engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 ```
@@ -276,8 +300,9 @@ et l'annonce.
 Prouvé par deux clients réels : graphes positionnés, nœuds, arêtes (y compris
 parallèles), libellés, sélection, voisins directs, SVG, viewport (fit, zoom,
 pan, resize), couloirs partagés côté serveur (FD-GRAPHICS-005), niveau de
-détail selon l'échelle (FD-GRAPHICS-006). Pas encore : layout générique, ports,
-routeur orthogonal interactif (obstacles, A\*, stabilité au déplacement),
-grille, glisser de nœuds, édition, commandes, historique, multi-sélection,
-groupes, minicarte, niveaux de détail des arêtes déclarés par le client.
+détail selon l'échelle (FD-GRAPHICS-006), minicarte et recentrage
+(FD-GRAPHICS-007). Pas encore : layout générique, ports, routeur orthogonal
+interactif (obstacles, A\*, stabilité au déplacement), grille, glisser de
+nœuds, édition, commandes, historique, multi-sélection, groupes, niveaux de
+détail des arêtes déclarés par le client.
 Debug Center garde son rendu propre.

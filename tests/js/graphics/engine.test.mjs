@@ -125,7 +125,9 @@ test("re-rendu : un seul SVG et sélection conservée", () => {
   engine.select("B");
   const old = byLabel(host, "Node B");
   engine.render();
-  assert.equal(host.querySelectorAll("svg").length, 1);
+  // Un seul SVG de scène et une seule minicarte après re-rendu.
+  assert.equal(host.querySelectorAll(".gx-scene").length, 1);
+  assert.equal(host.querySelectorAll(".gx-minimap").length, 1);
   assert.equal(old.listeners.length, 0);
   assert.ok(byLabel(host, "Node B").classList.contains("gx-selected"));
 });

@@ -93,6 +93,20 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .gx-detail-overview .gx-variant-category-2 .gx-node-box { fill: #e3daf2; }
 .gx-detail-overview .gx-variant-category-3 .gx-node-box { fill: #d3ebdc; }
 .gx-detail-overview .gx-variant-category-4 .gx-node-box { fill: #f3e2c7; }
+/* Minicarte (FD-GRAPHICS-007) : coin supérieur droit de la scène, bornée, sans texte. */
+.gx-stage { position: relative; }
+.gx-minimap { position: absolute; top: 8px; right: 8px; z-index: 1; max-width: 40%; line-height: 0; background: #fff; border: 1px solid #98a2b3; border-radius: 4px; box-shadow: 0 2px 8px #0002; cursor: crosshair; touch-action: none; }
+.gx-minimap[hidden] { display: none; }
+.gx-minimap:focus-visible { outline: 3px solid #24578a; outline-offset: 2px; }
+.gx-minimap-svg { display: block; max-width: 100%; height: auto; }
+.gx-minimap-scene { fill: #fff; stroke: #d0d5dd; }
+.gx-minimap-edges { fill: none; stroke: #98a2b3; stroke-width: 1; }
+.gx-minimap-nodes { fill: #d0d5dd; }
+.gx-minimap-nodes.gx-variant-category-1 { fill: #8fb0dc; }
+.gx-minimap-nodes.gx-variant-category-2 { fill: #b49fdc; }
+.gx-minimap-nodes.gx-variant-category-3 { fill: #8fc9a5; }
+.gx-minimap-nodes.gx-variant-category-4 { fill: #e2b97a; }
+.gx-minimap-viewport { fill: #82402914; stroke: #824029; stroke-width: 1.5; }
 .graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .graph-details dd { margin-bottom: .75rem; }
 

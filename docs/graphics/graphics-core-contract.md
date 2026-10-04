@@ -751,6 +751,23 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 - DrawCiel ne possède pas de semantic zoom (vérifié à `88f95b75`) : aucune
   provenance.
 
+## Minimap / navigation spatiale — FD-GRAPHICS-007
+
+- **Décidé** : chaque instance du moteur possède une minicarte, **projection
+  runtime simplifiée de la GraphicScene** synchronisée avec son viewport. Ce
+  n'est ni un nouveau document, ni un nouveau graphe métier, ni un second
+  renderer métier : aucun champ de scène, aucune persistance, aucun texte.
+- SVG plutôt que canvas : vectoriel (net à toute densité d'écran), testable
+  hors navigateur, accessible, rectangle mis à jour par quatre attributs, DOM
+  constant quel que soit le volume (un chemin pour les arêtes, un par
+  variante).
+- Affichée seulement lorsque toute la scène n'est pas visible (géométrie
+  visible, jamais le niveau de détail), avec une hystérésis.
+- Navigation générique `centerAt(point)` ajoutée au viewport : recentrer une
+  vue sur un point monde, échelle conservée.
+- Provenance : principes de `renderMinimap` et `minimapNavigate` de DrawCiel
+  (`88f95b75`), adaptés ; état global, canvas et bornes variables non repris.
+
 ## Questions reportées
 
 | Question | Ticket attendu |

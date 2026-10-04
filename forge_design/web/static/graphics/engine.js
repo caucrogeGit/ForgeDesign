@@ -1,15 +1,25 @@
 // Graphic Core — instance de moteur graphique (FD-GRAPHICS-002, viewport FD-GRAPHICS-004,
-// niveau de détail FD-GRAPHICS-006).
+// niveau de détail FD-GRAPHICS-006, minicarte FD-GRAPHICS-007).
 // Une instance par conteneur, sans singleton ni état global : scène validée,
 // index, sélection et viewport runtime, rendu et écouteurs lui appartiennent ;
 // destroy() les libère. Le moteur ne lit ni n'écrit aucun projet et ne persiste rien.
 
 import { detailLevelForScale } from "./detail-level.js";
+import {
+  describeVisible,
+  minimapLayout,
+  minimapToWorld,
+  minimapViewportRect,
+  needsMinimap,
+  renderMinimap,
+} from "./minimap.js";
 import { validateScene } from "./model.js";
 import { createSelection, indexScene } from "./scene.js";
 import { applyDetailLevel, applySelection, renderScene } from "./svg-renderer.js";
 import { createViewport, wheelFactor } from "./viewport.js";
 
+// Minicarte : en deçà de ce déplacement (pixels écran), un appui-relâcher est un clic.
+const CLICK_SLOP = 3;
 // Déplacement clavier (Maj + flèches) : fraction de la zone visible.
 const PAN_STEP = 0.15;
 const ARROWS = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
@@ -37,11 +47,15 @@ export function createGraphicEngine(container, input, options = {}) {
     zoomOut: button("−", "Zoom arrière"),
   };
   const scaleText = htmlElement(document, "span", { class: "gx-toolbar-scale" });
+  // La minicarte vit dans la scène (coin supérieur droit), hors de la zone de pan.
+  const stage = htmlElement(document, "div", { class: "gx-stage" });
   const area = htmlElement(document, "div", { class: "gx-viewport" });
   toolbar.append(controls.fit, controls.zoomIn, controls.zoomOut, scaleText);
-  frame.append(toolbar, area);
+  stage.append(area);
+  frame.append(toolbar, stage);
   container.append(frame);
   const viewport = createViewport(scene, measure());
+  const miniLayout = minimapLayout(scene);
   const frameListeners = new AbortController();
   let observer = null;
   let nodeListeners = null;
@@ -52,6 +66,9 @@ export function createGraphicEngine(container, input, options = {}) {
   // L'hystérésis ne s'appuie que sur un niveau obtenu avec une zone mesurée :
   // l'échelle provisoire d'avant la première mesure ne fait pas historique.
   let levelMeasured = false;
+  let minimap = null;
+  let minimapShown = false;
+  let minimapDrag = null;
   let destroyed = false;
 
   function measure() {
@@ -74,9 +91,19 @@ export function createGraphicEngine(container, input, options = {}) {
     }
     const { width, height } = viewport.area();
     levelMeasured = width > 0 && height > 0;
+    updateMinimap();
     return viewportState();
   }
 
+  // O(1) : seuls le rectangle visible et le nom accessible changent ; la structure jamais.
+  function updateMinimap() {
+    const visible = viewport.visibleWorldRect();
+    // Pendant un glisser ou avec le focus, la minicarte ne disparaît pas sous l'utilisateur.
+    const engaged = minimapDrag !== null || document.activeElement === minimap.element;
+    minimapShown = (engaged && minimapShown) || needsMinimap(scene, visible, minimapShown);
+    minimap.setVisible(minimapShown);
+    if (visible !== null) minimap.update(minimapViewportRect(miniLayout, visible), describeVisible(scene, visible));
+  }
   function viewportState() {
     const { scale, x, y } = viewport.state();
     const { width, height } = viewport.area();
@@ -127,17 +154,108 @@ export function createGraphicEngine(container, input, options = {}) {
     if (nodeListeners) nodeListeners.abort();
     nodeListeners = null;
     if (view) view.svg.remove();
+    if (minimap) minimap.element.remove();
     view = null;
+    minimap = null;
+    minimapDrag = null;
     nodeElements = new Set();
+  }
+
+  function panStep(direction) {
+    const { width, height } = viewport.area();
+    navigate(() => viewport.panBy(direction[0] * width * PAN_STEP, direction[1] * height * PAN_STEP));
+  }
+
+  function minimapWorld(event) {
+    return minimapToWorld(miniLayout, minimap.toMinimap(event.clientX, event.clientY));
+  }
+
+  // Clic : recentre sur le point pointé. Glisser depuis le rectangle visible : le
+  // rectangle suit le pointeur en gardant le décalage de saisie (pas de saut) ; glisser
+  // ailleurs : recentrage continu. L'échelle ne change jamais.
+  function bindMinimap(signal) {
+    const element = minimap.element;
+    const listen = (type, listener, extra = {}) => element.addEventListener(type, listener, { signal, ...extra });
+    const moveTo = (event) => {
+      const world = minimapWorld(event);
+      navigate(() => viewport.centerAt({ x: world.x + minimapDrag.dx, y: world.y + minimapDrag.dy }));
+    };
+    listen("pointerdown", (event) => {
+      if (event.button !== 0 || minimapDrag) return;
+      event.preventDefault();
+      const world = minimapWorld(event);
+      const visible = viewport.visibleWorldRect();
+      const inside =
+        visible !== null &&
+        world.x >= visible.x &&
+        world.x <= visible.x + visible.width &&
+        world.y >= visible.y &&
+        world.y <= visible.y + visible.height;
+      const center = inside ? { x: visible.x + visible.width / 2, y: visible.y + visible.height / 2 } : world;
+      minimapDrag = {
+        id: event.pointerId,
+        dx: center.x - world.x,
+        dy: center.y - world.y,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+      };
+      if (element.setPointerCapture) element.setPointerCapture(event.pointerId);
+      moveTo(event);
+    });
+    listen("pointermove", (event) => {
+      if (!minimapDrag || event.pointerId !== minimapDrag.id) return;
+      minimapDrag.moved ||=
+        Math.abs(event.clientX - minimapDrag.startX) > CLICK_SLOP || Math.abs(event.clientY - minimapDrag.startY) > CLICK_SLOP;
+      moveTo(event);
+    });
+    const end = (event, click) => {
+      if (!minimapDrag || event.pointerId !== minimapDrag.id) return;
+      if (element.releasePointerCapture) element.releasePointerCapture(event.pointerId);
+      // Un clic (sans glisser) dans le rectangle recentre aussi sur le point cliqué.
+      if (click && !minimapDrag.moved) {
+        const world = minimapWorld(event);
+        minimapDrag = null;
+        navigate(() => viewport.centerAt(world));
+        return;
+      }
+      minimapDrag = null;
+      applyViewport();
+    };
+    listen("pointerup", (event) => end(event, true));
+    listen("pointercancel", (event) => end(event, false));
+    // Ctrl/Cmd + molette sur la minicarte : zoom autour du centre de la vue (jamais le zoom de page).
+    listen(
+      "wheel",
+      (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        const { width, height } = viewport.area();
+        navigate(() => viewport.zoomAt({ x: width / 2, y: height / 2 }, wheelFactor(event.deltaY, event.deltaMode)));
+      },
+      { passive: false },
+    );
+    // Flèches seules sur la minicarte focalisée : déplacent la zone visible (même pas que Maj + flèches).
+    listen("keydown", (event) => {
+      const direction = ARROWS[event.key];
+      if (!direction || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      panStep(direction);
+    });
+    // Perte du focus : la politique d'affichage s'applique de nouveau.
+    listen("blur", () => applyViewport());
   }
 
   function render() {
     alive();
     detach();
+    // La minicarte précède la zone : juste après la barre d'outils dans l'ordre de tabulation.
+    minimap = renderMinimap(stage, scene, miniLayout);
     view = renderScene(area, scene);
     nodeElements = new Set(view.nodes.values());
     nodeListeners = new AbortController();
     const { signal } = nodeListeners;
+    bindMinimap(signal);
     for (const [nodeId, element] of view.nodes) {
       element.addEventListener("click", () => toggle(nodeId), { signal });
       element.addEventListener(
@@ -221,8 +339,7 @@ export function createGraphicEngine(container, input, options = {}) {
     const direction = ARROWS[event.key];
     if (!direction || !event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
-    const { width, height } = viewport.area();
-    navigate(() => viewport.panBy(direction[0] * width * PAN_STEP, direction[1] * height * PAN_STEP));
+    panStep(direction);
   });
   if (typeof ResizeObserver === "function") {
     observer = new ResizeObserver(() => {
@@ -267,6 +384,18 @@ export function createGraphicEngine(container, input, options = {}) {
     viewport: () => {
       alive();
       return viewportState();
+    },
+    centerAt: (point) => navigate(() => viewport.centerAt(point)),
+    // Inspection de la minicarte (lecture seule).
+    minimap: () => {
+      alive();
+      const visible = viewport.visibleWorldRect();
+      return Object.freeze({
+        visible: minimapShown,
+        width: miniLayout.width,
+        height: miniLayout.height,
+        rect: visible === null ? null : minimapViewportRect(miniLayout, visible),
+      });
     },
     detailLevel: () => {
       alive();

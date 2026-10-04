@@ -1,4 +1,4 @@
-// Graphic Core — viewport 2D, mathématiques pures (FD-GRAPHICS-004).
+// Graphic Core — viewport 2D, mathématiques pures (FD-GRAPHICS-004, centerAt FD-GRAPHICS-007).
 // Aucun DOM : l'état runtime { scale, x, y } décrit la fenêtre visible, où
 // (x, y) est le point monde au coin supérieur gauche et scale le nombre de
 // pixels écran par unité monde. Le SVG l'applique par un seul viewBox :
@@ -84,9 +84,21 @@ export function resizeState(current, before, after) {
   return state(current.scale, centerX - after.width / (2 * current.scale), centerY - after.height / (2 * current.scale));
 }
 
-export function viewBox(current, area, bounds) {
-  if (!measurable(area)) return Object.freeze({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+// Rectangle monde visible dans la zone (null tant que la zone n'est pas mesurée).
+export function visibleWorldRect(current, area) {
+  if (!measurable(area)) return null;
   return Object.freeze({ x: current.x, y: current.y, width: area.width / current.scale, height: area.height / current.scale });
+}
+
+export function viewBox(current, area, bounds) {
+  return visibleWorldRect(current, area) ?? Object.freeze({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+}
+
+// Recentre la vue sur un point monde, échelle conservée (FD-GRAPHICS-007).
+export function centerState(current, area, point) {
+  const x = finite(point.x, "point.x");
+  const y = finite(point.y, "point.y");
+  return state(current.scale, x - area.width / (2 * current.scale), y - area.height / (2 * current.scale));
 }
 
 // Facteur de molette normalisé (pixels, lignes ou pages), borné à un pas.
@@ -131,6 +143,8 @@ export function createViewport(bounds, initialArea = { width: 0, height: 0 }) {
     zoomIn: () => interact(zoomAtState(current, center(), ZOOM_STEP)),
     zoomOut: () => interact(zoomAtState(current, center(), 1 / ZOOM_STEP)),
     panBy: (dx, dy) => interact(panState(current, dx, dy)),
+    centerAt: (point) => interact(centerState(current, area, point)),
+    visibleWorldRect: () => visibleWorldRect(current, area),
     // Avant toute interaction le fit suit la zone ; ensuite le centre est conservé.
     setArea(width, height) {
       const next = size(width, height);

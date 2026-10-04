@@ -34,6 +34,7 @@ def test_graphics_assets_are_fixed_forge_routes() -> None:
         "detail-level",
         "engine",
         "geometry",
+        "minimap",
         "model",
         "scene",
         "svg-renderer",

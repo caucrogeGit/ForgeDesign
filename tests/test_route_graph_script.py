@@ -13,6 +13,7 @@ GRAPHICS = (
     "detail-level",
     "engine",
     "geometry",
+    "minimap",
     "model",
     "scene",
     "svg-renderer",
@@ -73,7 +74,7 @@ def test_node_check(path: Path) -> None:
 
 
 def test_node_suites() -> None:
-    assert len(SUITES) == 9
+    assert len(SUITES) == 11
     result = subprocess.run(
         [_node(), "--test", *map(str, SUITES)],
         capture_output=True,

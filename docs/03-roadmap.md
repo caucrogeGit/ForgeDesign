@@ -324,7 +324,9 @@ fait      FD-GRAPHICS-005  allocation générique de couloirs partagée par Rout
                            Entity : aucun gain possible à deux colonnes)
 fait      FD-GRAPHICS-006  niveau de détail générique (overview, normal, detail) selon l'échelle ;
                            Route au fit en vue structurelle, Entity au fit en normal
-suivant   FD-GRAPHICS-007  à décider sur l'usage observé (voir rapport FD-GRAPHICS-006)
+fait      FD-GRAPHICS-007  minicarte générique et recentrage (centerAt), affichée seulement quand
+                           la scène dépasse la zone ; mêmes mécanismes pour Route et Entity
+suivant   FD-GRAPHICS-008  à décider sur l'usage observé (voir rapport FD-GRAPHICS-007)
 ensuite   ports et routage orthogonal extrait de DrawCiel, commandes et historique
 en attente du socle Graphics :
           FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
