@@ -92,8 +92,9 @@ Aucun instantané global n’est garanti : un fichier ouvert peut encore être m
 par un autre processus. `/source` n’autorise pas le journal.
 
 La page utilise uniquement le modèle masqué, échappé par Jinja. Elle n’affiche pas
-le JSONL original brut. Le détail explicite les propriétés du modèle masqué. Aucun JS,
-polling, surveillance filesystem, SSE ou WebSocket. Une modification externe est
+le JSONL original brut. Le détail explicite les propriétés du modèle masqué. Aucun
+polling, surveillance filesystem, SSE ou WebSocket ; le seul JavaScript est le client
+du Graphic Core du flux runtime (FD-GRAPHICS-008), sans requête réseau. Une modification externe est
 visible lors du prochain GET, dans les bornes ci-dessus.
 
 
@@ -187,7 +188,7 @@ POST reste 405. Une lecture partielle est signalée même sur une 404 ; le déta
 ne contourne jamais la fenêtre du Bridge pour chercher une ligne plus loin.
 
 Le lien « Retour au Debug Center » revient à /debug, sans conserver les filtres
-et sans return_to client. Aucun formulaire de filtre ou JavaScript dans le détail.
+et sans return_to client. Aucun formulaire de filtre dans le détail.
 L’URL est le seul état de sélection. Un append conserve normalement le couple ;
 une rotation/réécriture peut rendre le lien obsolète et produire 404. Si le même
 couple ligne/id est réutilisé, le détail montre les données de la lecture actuelle :
@@ -217,7 +218,21 @@ role=img, titre et description référencés ; les types sont explicitement écr
 Les flèches ont un marker local. Sans étape, aucun SVG : « Aucun flux structuré
 disponible pour cet événement. »
 
-Aucune interaction métier, sélection, zoom, pan, JavaScript ou nouvelle lecture.
+Aucune interaction métier ni nouvelle lecture.
+
+## Flux runtime sur le Graphic Core (FD-GRAPHICS-008)
+
+Avec JavaScript, le même `DebugFlowLayout` est projeté par
+`web/debug_flow_scene.build_debug_graphic_scene` en GraphicScene (identités
+`debug-node-<type>`, arêtes `["debug-flow", source, cible]`, catégories génériques
+1 à 5), transportée en JSON inerte et rendue par le Graphic Core via `/debug-flow.js`.
+Le SVG serveur ci-dessus devient le repli statique sans JavaScript. Sélection d'une
+étape (clic, Entrée, Espace, Échap) annoncée par un statut accessible, viewport,
+niveaux de détail et minicarte du moteur ; aucun panneau, les sections de la page
+détaillent l'événement. L'adaptateur ne reçoit que le layout, jamais le DebugError ;
+la scène ne contient ni SQL, ni traceback, ni query, et le nom accessible est borné
+à 256 caractères (valeurs complètes dans les sections). Le schéma reste un ordre
+conceptuel des étapes connues, jamais une trace d'exécution.
 La construction et le layout sont des fonctions pures déterministes depuis le
 DebugError sélectionné. Les détails textuels restent tous accessibles ; les pages
 400/404/409 ne construisent aucun graphe. Les limites du masquage du Bridge restent

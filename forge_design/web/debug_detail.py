@@ -18,6 +18,8 @@ from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.debug_detail import find_debug_event
 from forge_design.tools.debug_flow import build_debug_flow
 from forge_design.web.debug_flow_layout import layout_debug_flow
+from forge_design.web.debug_flow_scene import build_debug_graphic_scene
+from forge_design.web.graphics import scene_json_payload
 from forge_design.web.rendering import render_page
 
 
@@ -79,14 +81,19 @@ def show_debug_detail(
                         "dans la lecture actuelle du journal.",
                         404,
                     )
+    # Flux, layout et scène calculés une seule fois ; aucun moteur sans étape.
+    flow_layout = (
+        layout_debug_flow(build_debug_flow(event)) if event is not None else None
+    )
     return render_page(
         "debug_detail.html",
         {
             "active_page": "debug",
             "current_project": context.inspection,
             "event": event,
-            "flow_layout": layout_debug_flow(build_debug_flow(event))
-            if event is not None
+            "flow_layout": flow_layout,
+            "flow_scene": scene_json_payload(build_debug_graphic_scene(flow_layout))
+            if flow_layout is not None and flow_layout.nodes
             else None,
             "error": error,
             "truncated": result.truncated

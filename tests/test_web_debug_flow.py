@@ -1,5 +1,6 @@
-"""SVG statique accessible, sans étapes inventées ni lecture supplémentaire."""
+"""Flux runtime : Graphic Core et repli SVG, sans étapes inventées ni lecture."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,21 @@ from test_web_recent_projects import call, project, running
 from forge_design.forge.debug_errors import DebugErrorsResult, read_debug_errors
 from forge_design.recent_projects import RecentProjects
 from forge_design.tools.debug_center import DebugCenterTool
+
+# Depuis FD-GRAPHICS-008, seuls le bloc JSON inerte de la scène et le client
+# du Graphic Core sont admis ; tout autre <script> trahirait une injection.
+ALLOWED_SCRIPTS = {
+    '<script type="application/json" data-graphic-scene>',
+    '<script type="module" src="/debug-flow.js">',
+}
+
+
+def foreign_scripts(html: str) -> list[str]:
+    return [
+        tag
+        for tag in re.findall(r"<script\b[^>]*>", html)
+        if tag not in ALLOWED_SCRIPTS
+    ]
 
 
 @pytest.mark.parametrize(
@@ -65,10 +81,13 @@ def test_flow_http(
             path.stat().st_mtime_ns,
         )
         assert (
-            "<script" not in html
+            not foreign_scripts(html)
             and "secret-value" not in html
             and "hidden-value" not in html
         )
+        # Moteur seulement s'il y a des étapes ; sinon ni scène ni client.
+        assert (html.count("data-graphic-scene") == 1) == bool(expected)
+        assert ('src="/debug-flow.js"' in html) == bool(expected)
         doc = SvgDocument()
         doc.feed(html)
         kinds = [

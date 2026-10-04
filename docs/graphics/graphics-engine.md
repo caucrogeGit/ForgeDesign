@@ -208,9 +208,22 @@ opération lève une erreur.
 |---|---|---|
 | Route Explorer (FD-GRAPHICS-002) | `web/route_graph_scene.py` | `/route-graph.js` |
 | Entity Explorer (FD-GRAPHICS-003) | `web/entity_graph_scene.py` | `/entity-graph.js` |
+| Debug Center (FD-GRAPHICS-008) | `web/debug_flow_scene.py` | `/debug-flow.js` |
 
 Sérialisation commune : `web/graphics.py` (`scene_json_payload`). Chaque client
-garde son vocabulaire, ses données opaques et son panneau de détails.
+garde son vocabulaire, ses données opaques et, s'il en a besoin, son panneau de
+détails (Debug n'en a pas : un statut accessible annonce l'étape sélectionnée).
+
+| Capacité | Route | Entity | Debug |
+|---|---|---|---|
+| Type de graphe | structure | structure (avec retours) | flux séquentiel |
+| Layout (Python, client) | multi-colonnes | deux colonnes | une ligne |
+| Couloirs partagés | oui | oui | non (arêtes droites) |
+| Viewport, semantic zoom, minicarte | oui | oui | oui |
+| Libellés d'arêtes | oui | oui (nom de relation) | non |
+| Données opaques | oui | oui | aucune |
+| Panneau spécifique | oui | oui | non (statut) |
+| Source métier | RouteGraph | EntityGraph | DebugFlow |
 
 ## Entity Explorer adapter
 
@@ -305,4 +318,4 @@ détail selon l'échelle (FD-GRAPHICS-006), minicarte et recentrage
 interactif (obstacles, A\*, stabilité au déplacement), grille, glisser de
 nœuds, édition, commandes, historique, multi-sélection, groupes, niveaux de
 détail des arêtes déclarés par le client.
-Debug Center garde son rendu propre.
+Debug Center est le troisième client depuis FD-GRAPHICS-008.

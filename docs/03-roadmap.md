@@ -326,8 +326,12 @@ fait      FD-GRAPHICS-006  niveau de détail générique (overview, normal, deta
                            Route au fit en vue structurelle, Entity au fit en normal
 fait      FD-GRAPHICS-007  minicarte générique et recentrage (centerAt), affichée seulement quand
                            la scène dépasse la zone ; mêmes mécanismes pour Route et Entity
-suivant   FD-GRAPHICS-008  à décider sur l'usage observé (voir rapport FD-GRAPHICS-007)
-ensuite   ports et routage orthogonal extrait de DrawCiel, commandes et historique
+fait      FD-GRAPHICS-008  Debug Center troisième client (flux séquentiel) ; moteur inchangé,
+                           trois clients sur les mêmes modules
+suivant   à décider par le porteur : le rapport FD-GRAPHICS-008 (décision J) conclut que
+                           la phase « architecture des modules spécialisés externes » peut
+                           commencer ; les capacités d'édition (ports, commandes, historique,
+                           routage interactif) suivraient alors les besoins du premier module
 en attente du socle Graphics :
           FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
           FD-CIRCUIT-005   intégration hôte, session, éditeur Web minimal

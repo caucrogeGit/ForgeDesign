@@ -119,7 +119,8 @@ test("aucune connaissance de Route Explorer ni d'un domaine", async () => {
     const source = (await readFile(new URL(name, directory), "utf8")).toLowerCase();
     // Mots entiers : AbortController n'est pas un contrôleur Forge.
     // « route » est absent : le moteur ne connaît pas de route HTTP Forge.
-    for (const word of ["route", "route-explorer", "route explorer", "handler", "controller", "template", "circuit", "resistor", "entity", "relation", "pivot", "many_to_many", "many_to_one", "table", "field", "network"]) {
+    // Mots entiers : requestAnimationFrame ou PAN_STEP ne sont pas des notions Debug.
+    for (const word of ["route", "route-explorer", "route explorer", "handler", "controller", "template", "circuit", "resistor", "entity", "relation", "pivot", "many_to_many", "many_to_one", "table", "field", "network", "request", "router", "sql", "debug", "flow", "step", "timeline", "trace"]) {
       assert.ok(!new RegExp(`\\b${word}\\b`).test(source), `${name} contient « ${word} »`);
     }
     for (const word of ["innerhtml", "eval(", "new function", "fetch(", "localstorage", "document.cookie"]) {

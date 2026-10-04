@@ -28,7 +28,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | Commit | `88f95b75` — feat(drawciel): intégrer Circuit au tunnel de l’activité |
 | Date du commit | 3 octobre 2026 |
 | Date d'analyse | 3 octobre 2026 |
-| Ticket | FD-GRAPHICS-007 |
+| Ticket | FD-GRAPHICS-008 |
 
 ## Journal des références
 
@@ -45,6 +45,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | FD-GRAPHICS-005 | `3a1753a2` | `88f95b75` | Un commit (ADR-309, Circuit dans le tunnel d'activité : mode aperçu en lecture seule, essai d'aperçu non persisté dans `tp.js`, adaptateurs hôte) ; `app.js` inchangé | Aucun sur le routage. Routage étudié (`cleanRoute`, `routeObstructed`, `astarGrid`, `simplifyExact`) : routage fil par fil sur grille avec obstacles, sans allocation globale de couloirs ; principes seulement, aucun code repris. Dette encore vraie : cas particulier par type de composant dans `routeObstructed`, non reproduit |
 | FD-GRAPHICS-006 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Aucun semantic zoom dans DrawCiel : zoom borné 0,25–3, tolérances d'interaction constantes à l'écran (`11/zoom`, `10/zoom`), minicarte canvas, zoom de zone ; rien n'est affiché ou masqué selon l'échelle. Aucune provenance |
 | FD-GRAPHICS-007 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Minicarte : ajustement uniforme et conversion mini → monde de `renderMinimap` / `minimapNavigate` ADAPT (fonctions pures, bornes fixes) ; recentrage `centerWorldPoint` ADAPT (`centerAt`) ; canvas, redessin complet à chaque vue, bornes dépendant de la vue, état et sélecteurs globaux non repris ; glisser à décalage de saisie et politique d'affichage REWRITE |
+| FD-GRAPHICS-008 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Aucun : migration d'un client plateforme (Debug Center), aucun élément DrawCiel repris |
 
 ## Procédure de delta
 

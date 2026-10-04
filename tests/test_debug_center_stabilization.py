@@ -10,6 +10,7 @@ import pytest
 from test_debug_errors import encoded, event, journal
 from test_debug_filters import sample
 from test_web_debug_detail import request
+from test_web_debug_flow import foreign_scripts
 from test_web_entity_graph import SvgDocument
 from test_web_recent_projects import call, project, running
 
@@ -328,7 +329,7 @@ def test_transverse_hostile_http(
             assert len(calls) == count + tool_calls
             assert (
                 "hidden-secret" not in html
-                and "<script" not in html
+                and not foreign_scripts(html)
                 and "<foreignObject" not in html
             )
             assert "script-src 'self'" in headers["Content-Security-Policy"]

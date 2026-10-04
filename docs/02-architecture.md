@@ -606,7 +606,8 @@ avertissements de préparation électrique. Aucun Graphics, rendu, éditeur ni
 simulation.
 Les graphes en lecture seule existants (Entity Explorer, Debug Center) restent
 inchangés ; Route Explorer est devenu le premier client du moteur
-(FD-GRAPHICS-002).
+(FD-GRAPHICS-002). (Depuis : Entity Explorer, FD-GRAPHICS-003 ; Debug Center,
+FD-GRAPHICS-008.)
 
 ### Premier noyau graphique — FD-GRAPHICS-002
 
@@ -717,6 +718,22 @@ Une seule scène, un seul viewport, une minicarte dérivée par instance.
 Entièrement côté navigateur ; seul `minimap.js` rejoint `GRAPHICS_MODULES`.
 Sans JavaScript, pas de minicarte : le repli statique reste défilable et
 complet.
+
+### Troisième client — FD-GRAPHICS-008
+
+```text
+DebugError ─▶ build_debug_flow ─▶ DebugFlow ─▶ layout_debug_flow ─▶ DebugFlowLayout
+   (une seule fois par GET /debug/event)            │
+                                                    ├─▶ SVG Jinja (repli sans JavaScript)
+                                                    └─▶ debug_flow_scene (pur) ─▶ GraphicScene
+                                                          ─▶ scene_json_payload ─▶ /debug-flow.js
+                                                          ─▶ Graphic Core (mêmes modules)
+```
+
+`/debug/event` reste une route Forge MVC ; `/debug-flow.js` est une route fixe de
+plus, comme `/route-graph.js` et `/entity-graph.js`. Aucun module du Graphic Core
+n'a changé ; seules les variantes génériques `category-5` et `category-6`,
+déclarées depuis FD-GRAPHICS-002, ont reçu leur style.
 
 ## 14. Écriture
 
@@ -1513,7 +1530,8 @@ Bridge, redaction, filtres et Tool demeurent inchangés par cette étape Debug C
 
 Le même DebugError sélectionné alimente indépendamment le détail textuel et
 `tools/debug_flow.build_debug_flow` → DebugFlow →
-`web/debug_flow_layout.layout_debug_flow` → SVG Jinja statique.
+`web/debug_flow_layout.layout_debug_flow` → SVG Jinja statique (repli sans
+JavaScript depuis FD-GRAPHICS-008, voir « Troisième client »).
 Les dataclasses logiques et géométriques sont gelées, les collections en tuples.
 IDs fixes par type ; arêtes entre étapes renseignées successives seulement.
 Le layout horizontal ne relit pas le projet et ne connaît ni Tool ni Request.

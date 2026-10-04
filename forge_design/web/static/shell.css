@@ -74,6 +74,9 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .gx-variant-category-2 .gx-node-box { fill: #f7f5fb; }
 .gx-variant-category-3 .gx-node-box { fill: #f4f9f6; }
 .gx-variant-category-4 .gx-node-box { fill: #fcf8f2; }
+/* category-5 et 6 : variantes génériques déclarées depuis FD-GRAPHICS-002, stylées en FD-GRAPHICS-008. */
+.gx-variant-category-5 .gx-node-box { fill: #fbf4f6; }
+.gx-variant-category-6 .gx-node-box { fill: #f3f7f9; }
 .gx-tone-warning .gx-node-box { stroke: #9a3412; stroke-dasharray: 6 3; }
 .gx-tone-muted .gx-node-text { fill: #475467; }
 .gx-node.gx-selected .gx-node-box { stroke: #824029; stroke-width: 5; stroke-dasharray: none; }
@@ -93,6 +96,8 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .gx-detail-overview .gx-variant-category-2 .gx-node-box { fill: #e3daf2; }
 .gx-detail-overview .gx-variant-category-3 .gx-node-box { fill: #d3ebdc; }
 .gx-detail-overview .gx-variant-category-4 .gx-node-box { fill: #f3e2c7; }
+.gx-detail-overview .gx-variant-category-5 .gx-node-box { fill: #f2d5dd; }
+.gx-detail-overview .gx-variant-category-6 .gx-node-box { fill: #d5e3ea; }
 /* Minicarte (FD-GRAPHICS-007) : coin supérieur droit de la scène, bornée, sans texte. */
 .gx-stage { position: relative; }
 .gx-minimap { position: absolute; top: 8px; right: 8px; z-index: 1; max-width: 40%; line-height: 0; background: #fff; border: 1px solid #98a2b3; border-radius: 4px; box-shadow: 0 2px 8px #0002; cursor: crosshair; touch-action: none; }
@@ -106,6 +111,8 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .gx-minimap-nodes.gx-variant-category-2 { fill: #b49fdc; }
 .gx-minimap-nodes.gx-variant-category-3 { fill: #8fc9a5; }
 .gx-minimap-nodes.gx-variant-category-4 { fill: #e2b97a; }
+.gx-minimap-nodes.gx-variant-category-5 { fill: #d895a8; }
+.gx-minimap-nodes.gx-variant-category-6 { fill: #8fb4c7; }
 .gx-minimap-viewport { fill: #82402914; stroke: #824029; stroke-width: 1.5; }
 .graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .graph-details dd { margin-bottom: .75rem; }

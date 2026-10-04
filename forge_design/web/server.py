@@ -88,6 +88,13 @@ def _editor_preview_style(request: Request) -> Response:
     return Response(body=css.read_bytes(), content_type="text/css; charset=utf-8")
 
 
+def _debug_flow_script(request: Request) -> Response:
+    script = files("forge_design.web").joinpath("static/debug-flow.js")
+    return Response(
+        body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
+    )
+
+
 def _entity_graph_script(request: Request) -> Response:
     script = files("forge_design.web").joinpath("static/entity-graph.js")
     return Response(
@@ -233,6 +240,7 @@ def create_application(
     router.add("GET", "/shell.css", _style, public=True)
     router.add("GET", "/route-graph.js", _graph_script, public=True)
     router.add("GET", "/entity-graph.js", _entity_graph_script, public=True)
+    router.add("GET", "/debug-flow.js", _debug_flow_script, public=True)
     for module in GRAPHICS_MODULES:
         router.add(
             "GET", f"/graphics/{module}.js", _graphics_module(module), public=True

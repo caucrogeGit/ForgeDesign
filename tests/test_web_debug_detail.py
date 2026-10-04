@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 import pytest
 from core.http.request import Request
 from test_debug_errors import encoded, journal
+from test_web_debug_flow import foreign_scripts
 from test_web_entity_graph import SvgDocument
 from test_web_recent_projects import call, project, running
 
@@ -220,7 +221,7 @@ def test_full_hostile_detail_and_truncated(
         assert (
             "super-secret" not in html
             and "secret123" not in html
-            and "<script" not in html
+            and not foreign_scripts(html)
         )
         assert "schema_version" not in html and "/source?" not in html
         document = SvgDocument()

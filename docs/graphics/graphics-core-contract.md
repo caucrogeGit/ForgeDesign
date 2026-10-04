@@ -768,6 +768,19 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 - Provenance : principes de `renderMinimap` et `minimapNavigate` de DrawCiel
   (`88f95b75`), adaptés ; état global, canvas et bornes variables non repris.
 
+## Troisième client — FD-GRAPHICS-008
+
+- Debug Center (flux séquentiel) rejoint Route et Entity (structures) sur les
+  **mêmes modules**, sans aucune modification du JavaScript du moteur.
+- Le moteur ne connaît ni flux, ni étape, ni requête, ni contrôleur, ni SQL (test
+  de vocabulaire étendu) ; le routage par couloirs reste une stratégie de layout
+  client, pas une architecture imposée.
+- Seule évolution : le style des variantes génériques `category-5` et
+  `category-6`, déclarées depuis FD-GRAPHICS-002.
+- Constat : l'ajustement d'un flux long et plat (5 étapes, 1460 × 130) donne
+  l'échelle 0,523, donc la vue d'ensemble sans texte ; une politique
+  d'ajustement lisible reste à arbitrer.
+
 ## Questions reportées
 
 | Question | Ticket attendu |
@@ -784,6 +797,7 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 | Groupes, verrous, alignement, pivot commun de rotation | FUTUR |
 | Miroir, rotation libre, redimensionnement | FUTUR |
 | Ports flottants (accroche n'importe où sur le bord, UML) | À étudier avec UML |
-| Convergence des graphes en lecture seule existants (routes, entités, debug) vers les primitives communes | À étudier ; aucune migration imposée |
+| Convergence des graphes en lecture seule existants (routes, entités, debug) vers les primitives communes | **Faite** : Route (002), Entity (003), Debug (008) |
+| Ajustement lisible des scènes allongées (fit en vue d'ensemble pour un flux long et plat) | Constat FD-GRAPHICS-008 ; à arbitrer |
 | Provenance et licence des symboles SVG DrawCiel | Avant toute reprise de symboles |
 | Script de rapport de delta DrawCiel | Si le besoin se confirme |

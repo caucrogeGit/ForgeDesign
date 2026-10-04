@@ -21,10 +21,11 @@
 </dl>
 <p>Cette propriété appartient au contrat Forge. Forge Design applique malgré tout son masquage défensif.</p>
 </section>
-<section aria-labelledby="debug-flow-heading"><h2 id="debug-flow-heading">Flux runtime</h2>
+<section aria-labelledby="debug-flow-heading"{% if flow_scene %} data-debug-flow{% endif %}><h2 id="debug-flow-heading">Flux runtime</h2>
 {% if flow_layout and flow_layout.nodes %}
 <p>Étapes renseignées dans le journal, reliées dans leur ordre conceptuel. Ce schéma ne constitue pas une trace d’exécution.</p>
-<div class="debug-flow-scroll" tabindex="0" aria-label="Flux runtime défilant">
+<div data-graphic-host></div>
+<div class="debug-flow-scroll" data-graphic-fallback tabindex="0" aria-label="Flux runtime défilant">
 <svg class="debug-flow" role="img" aria-labelledby="debug-flow-title debug-flow-description" viewBox="0 0 {{ flow_layout.width }} {{ flow_layout.height }}" width="{{ flow_layout.width }}" height="{{ flow_layout.height }}">
 <title id="debug-flow-title">Flux des étapes runtime connues</title>
 <desc id="debug-flow-description">Seules les informations présentes dans le journal Forge sont représentées, dans un ordre conceptuel de gauche à droite.</desc>
@@ -38,8 +39,11 @@
 <text class="debug-flow-detail" x="{{ item.x + 12 }}" y="{{ item.y + 58 }}">{{ item.detail }}</text>
 </g>{% endfor %}
 </svg></div>
+<script type="application/json" data-graphic-scene>{{ flow_scene }}</script>
+<p data-selection-status role="status" aria-live="polite">La sélection du graphe nécessite JavaScript. Les sections suivantes détaillent l’événement.</p>
 {% else %}<p>Aucun flux structuré disponible pour cet événement.</p>{% endif %}
 </section>
+{% if flow_scene %}<script type="module" src="/debug-flow.js"></script>{% endif %}
 <section aria-labelledby="debug-request"><h2 id="debug-request">Requête HTTP</h2>
 {% if event.request %}<dl>
 <dt>Méthode</dt><dd>{{ event.request.method or '—' }}</dd>
