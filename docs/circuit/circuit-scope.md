@@ -1,5 +1,9 @@
 # Circuit — besoins et périmètre
 
+> **Phase Modules (FD-MODULES-001)** : Circuit quitte le cœur pour le module externe
+> ForgeDesign-Circuit ([architecture](../modules/module-architecture.md)). Ce document
+> migrera avec lui ; aucune nouvelle fonctionnalité Circuit n'est ajoutée au cœur.
+
 Statut : **normatif** pour la Phase 10 (FD-CIRCUIT-001). Ce document fixe ce
 que doit être Circuit avant toute implémentation. Il ne crée ni format, ni
 classe, ni dépendance. Les noms employés (`CircuitDocument`,

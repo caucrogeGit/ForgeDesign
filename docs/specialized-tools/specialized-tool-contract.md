@@ -646,5 +646,5 @@ migration n'est demandée) :
 | Formats d'export et leur publication | Premier outil exportant |
 | Capacité `preview` dans le vocabulaire plateforme | Quand un outil en aura besoin |
 | Identifiant stable interne de ressource (au-delà du chemin) | Format qui le justifie |
-| Registre d'outils spécialisés | Après FD-SPECIALIZED-002 |
+| Registre d'outils spécialisés | **Tranché par FD-MODULES-001** : pas de registre de découverte ; activation explicite de modules externes ([architecture](../modules/module-architecture.md)) |
 | 3D ; Network (sans phase dédiée à ce jour) | Phase 11 pour la 3D ; Network à planifier |

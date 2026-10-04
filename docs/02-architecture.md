@@ -735,6 +735,26 @@ plus, comme `/route-graph.js` et `/entity-graph.js`. Aucun module du Graphic Cor
 n'a changé ; seules les variantes génériques `category-5` et `category-6`,
 déclarées depuis FD-GRAPHICS-002, ont reçu leur style.
 
+### Modules spécialisés externes — FD-MODULES-001
+
+Normatif : [Architecture des modules spécialisés](modules/module-architecture.md).
+
+```text
+configuration de lancement (liste explicite de paquets, jamais le projet ouvert)
+   ↓ activate_modules → import des seuls paquets nommés → FORGE_DESIGN_MODULE
+ModuleDescriptor (SpecializedToolDefinition + version + api_version + codecs +
+                  projections GraphicScene + assets en liste fermée + sonde)
+   ↓ diagnostics (absent, incompatible, doublon…) sans casser le cœur
+hôte (FD-MODULES-002) : routes GET fixes sous /modules/<id>/, assets servis par l'hôte,
+                        lecture et écriture par read/write_specialized_resource
+```
+
+`forge_design.modules` ne dépend que de `forge_design.specialized` ; aucun code
+du cœur n'importe un module (test de frontière). Les modules ne sont pas des
+Tools : le registre reste à cinq. `forge_design/circuit/` est un module à
+extraire (FD-MODULES-003), toléré dans le cœur jusque-là sans nouvelle
+fonctionnalité.
+
 ## 14. Écriture
 
 Principe :

@@ -1,5 +1,9 @@
 # Domaine Circuit V1
 
+> **Phase Modules (FD-MODULES-001)** : Circuit quitte le cœur pour le module externe
+> ForgeDesign-Circuit ([architecture](../modules/module-architecture.md)). Ce document
+> migrera avec lui ; aucune nouvelle fonctionnalité Circuit n'est ajoutée au cœur.
+
 Statut : **normatif et implémenté** (FD-CIRCUIT-003). Code :
 `forge_design/circuit/catalog.py`, `domain.py`, `topology.py`, `validation.py`.
 Format persistant inchangé : [Ressource Circuit V0.1](circuit-resource.md).

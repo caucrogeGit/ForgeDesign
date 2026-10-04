@@ -328,11 +328,11 @@ fait      FD-GRAPHICS-007  minicarte générique et recentrage (centerAt), affic
                            la scène dépasse la zone ; mêmes mécanismes pour Route et Entity
 fait      FD-GRAPHICS-008  Debug Center troisième client (flux séquentiel) ; moteur inchangé,
                            trois clients sur les mêmes modules
-suivant   à décider par le porteur : le rapport FD-GRAPHICS-008 (décision J) conclut que
-                           la phase « architecture des modules spécialisés externes » peut
-                           commencer ; les capacités d'édition (ports, commandes, historique,
-                           routage interactif) suivraient alors les besoins du premier module
-en attente du socle Graphics :
+état      Graphics : socle de visualisation éprouvé (trois clients) ; édition graphique à
+                           construire, pilotée par un module réel (Phase Modules)
+suspendu  Circuit dans le cœur : migration hors core avant toute poursuite fonctionnelle
+                           (Phase Modules, FD-MODULES-001) ; les tickets suivants
+                           deviennent des tickets du module ForgeDesign-Circuit :
           FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
           FD-CIRCUIT-005   intégration hôte, session, éditeur Web minimal
           FD-CIRCUIT-006   export SVG depuis le modèle
@@ -347,6 +347,27 @@ Le moteur de simulation n'est pas choisi avant une étude dédiée.
 Premier jalon de la phase : créer, éditer, valider, enregistrer avec
 révision, rouvrir à l'identique et exporter en SVG un schéma exact, sans
 simulation.
+
+## Phase Modules — modules spécialisés externes
+
+Normatif : [Architecture des modules spécialisés](modules/module-architecture.md)
+(FD-MODULES-001). Forge Design héberge des modules **externes**, installés,
+compatibles et explicitement activés ; il ne contient aucune logique métier de
+domaine. Direction des dépendances : module → cœur, jamais l'inverse. Toute
+nouvelle capacité d'édition générique du Graphic Core est motivée par un besoin
+réel d'un module.
+
+```text
+fait      FD-MODULES-001  frontière core / module, ModuleDescriptor et activation explicite
+                          (forge_design.modules), plan de migration Circuit
+suivant   FD-MODULES-002  hôte Web des modules : activation au lancement, routes GET fixes
+                          sous /modules/<id>/, assets déclarés, zone « Modules », ouverture
+                          et visualisation d'une ressource (faux module, deux navigateurs)
+ensuite   FD-MODULES-003  extraction de Circuit dans ForgeDesign-Circuit (forge-design-circuit,
+                          forge_design_circuit), provenance explicite, retrait du cœur
+puis      tickets du module Circuit (projection, édition, export, simulation), chaque
+          capacité générique d'édition étant extraite vers le cœur quand elle sert
+```
 
 ## Phase 11 — 3D
 
