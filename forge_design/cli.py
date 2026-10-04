@@ -17,8 +17,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--no-browser", action="store_true", help="Ne pas ouvrir le navigateur."
     )
+    parser.add_argument(
+        "--module",
+        action="append",
+        default=[],
+        metavar="PACKAGE",
+        help="Activer un module spécialisé installé (paquet Python, répétable).",
+    )
     args = parser.parse_args(argv)
-    # Garder --version et --help indépendants du chargement du backend Web.
+    # Garder --version et --help indépendants des modules et du backend Web.
+    from forge_design.modules import activate_modules
+
+    try:
+        # Seuls les paquets nommés ici sont importés, jamais depuis un projet.
+        modules = activate_modules(tuple(args.module))
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    for diagnostic in modules.diagnostics:
+        print(
+            f"Module {diagnostic.package} non chargé ({diagnostic.code}) : "
+            f"{diagnostic.message}",
+            file=sys.stderr,
+        )
     from forge_design.web.server import DEFAULT_HOST, DEFAULT_PORT, run_server
 
     def ready() -> None:
@@ -37,7 +58,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
 
     try:
-        run_server(host=DEFAULT_HOST, port=DEFAULT_PORT, on_ready=ready)
+        run_server(
+            host=DEFAULT_HOST, port=DEFAULT_PORT, on_ready=ready, modules=modules
+        )
     except KeyboardInterrupt:
         return 0
     except OSError as error:

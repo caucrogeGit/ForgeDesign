@@ -363,10 +363,19 @@ def test_core_never_imports_circuit() -> None:
 
 
 def test_module_contract_depends_only_on_the_specialized_contract() -> None:
-    allowed = {"forge_design.specialized", "forge_design.modules"}
+    """Contrat et hôte : contrat spécialisé, erreurs de racine, stdlib ; jamais Web."""
+    allowed = {
+        "forge_design.specialized",
+        "forge_design.modules",
+        "forge_design.forge.project_root",
+        "forge_design.forge.project_version",
+    }
     stdlib = {
         "re",
+        "json",
+        "logging",
         "importlib",
+        "importlib.resources",
         "collections.abc",
         "dataclasses",
         "pathlib",

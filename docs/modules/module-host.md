@@ -1,0 +1,101 @@
+# Hôte des modules spécialisés
+
+Mode d'emploi de l'hôte livré par FD-MODULES-002. Contrat normatif :
+[Architecture des modules spécialisés](module-architecture.md).
+
+## Activer un module
+
+```sh
+pip install -e ../ForgeDesign-Circuit          # environnement de développement
+forge-design --module forge_design_circuit     # activation explicite
+forge-design --module pkg_a --module pkg_b     # plusieurs, dans cet ordre
+```
+
+- Sans `--module`, aucun module n'est importé : Forge Design est complet seul.
+- La liste ne vient jamais du projet ouvert (ni `config.py`, ni
+  `bootstrap.py`, ni `mvc/`, ni fichier de projet).
+- Activation **une fois par démarrage**, avant le serveur. Changer de projet
+  ne réactive rien.
+- `--help` et `--version` n'importent ni modules ni backend Web.
+
+| Situation au démarrage | Effet |
+|---|---|
+| Nom malformé ou listé deux fois | message, code de sortie 2, aucun serveur |
+| Module absent | `Module <paquet> non chargé (module-missing) : …` sur stderr ; Forge Design démarre |
+| Import en échec, descripteur absent ou invalide, API incompatible, doublon | diagnostic sur stderr, module non chargé |
+| Asset déclaré introuvable | module non exposé au Web, `asset-missing` sur l'accueil |
+
+L'accueil affiche un bloc « Modules non chargés » (paquet, code, message
+borné, jamais de trace) seulement s'il existe des diagnostics.
+
+## Ce que le module déclare
+
+Un paquet expose `FORGE_DESIGN_MODULE = ModuleDescriptor(...)` :
+`SpecializedToolDefinition` (avec `UiEntry` pour apparaître dans le shell),
+version, `api_version`, un `ResourceBinding(type, codec, scene)` par type,
+`asset_package` et `assets`, et une sonde facultative. Il ne reçoit ni
+Router, ni Request, ni racine de projet, ni chemin système.
+
+## Routes
+
+Pour un module `<id>` exposé muni d'une `UiEntry`, et seulement celles-ci :
+
+| Route | Contenu | Cache |
+|---|---|---|
+| `GET /modules/<id>/` | Libellé, version, API, capacités disponibles, dépendances indisponibles, ressources du projet courant par type | `no-store` |
+| `GET /modules/<id>/resource?type=<type>&path=<chemin>` | Métadonnées (module, type, chemin, version du format, révision `sha256` et taille, validation), diagnostics, visualisation | `no-store` |
+| `GET /modules/<id>/assets/<name>` | Un asset déclaré, avec le type MIME fixé par le cœur | politique des assets du cœur |
+
+Tout le reste (`/modules/<id>/foo`, `/modules/<id>/actions/…`, un asset non
+déclaré, un autre module, une traversée) répond 404, et un POST répond 405.
+L'ordre de la zone « Modules » est l'ordre d'activation.
+
+Paramètres de `/resource` : exactement `type` et `path`, une valeur chacun.
+
+| Cas | Statut |
+|---|---|
+| Paramètre inconnu ou en double, type absent ou inconnu, chemin absent ou trop long | 400 |
+| Chemin refusé par l'hôte (hors espace, suffixe, segment interdit, lien) | 400 |
+| Aucun projet ouvert, racine devenue invalide | 409 |
+| Ressource introuvable | 404 |
+| Ressource invalide, version non prise en charge | 200, avec les diagnostics |
+
+## Inventaire et lecture
+
+- `list_specialized_resources` (cœur) parcourt l'espace de sources du type :
+  - ouverture relative au parent, `O_NOFOLLOW` et `samestat` ;
+  - liens, FIFO et entrées cachées ignorés ;
+  - même politique lexicale que la lecture ;
+  - tri lexical ;
+  - bornes de 512 ressources, 4 096 entrées et 32 niveaux, avec indicateur
+    `truncated`.
+
+  Il ne lit aucun contenu. C'est un inventaire au mieux, pas un instantané
+  atomique.
+- `read_specialized_resource` (cœur) lit le fichier, puis le codec du module
+  décode les octets.
+- Une exception du codec ou de la projection n'interrompt pas la page :
+  message borné `… du module en échec (Classe).`, trace sur la journalisation
+  du serveur (logger `forge_design.modules`).
+
+## Visualisation
+
+Si le type a une projection et que la lecture réussit, la `GraphicScene`
+produite :
+
+- est contrôlée par l'hôte : objet, JSON strict sans `NaN`, au plus 8 Mio ;
+- est copiée, puis transportée par `scene_json_payload` ;
+- est validée et rendue dans le navigateur par le Graphic Core via
+  `/module-resource.js`, un client générique sans vocabulaire de module.
+
+Sélection, viewport, niveaux de détail et minicarte sont ceux du moteur.
+
+Sans JavaScript, les métadonnées et diagnostics restent lisibles, avec le
+message « La visualisation graphique nécessite JavaScript. ». Il n'y a pas de
+rendu SVG côté serveur pour un module.
+
+## Limites V1
+
+Pas d'édition (aucun bouton Enregistrer, Modifier, Créer ou Supprimer), pas
+d'actions POST, pas de JS ni de template fournis par le module, pas d'icône
+d'`UiEntry` affichée, pas de découverte automatique ni d'installation.

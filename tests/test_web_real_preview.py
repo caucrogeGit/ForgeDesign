@@ -958,7 +958,9 @@ def test_run_server_finally_closes_runtime(
     harness.runtime.start(tmp_path)
     order: list[str] = []
 
-    def create(host: str, port: int) -> web.ForgeDesignServer:
+    def create(
+        host: str, port: int, *, modules: object = None
+    ) -> web.ForgeDesignServer:
         return server
 
     def serve(poll_interval: float = 0.5) -> None:
@@ -1158,8 +1160,10 @@ def test_real_server_shutdown_while_running(tmp_path: Path, no_survivors: None) 
 
 def _returning(
     server: web.ForgeDesignServer,
-) -> Callable[[str, int], web.ForgeDesignServer]:
-    def create(host: str, port: int) -> web.ForgeDesignServer:
+) -> Callable[..., web.ForgeDesignServer]:
+    def create(
+        host: str, port: int, *, modules: object = None
+    ) -> web.ForgeDesignServer:
         return server
 
     return create

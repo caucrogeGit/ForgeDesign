@@ -5,6 +5,12 @@
     <h1>Forge Design</h1>
     <p class="intro">Cockpit graphique et plateforme d’outils visuels pour Forge.</p>
     <p><a href="/inspector">Ouvrir Project Inspector</a></p>
+    {% if module_diagnostics %}
+    <section aria-labelledby="module-diagnostics-title" class="module-diagnostics">
+      <h2 id="module-diagnostics-title">Modules non chargés</h2>
+      <ul>{% for item in module_diagnostics %}<li><code>{{ item.package }}</code> — {{ item.code }} : {{ item.message }}</li>{% endfor %}</ul>
+    </section>
+    {% endif %}
     <section aria-labelledby="recent-projects-title">
       <h2 id="recent-projects-title">Projets récents</h2>
       {% if message %}<p role="status">{{ message }}</p>{% endif %}

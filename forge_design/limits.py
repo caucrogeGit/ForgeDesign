@@ -73,3 +73,10 @@ MAX_HISTORY_EVENT_BYTES = 16_384
 MAX_SPECIALIZED_RESOURCE_BYTES = 64 * 1024 * 1024
 MAX_SPECIALIZED_ISSUES = 512
 MAX_SPECIALIZED_LOCATION_DEPTH = 64
+
+# Inventaire des ressources spécialisées (FD-MODULES-002), mêmes ordres de
+# grandeur que l'inventaire des contrats de vue : fichiers retenus, entrées de
+# répertoire examinées au total, profondeur sous l'espace de sources.
+MAX_SPECIALIZED_LISTED_RESOURCES = 512
+MAX_SPECIALIZED_DIRECTORY_ENTRIES = 4096
+MAX_SPECIALIZED_SCAN_DEPTH = 32

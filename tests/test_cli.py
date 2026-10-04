@@ -2,6 +2,7 @@
 
 import errno
 import subprocess
+import sys
 import sysconfig
 from collections.abc import Callable
 from pathlib import Path
@@ -10,6 +11,7 @@ import pytest
 
 from forge_design import __version__
 from forge_design.cli import main
+from forge_design.modules import ModuleActivation
 
 
 def test_installed_version(tmp_path: Path) -> None:
@@ -34,8 +36,11 @@ def test_main_without_arguments(
 
     calls: list[tuple[str, int]] = []
 
-    def run(host: str, port: int, *, on_ready: Callable[[], None]) -> None:
+    def run(
+        host: str, port: int, *, on_ready: Callable[[], None], modules: object
+    ) -> None:
         calls.append((host, port))
+        assert isinstance(modules, ModuleActivation) and modules.modules == ()
         on_ready()
 
     monkeypatch.setattr(server, "run_server", run)
@@ -66,7 +71,9 @@ def test_server_exit(
 ) -> None:
     from forge_design.web import server
 
-    def fail(host: str, port: int, *, on_ready: Callable[[], None]) -> None:
+    def fail(
+        host: str, port: int, *, on_ready: Callable[[], None], modules: object
+    ) -> None:
         raise error
 
     monkeypatch.setattr(server, "run_server", fail)
@@ -80,7 +87,9 @@ def test_server_exit(
 def test_unexpected_error_propagates(monkeypatch: pytest.MonkeyPatch) -> None:
     from forge_design.web import server
 
-    def fail(host: str, port: int, *, on_ready: Callable[[], None]) -> None:
+    def fail(
+        host: str, port: int, *, on_ready: Callable[[], None], modules: object
+    ) -> None:
         raise RuntimeError("unexpected")
 
     monkeypatch.setattr(server, "run_server", fail)
@@ -120,7 +129,7 @@ def test_startup_has_no_business_or_browser_effects(
 
     instance = FakeServer()
 
-    def create(host: str, port: int) -> FakeServer:
+    def create(host: str, port: int, *, modules: object = None) -> FakeServer:
         assert (host, port) == ("127.0.0.1", 8765)
         server.create_application()
         return instance
@@ -156,7 +165,7 @@ def test_browser_after_socket_ready(
             events.append("serve")
             raise KeyboardInterrupt
 
-    def create(host: str, port: int) -> FakeServer:
+    def create(host: str, port: int, *, modules: object = None) -> FakeServer:
         assert (host, port) == ("127.0.0.1", 8765)
         return FakeServer()
 
@@ -187,7 +196,7 @@ def test_version_and_busy_port_never_open_browser(
     def forbidden(url: str) -> bool:
         pytest.fail("Aucun navigateur attendu")
 
-    def busy(host: str, port: int) -> None:
+    def busy(host: str, port: int, *, modules: object = None) -> None:
         raise OSError(errno.EADDRINUSE, "busy")
 
     monkeypatch.setattr(webbrowser, "open", forbidden)
@@ -196,3 +205,72 @@ def test_version_and_busy_port_never_open_browser(
     assert result.value.code == 0
     monkeypatch.setattr(server, "create_server", busy)
     assert main([]) == 1
+
+
+def test_module_option_is_explicit_repeatable_and_never_fatal_when_absent(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forge_design.web import server
+
+    received: list[ModuleActivation] = []
+
+    def run(
+        host: str, port: int, *, on_ready: Callable[[], None], modules: object
+    ) -> None:
+        assert isinstance(modules, ModuleActivation)
+        received.append(modules)
+
+    monkeypatch.setattr(server, "run_server", run)
+    argv = ["--no-browser", "--module", "fd_absent_one", "--module", "fd_absent_two"]
+    assert main(argv) == 0
+    activation = received[0]
+    assert activation.modules == ()
+    assert [(d.package, d.code) for d in activation.diagnostics] == [
+        ("fd_absent_one", "module-missing"),
+        ("fd_absent_two", "module-missing"),
+    ]
+    errors = capsys.readouterr().err
+    assert "Module fd_absent_one non chargé (module-missing)" in errors
+    assert "Module fd_absent_two non chargé (module-missing)" in errors
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--module", "../escape"],
+        ["--module", "dup", "--module", "dup"],
+        ["--module", ""],
+    ],
+)
+def test_malformed_module_configuration_fails_before_server(
+    argv: list[str],
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from forge_design.web import server
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("Le serveur ne doit pas démarrer")
+
+    monkeypatch.setattr(server, "run_server", forbidden)
+    assert main(["--no-browser", *argv]) == 2
+    assert "Configuration des modules" in capsys.readouterr().err
+
+
+def test_help_and_version_import_no_module_machinery() -> None:
+    code = (
+        "import sys\n"
+        "from forge_design.cli import main\n"
+        "for arg in ('--help', '--version'):\n"
+        "    try:\n"
+        "        main([arg])\n"
+        "    except SystemExit:\n"
+        "        pass\n"
+        "prefixes = ('forge_design.web', 'forge_design.modules')\n"
+        "loaded = [m for m in sys.modules if m.startswith(prefixes)]\n"
+        "print(loaded)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert result.stdout.strip().splitlines()[-1] == "[]"

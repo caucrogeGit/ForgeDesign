@@ -745,8 +745,19 @@ configuration de lancement (liste explicite de paquets, jamais le projet ouvert)
 ModuleDescriptor (SpecializedToolDefinition + version + api_version + codecs +
                   projections GraphicScene + assets en liste fermée + sonde)
    ↓ diagnostics (absent, incompatible, doublon…) sans casser le cœur
-hôte (FD-MODULES-002) : routes GET fixes sous /modules/<id>/, assets servis par l'hôte,
+hôte (FD-MODULES-002, fait) : routes GET fixes sous /modules/<id>/, assets servis par l'hôte,
                         lecture et écriture par read/write_specialized_resource
+```
+
+Hôte Web (FD-MODULES-002) :
+
+```text
+forge-design --module PAQUET … ─▶ activate_modules (une fois, hors HTTP)
+   ─▶ create_server(modules=) ─▶ create_application(modules=) ─▶ ModuleHost
+        ├── routes GET exactes /modules/<id>/, /resource, /assets/<name> (Router Forge)
+        ├── shell : zone « Modules » (ContextVar posée par requête, lue par render_page)
+        ├── list_specialized_resources / read_specialized_resource (cœur)
+        └── projection du module ─▶ scene_json_payload ─▶ /module-resource.js ─▶ Graphic Core
 ```
 
 `forge_design.modules` ne dépend que de `forge_design.specialized` ; aucun code

@@ -149,7 +149,7 @@ def test_run_server_closes_on_exit(
 ) -> None:
     server = web.create_server(port=0)
 
-    def create(host: str, port: int) -> WSGIServer:
+    def create(host: str, port: int, *, modules: object = None) -> WSGIServer:
         assert host == "127.0.0.1" and port == 0
         return server
 

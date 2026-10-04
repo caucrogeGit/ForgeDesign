@@ -360,10 +360,10 @@ réel d'un module.
 ```text
 fait      FD-MODULES-001  frontière core / module, ModuleDescriptor et activation explicite
                           (forge_design.modules), plan de migration Circuit
-suivant   FD-MODULES-002  hôte Web des modules : activation au lancement, routes GET fixes
-                          sous /modules/<id>/, assets déclarés, zone « Modules », ouverture
-                          et visualisation d'une ressource (faux module, deux navigateurs)
-ensuite   FD-MODULES-003  extraction de Circuit dans ForgeDesign-Circuit (forge-design-circuit,
+fait      FD-MODULES-002  hôte Web des modules : --module PAQUET, routes GET exactes sous
+                          /modules/<id>/, assets déclarés, zone « Modules », inventaire et
+                          lecture par l'hôte, projection rendue par le Graphic Core
+suivant   FD-MODULES-003  extraction de Circuit dans ForgeDesign-Circuit (forge-design-circuit,
                           forge_design_circuit), provenance explicite, retrait du cœur
 puis      tickets du module Circuit (projection, édition, export, simulation), chaque
           capacité générique d'édition étant extraite vers le cœur quand elle sert

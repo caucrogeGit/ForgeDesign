@@ -26,6 +26,9 @@ li { margin-block: .5rem; overflow-wrap: anywhere; }
 nav { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; margin-top: 1.25rem; }
 nav a { padding: .35rem 0; text-decoration: none; }
 nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-decoration-thickness: .15em; }
+/* Zone Modules (FD-MODULES-002) : distincte de la navigation des outils. */
+.module-navigation { margin-top: .5rem; padding-top: .5rem; border-top: 1px solid #d0d5dd; align-items: baseline; }
+.module-navigation-title { font-size: .75rem; font-weight: 650; letter-spacing: .14em; text-transform: uppercase; color: #765340; }
 
 .current-project { margin-top: 1.25rem; overflow-wrap: anywhere; }
 .current-project p { margin: .5rem 0; }

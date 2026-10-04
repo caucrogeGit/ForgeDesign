@@ -16,6 +16,8 @@ from core.http.router import Router
 
 from forge_design.app import create_tool_registry
 from forge_design.current_project import CurrentProjectContext
+from forge_design.modules import ModuleActivation
+from forge_design.modules.host import ModuleHost
 from forge_design.project_selector import ProjectSelector
 from forge_design.recent_projects import RecentProjects
 from forge_design.web.debug import show_debug
@@ -28,12 +30,14 @@ from forge_design.web.inspector import (
     refresh_project,
     show_inspector,
 )
+from forge_design.web.modules import module_asset, show_module, show_module_resource
 from forge_design.web.real_preview import (
     RealPreviewPanel,
     RealPreviewRuntime,
     real_preview_action,
 )
 from forge_design.web.recent_projects import recent_action, show_home
+from forge_design.web.rendering import ShellModules, with_shell
 from forge_design.web.routes import show_routes
 from forge_design.web.security import is_local_action
 from forge_design.web.source import show_source
@@ -95,6 +99,13 @@ def _debug_flow_script(request: Request) -> Response:
     )
 
 
+def _module_resource_script(request: Request) -> Response:
+    script = files("forge_design.web").joinpath("static/module-resource.js")
+    return Response(
+        body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
+    )
+
+
 def _entity_graph_script(request: Request) -> Response:
     script = files("forge_design.web").joinpath("static/entity-graph.js")
     return Response(
@@ -140,6 +151,7 @@ def create_application(
     *,
     recent_projects: RecentProjects | None = None,
     real_preview: RealPreviewRuntime | None = None,
+    modules: ModuleActivation | None = None,
 ) -> Application:
     """Créer l'application Forge avec ses seules routes publiques explicites.
 
@@ -147,8 +159,12 @@ def create_application(
     Les middlewares Forge par défaut restent en place ; le shell est public.
     Sans runtime fourni, la preview réelle reste désactivée : son origine
     d'encadrement n'est connue qu'après le bind (create_server).
+    Les modules spécialisés arrivent déjà activés (activate_modules, hors de la
+    composition HTTP) ; sans activation, aucun module, aucune route /modules.
     """
     registry = create_tool_registry()
+    host = ModuleHost(modules if modules is not None else ModuleActivation((), ()))
+    shell = ShellModules(host.navigation(), host.diagnostics())
     context = CurrentProjectContext()
     store = recent_projects if recent_projects is not None else RecentProjects()
     runtime = real_preview if real_preview is not None else RealPreviewRuntime()
@@ -236,23 +252,30 @@ def create_application(
         )
 
     router = Router()
-    router.add("GET", "/", index, public=True, no_store=True)
-    router.add("GET", "/shell.css", _style, public=True)
-    router.add("GET", "/route-graph.js", _graph_script, public=True)
-    router.add("GET", "/entity-graph.js", _entity_graph_script, public=True)
-    router.add("GET", "/debug-flow.js", _debug_flow_script, public=True)
+
+    def add(
+        method: str,
+        pattern: str,
+        handler: Callable[[Request], Response],
+        **options: Any,
+    ) -> None:
+        # Chaque page connaît la zone Modules de cette application (shell commun).
+        router.add(method, pattern, with_shell(handler, shell), **options)
+
+    add("GET", "/", index, public=True, no_store=True)
+    add("GET", "/shell.css", _style, public=True)
+    add("GET", "/route-graph.js", _graph_script, public=True)
+    add("GET", "/entity-graph.js", _entity_graph_script, public=True)
+    add("GET", "/module-resource.js", _module_resource_script, public=True)
+    add("GET", "/debug-flow.js", _debug_flow_script, public=True)
     for module in GRAPHICS_MODULES:
-        router.add(
-            "GET", f"/graphics/{module}.js", _graphics_module(module), public=True
-        )
-    router.add("GET", "/inspector", show, public=True, no_store=True)
+        add("GET", f"/graphics/{module}.js", _graphics_module(module), public=True)
+    add("GET", "/inspector", show, public=True, no_store=True)
     # Ces actions runtime sans session exigent une origine locale exacte.
-    router.add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
-    router.add("POST", "/project/close", close, public=True, csrf=False, no_store=True)
-    router.add(
-        "POST", "/project/refresh", refresh, public=True, csrf=False, no_store=True
-    )
-    router.add(
+    add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
+    add("POST", "/project/close", close, public=True, csrf=False, no_store=True)
+    add("POST", "/project/refresh", refresh, public=True, csrf=False, no_store=True)
+    add(
         "POST",
         "/project/open-recent",
         open_recent,
@@ -260,7 +283,7 @@ def create_application(
         csrf=False,
         no_store=True,
     )
-    router.add(
+    add(
         "POST",
         "/project/recent/remove",
         remove_recent,
@@ -268,24 +291,22 @@ def create_application(
         csrf=False,
         no_store=True,
     )
-    router.add("GET", "/routes", routes, public=True, no_store=True)
-    router.add("GET", "/entities", entities, public=True, no_store=True)
-    router.add("GET", "/debug", debug, public=True, no_store=True)
-    router.add("GET", "/debug/event", debug_detail, public=True, no_store=True)
-    router.add("GET", "/source", source, public=True, no_store=True)
-    router.add("GET", "/templates", templates, public=True, no_store=True)
-    router.add("GET", "/templates/view", template, public=True, no_store=True)
-    router.add("GET", "/templates/tree", template_tree, public=True, no_store=True)
-    router.add("GET", "/editor", editor, public=True, no_store=True)
+    add("GET", "/routes", routes, public=True, no_store=True)
+    add("GET", "/entities", entities, public=True, no_store=True)
+    add("GET", "/debug", debug, public=True, no_store=True)
+    add("GET", "/debug/event", debug_detail, public=True, no_store=True)
+    add("GET", "/source", source, public=True, no_store=True)
+    add("GET", "/templates", templates, public=True, no_store=True)
+    add("GET", "/templates/view", template, public=True, no_store=True)
+    add("GET", "/templates/tree", template_tree, public=True, no_store=True)
+    add("GET", "/editor", editor, public=True, no_store=True)
     # Document encadré par l'éditeur : CSP et X-Frame-Options propres à la réponse.
-    router.add("GET", "/editor/preview", editor_preview, public=True, no_store=True)
-    router.add("GET", "/editor-preview.css", _editor_preview_style, public=True)
+    add("GET", "/editor/preview", editor_preview, public=True, no_store=True)
+    add("GET", "/editor-preview.css", _editor_preview_style, public=True)
     # Mutations du .design.json : même contrôle d'origine locale exacte.
-    router.add(
-        "POST", "/editor/action", editor_post, public=True, csrf=False, no_store=True
-    )
+    add("POST", "/editor/action", editor_post, public=True, csrf=False, no_store=True)
     # Preview réelle : seules mutations du runtime, jamais par GET.
-    router.add(
+    add(
         "POST",
         "/editor/real-preview/start",
         real_preview_start,
@@ -293,7 +314,7 @@ def create_application(
         csrf=False,
         no_store=True,
     )
-    router.add(
+    add(
         "POST",
         "/editor/real-preview/stop",
         real_preview_stop,
@@ -301,6 +322,23 @@ def create_application(
         csrf=False,
         no_store=True,
     )
+    # Modules : routes exactes, seulement pour les modules exposés munis d'une
+    # UiEntry ; jamais de motif dynamique ni de POST sous /modules.
+    for entry in host.navigation():
+
+        def page(request: Request, module_id: str = entry.module_id) -> Response:
+            return show_module(request, host, module_id, context)
+
+        def resource(request: Request, module_id: str = entry.module_id) -> Response:
+            return show_module_resource(request, host, module_id, context)
+
+        add("GET", entry.url, page, public=True, no_store=True)
+        add("GET", entry.url + "resource", resource, public=True, no_store=True)
+        for asset in host.assets(entry.module_id):
+            url = host.module(entry.module_id).descriptor.asset_url(asset.name)
+            add(
+                "GET", url, module_asset(host, entry.module_id, asset.name), public=True
+            )
     return Application(router, api_routes_module=None)
 
 
@@ -327,6 +365,7 @@ def create_server(
     *,
     recent_projects: RecentProjects | None = None,
     real_preview: RealPreviewRuntime | None = None,
+    modules: ModuleActivation | None = None,
 ) -> ForgeDesignServer:
     """Ouvrir l'écoute locale servant exclusivement l'adaptateur WSGI Forge.
 
@@ -343,7 +382,7 @@ def create_server(
         raise ValueError("Le port doit être compris entre 0 et 65535.")
     runtime = real_preview if real_preview is not None else RealPreviewRuntime()
     application = create_application(
-        recent_projects=recent_projects, real_preview=runtime
+        recent_projects=recent_projects, real_preview=runtime, modules=modules
     )
     wsgi_app = create_wsgi_app(application)
     server = make_server(host, port, wsgi_app, server_class=ForgeDesignServer)
@@ -393,6 +432,7 @@ def run_server(
     port: int = DEFAULT_PORT,
     *,
     on_ready: Callable[[], None] | None = None,
+    modules: ModuleActivation | None = None,
 ) -> None:
     """Servir Forge jusqu'à Ctrl+C, SIGTERM ou SIGHUP, puis fermer preview et écoute.
 
@@ -400,7 +440,10 @@ def run_server(
     normale.
     """
     # Signaux à l'extérieur : un second signal reste ignoré pendant la fermeture.
-    with _stop_signals_as_interrupt(), create_server(host, port) as server:
+    with (
+        _stop_signals_as_interrupt(),
+        create_server(host, port, modules=modules) as server,
+    ):
         try:
             if on_ready is not None:
                 on_ready()

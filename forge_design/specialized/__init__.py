@@ -1,9 +1,14 @@
 """Socle des ressources d'outils spécialisés (FD-SPECIALIZED-002).
 
 Déclarations gelées du contrat FD-SPECIALIZED-001 et hôte de lecture/écriture
-contrôlée. Aucun outil, registre, UI, runtime ni export n'est fourni ici.
+contrôlée, inventaire confiné (FD-MODULES-002). Aucun outil, registre, UI,
+runtime ni export n'est fourni ici.
 """
 
+from forge_design.specialized.listing import (
+    SpecializedResourceListing,
+    list_specialized_resources,
+)
 from forge_design.specialized.models import (
     PLATFORM_CAPABILITIES,
     ErrorCategory,
@@ -48,6 +53,7 @@ __all__ = [
     "SpecializedResourceCodec",
     "SpecializedResourceConflictError",
     "SpecializedResourceError",
+    "SpecializedResourceListing",
     "SpecializedResourceHistoryError",
     "SpecializedResourceRef",
     "SpecializedResourceRefusedError",
@@ -58,6 +64,7 @@ __all__ = [
     "SpecializedWriteResult",
     "UiEntry",
     "UnsupportedSpecializedVersionError",
+    "list_specialized_resources",
     "read_specialized_resource",
     "write_specialized_resource",
 ]

@@ -64,7 +64,12 @@ def test_packaged_modules_and_static_contract() -> None:
 @pytest.mark.parametrize(
     "path",
     [STATIC / f"graphics/{name}.js" for name in GRAPHICS]
-    + [STATIC / "route-graph.js", STATIC / "entity-graph.js", STATIC / "debug-flow.js"]
+    + [
+        STATIC / "route-graph.js",
+        STATIC / "entity-graph.js",
+        STATIC / "debug-flow.js",
+        STATIC / "module-resource.js",
+    ]
     + SUITES
     + [ROOT / "tests/js/graphics/fake-dom.mjs", ROOT / "tests/js/graphics/scenes.mjs"],
     ids=lambda path: path.name,
@@ -74,7 +79,7 @@ def test_node_check(path: Path) -> None:
 
 
 def test_node_suites() -> None:
-    assert len(SUITES) == 13
+    assert len(SUITES) == 14
     result = subprocess.run(
         [_node(), "--test", *map(str, SUITES)],
         capture_output=True,

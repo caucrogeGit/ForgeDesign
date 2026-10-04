@@ -40,7 +40,8 @@ def test_graphics_assets_are_fixed_forge_routes() -> None:
         "svg-renderer",
         "viewport",
     )
-    assert 'router.add(\n            "GET", f"/graphics/{module}.js"' in server
+    # Enregistrées par l'enveloppe add() de create_application (shell des modules).
+    assert 'add("GET", f"/graphics/{module}.js", _graphics_module(module)' in server
     static = PACKAGE / "web/static/graphics"
     assert sorted(p.stem for p in static.glob("*.js")) == sorted(GRAPHICS_MODULES)
 

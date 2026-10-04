@@ -37,6 +37,7 @@ DiagnosticCode = Literal[
     "duplicate-module",
     "duplicate-resource-type",
     "dependency-probe-failed",
+    "asset-missing",
 ]
 
 

@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+{% block title %}Ressource — {{ module_label }} — Forge Design{% endblock %}
+{% block head %}{% for href in styles %}<link rel="stylesheet" href="{{ href }}">{% endfor %}{% endblock %}
+{% block content %}
+<p class="eyebrow">Module spécialisé · consultation</p>
+<h1>Ressource — {{ module_label }}</h1>
+<p><a href="{{ module.descriptor.base_url }}">Retour au module</a></p>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if view %}
+<section aria-labelledby="resource-summary">
+<h2 id="resource-summary">Ressource</h2>
+<dl>
+<dt>Module</dt><dd><code>{{ module.descriptor.id }}</code> {{ module.descriptor.version }}</dd>
+<dt>Type</dt><dd><code>{{ view.resource_type.id }}</code> ({{ view.resource_type.format_id }})</dd>
+<dt>Chemin</dt><dd><code>{{ view.path }}</code></dd>
+{% if view.read and view.read.ref %}<dt>Version du format</dt><dd>{{ view.read.ref.format_version }}</dd>{% endif %}
+{% if view.read and view.read.revision %}<dt>Révision</dt><dd><code>sha256:{{ view.read.revision.digest[:16] }}</code> · {{ view.read.revision.size }} octets</dd>{% endif %}
+<dt>Validation</dt><dd>{% if view.runtime_error %}runtime-error{% elif view.read.error %}{{ view.read.error }}{% elif view.read.issues %}valide, avec avertissements{% else %}valide{% endif %}</dd>
+</dl>
+{% if view.runtime_error %}<p role="alert">{{ view.runtime_error }}</p>{% endif %}
+{% if view.read and view.read.issues %}
+<h3>Diagnostics</h3>
+<ul data-resource-issues>{% for issue in view.read.issues %}<li>{{ issue.severity }} · <code>{{ issue.code }}</code> · {{ issue.level }} : {{ issue.message }}{% if issue.location %} ({{ issue.location | join('/') }}){% endif %}</li>{% endfor %}</ul>
+{% if view.read.truncated %}<p>Diagnostics tronqués.</p>{% endif %}
+{% endif %}
+</section>
+{% if scene %}
+<section aria-labelledby="resource-graph" data-module-graph>
+<h2 id="resource-graph">Visualisation</h2>
+<div data-graphic-host></div>
+<p data-graphic-fallback>La visualisation graphique nécessite JavaScript.</p>
+<script type="application/json" data-graphic-scene>{{ scene }}</script>
+<p data-selection-status role="status" aria-live="polite">La sélection du graphe nécessite JavaScript.</p>
+</section>
+<script type="module" src="/module-resource.js"></script>
+{% elif view.scene_error %}
+<p role="alert">{{ view.scene_error }}</p>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,8 +1,9 @@
 # Architecture des modules spécialisés
 
-Statut : **normatif pour la phase Modules** (FD-MODULES-001). Contrat
-exécutable minimal : `forge_design/modules/` (descripteur et activation). L'hôte
-Web (routes, assets, pages) arrive avec FD-MODULES-002.
+Statut : **normatif pour la phase Modules** (FD-MODULES-001, hôte Web
+FD-MODULES-002). Code : `forge_design/modules/` (descripteur, activation,
+`ModuleHost`), `forge_design/specialized/listing.py` (inventaire),
+`forge_design/web/modules.py` (pages). Mode d'emploi : [Hôte des modules](module-host.md).
 
 ## Objectif
 
@@ -84,9 +85,10 @@ l'ordre donné, les seuls paquets nommés, puis lit leur descripteur.
 | C. Entry points allowlistés | refusée en V1 | balaye l'environnement ; l'allowlist n'apporte rien de plus qu'un nom explicite |
 | D. Registre statique dans l'application | **retenue** (lieu) | la liste arrive à la racine de composition, jamais depuis un projet |
 
-La liste vient de la configuration de lancement de Forge Design (option de
-ligne de commande ou configuration utilisateur, définie par FD-MODULES-002),
-jamais du projet ouvert. Sans liste, aucun module n'est importé.
+La liste vient de la ligne de commande, **`forge-design --module PAQUET`**
+(répétable, FD-MODULES-002), jamais du projet ouvert. Sans option, aucun module
+n'est importé. L'activation a lieu une fois par démarrage, hors de la
+composition HTTP, puis est injectée dans `create_application(modules=…)`.
 
 ## Compatibilité
 
@@ -138,7 +140,10 @@ persistance dans un module : `Path(racine) / …`, `open(…)`, `os.open(…)`.
 ## Assets
 
 - Liste fermée déclarée par le module, servie par l'hôte à
-  `/modules/<id>/assets/<name>`.
+  `/modules/<id>/assets/<name>`. Chaque asset est vérifié et lu à la
+  construction de l'hôte ; un asset introuvable retire le module du Web avec
+  le diagnostic `asset-missing`. Les CSS du module ne sont chargées que sur
+  ses pages ; aucun JS de module n'est chargé en V1.
 - Type MIME fixé par l'hôte selon l'extension (`.js`, `.css`, `.svg`).
 - Aucun chemin d'utilisateur, aucun serveur statique générique, aucune
   traversée possible.
@@ -149,9 +154,16 @@ persistance dans un module : `Path(racine) / …`, `open(…)`, `os.open(…)`.
 
 V1 (FD-MODULES-002) : **ouvrir et visualiser** seulement.
 
-- L'hôte enregistre lui-même, pour chaque module actif, des routes **GET**
-  fixes : page du module, vue d'une ressource lue par l'hôte puis projetée
-  par le module, assets.
+- L'hôte enregistre lui-même, pour chaque module exposé muni d'une
+  `UiEntry`, des routes **GET** exactes : `/modules/<id>/` (page : version,
+  capacités, dépendances indisponibles, ressources inventoriées),
+  `/modules/<id>/resource?type=…&path=…` (lecture par l'hôte, projection par
+  le module, rendu par le Graphic Core) et `/modules/<id>/assets/<name>` par
+  asset déclaré. Templates du cœur ; le module ne fournit aucun HTML.
+- Inventaire : `list_specialized_resources` (cœur), jamais le module.
+- Sans JavaScript : métadonnées et diagnostics lisibles, message « La
+  visualisation graphique nécessite JavaScript. » ; pas de second renderer
+  SVG côté serveur.
 - Le module ne fournit pas de handler Forge MVC : il ne voit ni Request, ni
   Response, ni Router.
 - L'édition viendra par des **actions bornées** POST
@@ -219,6 +231,8 @@ D'où l'activation explicite, jamais depuis un projet.
 | Identifiant déjà actif | `duplicate-module` |
 | Espace et suffixe déjà pris | `duplicate-resource-type` |
 | Sonde de dépendances en échec | `dependency-probe-failed`, capacités dépendantes indisponibles, module actif |
+| Asset déclaré introuvable | `asset-missing`, module non exposé au Web |
+| Codec ou projection du module en exception | page ressource : erreur bornée (`… du module en échec (Classe).`), trace sur la journalisation du serveur, jamais dans la page |
 
 Un descripteur invalide lève une erreur à sa construction, donc à l'import du
 module : `module-import-failed`. Aucune de ces situations ne rend Forge Design
