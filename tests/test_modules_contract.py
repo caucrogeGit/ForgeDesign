@@ -6,6 +6,7 @@ fourni par un importeur injecté, sans toucher sys.path ni installer de paquet.
 
 import ast
 import json
+import tomllib
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -353,13 +354,30 @@ def _imports(path: Path) -> set[str]:
 
 
 def test_core_never_imports_circuit() -> None:
-    """Direction des dépendances : seul forge_design/circuit (à migrer) s'importe."""
+    """Direction des dépendances : le cœur n'importe jamais le module Circuit."""
+    assert not (PACKAGE / "circuit").exists()
     for path in sorted(PACKAGE.rglob("*.py")):
-        if path.is_relative_to(PACKAGE / "circuit"):
-            continue
         for name in _imports(path):
             assert not name.startswith("forge_design.circuit"), path
             assert not name.startswith("forge_design_circuit"), path
+
+
+def test_core_distribution_ships_no_circuit() -> None:
+    """FD-MODULES-003 : Circuit vit dans ForgeDesign-Circuit, hors de la roue."""
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    setuptools = config["tool"]["setuptools"]
+    names = [
+        *setuptools["packages"],
+        *setuptools["package-data"],
+        *config["project"]["dependencies"],
+    ]
+    assert not [name for name in names if "circuit" in name.lower()]
+    assert not [path for path in PACKAGE.rglob("*") if "circuit" in path.name.lower()]
+    # Code livré (pas la documentation) : aucun vocabulaire du domaine Circuit.
+    for pattern in ("*.py", "*.js", "*.html", "*.css", "*.json"):
+        for path in PACKAGE.rglob(pattern):
+            assert "circuit" not in path.read_text(encoding="utf-8").lower(), path
+    assert not list((ROOT / "tests").glob("*circuit*"))
 
 
 def test_module_contract_depends_only_on_the_specialized_contract() -> None:

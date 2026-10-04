@@ -1,6 +1,12 @@
 # Rapport — FD-CIRCUIT-003
 
-Contrat normatif : [Domaine Circuit V1](../circuit/circuit-domain.md).
+> **Histoire avant extraction.** Ce rapport décrit Circuit lorsqu'il vivait dans le
+> cœur (`forge_design/circuit/`, `docs/circuit/`). Depuis FD-MODULES-003, Circuit est
+> le module externe ForgeDesign-Circuit (paquet `forge_design_circuit`) ; ses
+> documents y ont été déplacés et les liens ci-dessous mènent au
+> [renvoi](../circuit/README.md). Le reste du rapport n'est pas réécrit.
+
+Contrat normatif : [Domaine Circuit V1](../circuit/README.md).
 
 ## Ticket et objectif
 

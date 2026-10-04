@@ -25,10 +25,10 @@ copie automatique, aucun suivi du HEAD en runtime.
 
 | Champ | Valeur |
 |---|---|
-| Commit | `88f95b75` — feat(drawciel): intégrer Circuit au tunnel de l’activité |
-| Date du commit | 3 octobre 2026 |
-| Date d'analyse | 3 octobre 2026 |
-| Ticket | FD-GRAPHICS-008 |
+| Commit | `9a38dce8` — feat(editeur): proposer une palette de texte à dix couleurs |
+| Date du commit | 4 octobre 2026 |
+| Date d'analyse | 4 octobre 2026 |
+| Ticket | FD-MODULES-003 |
 
 ## Journal des références
 
@@ -46,6 +46,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | FD-GRAPHICS-006 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Aucun semantic zoom dans DrawCiel : zoom borné 0,25–3, tolérances d'interaction constantes à l'écran (`11/zoom`, `10/zoom`), minicarte canvas, zoom de zone ; rien n'est affiché ou masqué selon l'échelle. Aucune provenance |
 | FD-GRAPHICS-007 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Minicarte : ajustement uniforme et conversion mini → monde de `renderMinimap` / `minimapNavigate` ADAPT (fonctions pures, bornes fixes) ; recentrage `centerWorldPoint` ADAPT (`centerAt`) ; canvas, redessin complet à chaque vue, bornes dépendant de la vue, état et sélecteurs globaux non repris ; glisser à décalage de saisie et politique d'affichage REWRITE |
 | FD-GRAPHICS-008 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Aucun : migration d'un client plateforme (Debug Center), aucun élément DrawCiel repris |
+| FD-MODULES-003 | `88f95b75` | `9a38dce8` | Un commit SéquenCiel (palette de texte de l'éditeur riche), aucun fichier DrawCiel modifié | Projection Circuit du module ForgeDesign-Circuit : composant centré et emprise permutée à 90° (`componentBox`) ADAPT ; borne = position locale tournée (`localTerminal`, `terminalPort`) et ordre N → E → S → W (`rotateSide`) REWRITE en arithmétique entière ; routes persistées respectées, A* et nettoyage de route non repris ; aucun code DrawCiel copié |
 
 ## Procédure de delta
 

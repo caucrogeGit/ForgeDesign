@@ -5,6 +5,10 @@ contrôlée, inventaire confiné (FD-MODULES-002). Aucun outil, registre, UI,
 runtime ni export n'est fourni ici.
 """
 
+# API publique des modules externes (FD-MODULES-003) : un codec spécialisé
+# n'importe jamais forge_design.json_strict ni forge_design.limits directement.
+from forge_design.json_strict import loads_strict_json
+from forge_design.limits import MAX_SPECIALIZED_ISSUES, MAX_SPECIALIZED_LOCATION_DEPTH
 from forge_design.specialized.listing import (
     SpecializedResourceListing,
     list_specialized_resources,
@@ -40,6 +44,8 @@ from forge_design.specialized.resource import (
 )
 
 __all__ = [
+    "MAX_SPECIALIZED_ISSUES",
+    "MAX_SPECIALIZED_LOCATION_DEPTH",
     "PLATFORM_CAPABILITIES",
     "ErrorCategory",
     "InvalidSpecializedResourceError",
@@ -65,6 +71,7 @@ __all__ = [
     "UiEntry",
     "UnsupportedSpecializedVersionError",
     "list_specialized_resources",
+    "loads_strict_json",
     "read_specialized_resource",
     "write_specialized_resource",
 ]

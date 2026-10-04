@@ -520,7 +520,8 @@ outil témoin limité aux tests. `Tool` et son registre restent inchangés.
 
 ### Frontière conceptuelle de Circuit — FD-CIRCUIT-001
 
-Périmètre normatif : [Circuit — besoins et périmètre](circuit/circuit-scope.md).
+Périmètre normatif : Circuit — besoins et périmètre, désormais dans le module
+ForgeDesign-Circuit ([renvoi](circuit/README.md)).
 **Rien de ce qui suit n'est implémenté** : les noms désignent des
 responsabilités, pas des classes existantes.
 
@@ -569,7 +570,11 @@ jamais via Graphics. Le noyau est explicitement 2D ; la 3D aura son moteur.
 
 ### Ressource Circuit V0.1 — FD-CIRCUIT-002
 
-Format normatif : [Ressource Circuit V0.1](circuit/circuit-resource.md).
+Format normatif : Ressource Circuit V0.1 ([renvoi](circuit/README.md)).
+
+> Depuis FD-MODULES-003, ce code et ce document vivent dans le module externe
+> ForgeDesign-Circuit ([renvoi](circuit/README.md)) ; le cœur ne contient plus
+> `forge_design.circuit`.
 
 ```text
 forge_design.circuit
@@ -588,7 +593,11 @@ Graphics sans `GraphicsDocument`. Circuit n'est enregistré dans aucun registre.
 
 ### Domaine Circuit V1 — FD-CIRCUIT-003
 
-Contrat : [Domaine Circuit V1](circuit/circuit-domain.md).
+Contrat : Domaine Circuit V1 ([renvoi](circuit/README.md)).
+
+> Depuis FD-MODULES-003, ce code et ce document vivent dans le module externe
+> ForgeDesign-Circuit ([renvoi](circuit/README.md)) ; le cœur ne contient plus
+> `forge_design.circuit`.
 
 ```text
 forge_design.circuit
@@ -762,9 +771,10 @@ forge-design --module PAQUET … ─▶ activate_modules (une fois, hors HTTP)
 
 `forge_design.modules` ne dépend que de `forge_design.specialized` ; aucun code
 du cœur n'importe un module (test de frontière). Les modules ne sont pas des
-Tools : le registre reste à cinq. `forge_design/circuit/` est un module à
-extraire (FD-MODULES-003), toléré dans le cœur jusque-là sans nouvelle
-fonctionnalité.
+Tools : le registre reste à cinq. Circuit est extrait dans le dépôt
+ForgeDesign-Circuit (FD-MODULES-003) : distribution `forge-design-circuit`,
+paquet `forge_design_circuit`, activé par `--module forge_design_circuit`. Le
+cœur ne livre plus aucun code Circuit ([renvoi](circuit/README.md)).
 
 ## 14. Écriture
 

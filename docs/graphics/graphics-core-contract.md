@@ -532,7 +532,7 @@ Circuit se projette ainsi :
 Paramètres : `grid_required = true`, rotations admises 0/90/180/270, mode de
 route `orthogonal`. Commandes de domaine : relier deux bornes, insérer une
 jonction sur une connexion, supprimer une jonction de degré 2. Le
-[périmètre Circuit](../circuit/circuit-scope.md) précise ce qui relève du
+[périmètre Circuit](../circuit/README.md) (module ForgeDesign-Circuit) précise ce qui relève du
 domaine.
 
 ## Flowchart

@@ -492,7 +492,7 @@ automatique ; script de delta éventuel plus tard.
 
 ## Impact sur Circuit
 
-[`circuit-scope.md`](../circuit/circuit-scope.md) est complété, sans annuler
+[`circuit-scope.md`](../circuit/README.md) est complété, sans annuler
 de décision :
 
 - frontière Graphics / Circuit en tête du document ;

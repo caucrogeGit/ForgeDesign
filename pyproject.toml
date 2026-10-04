@@ -17,12 +17,13 @@ forge-design = "forge_design.cli:main"
 dev = ["pytest>=8", "ruff>=0.9", "pyright>=1.1.390"]
 
 [tool.setuptools]
-packages = ["forge_design", "forge_design.circuit", "forge_design.contracts", "forge_design.design", "forge_design.editor", "forge_design.forge", "forge_design.generate", "forge_design.graphics", "forge_design.modules", "forge_design.tools", "forge_design.platform", "forge_design.preview", "forge_design.real_preview", "forge_design.safewrite", "forge_design.specialized", "forge_design.web"]
+packages = ["forge_design", "forge_design.contracts", "forge_design.design", "forge_design.editor", "forge_design.forge", "forge_design.generate", "forge_design.graphics", "forge_design.modules", "forge_design.tools", "forge_design.platform", "forge_design.preview", "forge_design.real_preview", "forge_design.safewrite", "forge_design.specialized", "forge_design.web"]
 
 [tool.setuptools.package-data]
+# PEP 561 : API typée pour les modules externes (FD-MODULES-003).
+"forge_design" = ["py.typed"]
 "forge_design.design" = ["design.schema.json"]
 "forge_design.contracts" = ["view_contract.schema.json"]
-"forge_design.circuit" = ["circuit.schema.json"]
 "forge_design.web" = ["templates/editor.html", "templates/preview_frame.html", "templates/template_tree.html", "templates/templates.html", "templates/template_view.html", "templates/debug_detail.html", "templates/debug.html", "templates/entities.html", "templates/routes.html", "templates/source.html", "templates/layout.html", "templates/index.html", "templates/inspector.html", "templates/module.html", "templates/module_resource.html", "static/shell.css", "static/editor-preview.css", "static/route-graph.js", "static/entity-graph.js", "static/debug-flow.js", "static/module-resource.js", "static/graphics/detail-level.js", "static/graphics/engine.js", "static/graphics/geometry.js", "static/graphics/minimap.js", "static/graphics/model.js", "static/graphics/scene.js", "static/graphics/svg-renderer.js", "static/graphics/viewport.js"]
 
 [tool.setuptools.dynamic]

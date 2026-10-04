@@ -287,6 +287,14 @@ dépôt** initialisé par copie du contenu à un commit source nommé, avec un
 fichier de provenance (commits source, chemins, rapports). Puis suppression du
 cœur dans un commit ultérieur. Aucune réécriture d'historique.
 
+**Fait** (FD-MODULES-003) : dépôt `ForgeDesign-Circuit` créé depuis le commit
+source `2a0db00` avec `PROVENANCE.md`, projection `CircuitDocument →
+GraphicScene` ajoutée dans le module, puis `forge_design/circuit/`, ses tests
+et ses documents retirés du cœur ([renvoi](../circuit/README.md)). Le cœur
+expose pour cela `loads_strict_json`, `MAX_SPECIALIZED_ISSUES` et
+`MAX_SPECIALIZED_LOCATION_DEPTH` dans `forge_design.specialized`, et livre
+`py.typed`.
+
 ## Out of scope V1
 
 - Découverte automatique, entry points, `pkgutil`, chargement de paquets

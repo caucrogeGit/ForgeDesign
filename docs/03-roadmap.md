@@ -287,8 +287,8 @@ registre et intégration seulement ensuite, si un besoin réel les justifie.
 
 ## Phase 10 — Circuit
 
-Périmètre normatif : [Circuit — besoins et périmètre](circuit/circuit-scope.md)
-(FD-CIRCUIT-001). Circuit V1 est un éditeur de schémas électriques exacts ;
+Périmètre normatif : Circuit — besoins et périmètre (FD-CIRCUIT-001), désormais
+dans le module ForgeDesign-Circuit ([renvoi](circuit/README.md)). Circuit V1 est un éditeur de schémas électriques exacts ;
 la simulation est une capacité optionnelle future, hors du premier jalon.
 
 Sous-phase Graphics (FD-GRAPHICS-001) : avant de figer le format Circuit, le
@@ -330,10 +330,10 @@ fait      FD-GRAPHICS-008  Debug Center troisième client (flux séquentiel) ; m
                            trois clients sur les mêmes modules
 état      Graphics : socle de visualisation éprouvé (trois clients) ; édition graphique à
                            construire, pilotée par un module réel (Phase Modules)
-suspendu  Circuit dans le cœur : migration hors core avant toute poursuite fonctionnelle
-                           (Phase Modules, FD-MODULES-001) ; les tickets suivants
-                           deviennent des tickets du module ForgeDesign-Circuit :
-          FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
+extrait   Circuit hors du cœur (FD-MODULES-003) : dépôt ForgeDesign-Circuit ; les tickets
+                           suivants sont des tickets du module :
+fait      (module)         projection Circuit → scène en consultation (FD-MODULES-003)
+          FD-CIRCUIT-004   commandes Circuit
           FD-CIRCUIT-005   intégration hôte, session, éditeur Web minimal
           FD-CIRCUIT-006   export SVG depuis le modèle
           FD-CIRCUIT-007   qualification du premier jalon en navigateur
@@ -363,9 +363,10 @@ fait      FD-MODULES-001  frontière core / module, ModuleDescriptor et activati
 fait      FD-MODULES-002  hôte Web des modules : --module PAQUET, routes GET exactes sous
                           /modules/<id>/, assets déclarés, zone « Modules », inventaire et
                           lecture par l'hôte, projection rendue par le Graphic Core
-suivant   FD-MODULES-003  extraction de Circuit dans ForgeDesign-Circuit (forge-design-circuit,
-                          forge_design_circuit), provenance explicite, retrait du cœur
-puis      tickets du module Circuit (projection, édition, export, simulation), chaque
+fait      FD-MODULES-003  extraction de Circuit dans ForgeDesign-Circuit (forge-design-circuit,
+                          forge_design_circuit), provenance explicite, projection
+                          CircuitDocument → GraphicScene dans le module, retrait du cœur
+suivant   tickets du module Circuit (édition, export, simulation), chaque
           capacité générique d'édition étant extraite vers le cœur quand elle sert
 ```
 

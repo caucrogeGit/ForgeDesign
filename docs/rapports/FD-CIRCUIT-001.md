@@ -1,8 +1,14 @@
 # FD-CIRCUIT-001 — Définir les besoins et le périmètre du Tool Circuit
 
+> **Histoire avant extraction.** Ce rapport décrit Circuit lorsqu'il vivait dans le
+> cœur (`forge_design/circuit/`, `docs/circuit/`). Depuis FD-MODULES-003, Circuit est
+> le module externe ForgeDesign-Circuit (paquet `forge_design_circuit`) ; ses
+> documents y ont été déplacés et les liens ci-dessous mènent au
+> [renvoi](../circuit/README.md). Le reste du rapport n'est pas réécrit.
+
 Statuts employés : **observé** (constaté dans DrawCiel ou ses rapports),
 **décidé** (règle retenue pour Circuit), **reporté** (renvoyé à un ticket).
-Le détail normatif est dans [Circuit — besoins et périmètre](../circuit/circuit-scope.md).
+Le détail normatif est dans [Circuit — besoins et périmètre](../circuit/README.md).
 
 ## Ticket et objectif
 
@@ -58,7 +64,7 @@ l'audit et n'est pas modifié.
 ## Capacités DrawCiel recensées
 
 39 capacités recensées et classées dans la
-[matrice](../circuit/circuit-scope.md#matrice-des-capacités) : document,
+[matrice](../circuit/README.md) : document,
 catalogue, placement, sélection, déplacement, rotation, inversion, symétrie,
 redimensionnement, bornes, connexions, jonctions, routage orthogonal,
 annotations, références, grille, zoom, pan, undo/redo, copier/coller, aligner,
@@ -129,7 +135,7 @@ n'empêche pas la simulation et que son absence soit annoncée.
 
 ## Périmètre V1
 
-Voir [Périmètre V1](../circuit/circuit-scope.md#périmètre-v1) : ressource
+Voir [Périmètre V1](../circuit/README.md) : ressource
 versionnée via `forge_design.specialized`, catalogue de 8 types + jonction,
 édition sur grille, routes orthogonales, validation à trois niveaux,
 historique, session et conflit, export SVG, bureau et clavier.
@@ -286,13 +292,13 @@ modèle stable ; la simulation vient après le jalon.
 ## Décisions retenues
 
 Les dix-huit décisions de la section
-[Décisions](../circuit/circuit-scope.md#décisions) du périmètre, dont : aucun
+[Décisions](../circuit/README.md) du périmètre, dont : aucun
 écart ne justifie de modifier le contrat des outils spécialisés ; le contrat de
 stockage n'est pas modifié (aucun chemin réservé).
 
 ## Questions reportées
 
-Voir [Questions reportées](../circuit/circuit-scope.md#questions-reportées) :
+Voir [Questions reportées](../circuit/README.md) :
 format, identités, limites (FD-CIRCUIT-002) ; positions de bornes
 (003/004) ; frontend et isolation du runtime (005/006) ; registre (006) ;
 autosave (007) ; emplacement des exports (008) ; moteur et IR (010) ;
