@@ -690,6 +690,19 @@ minimal) ; la scène `GraphicScene`, le moteur JavaScript et les clients sont
 inchangés. Ce paquet serveur ne doit pas être confondu avec
 `forge_design/web/static/graphics/` (moteur navigateur).
 
+### Niveau de détail — FD-GRAPHICS-006
+
+```text
+viewport.scale ─▶ detail-level.js (pur) ─▶ overview | normal | detail
+                                                │ une classe sur le SVG racine
+adaptateur Python ─▶ node.levels (indices de lignes) ─▶ CSS : lignes et libellés visibles
+```
+
+Le moteur décide quand changer de niveau, l'adaptateur décide quoi montrer.
+Tout se passe dans le navigateur : aucune route métier, aucun point d'accès,
+aucune persistance. Seul `detail-level.js` rejoint la liste fermée
+`GRAPHICS_MODULES` servie par le Router Forge. Le repli serveur reste complet.
+
 ## 14. Écriture
 
 Principe :

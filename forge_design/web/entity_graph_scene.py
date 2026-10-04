@@ -13,6 +13,11 @@ from forge_design.web.entity_graph_layout import EntityGraphLayout
 KIND_LABELS = {"entity": "Entité", "pivot": "Pivot"}
 _VARIANTS = {"entity": "category-1", "pivot": "category-2"}
 _FIELD_LABELS = {"entity": "Champs", "pivot": "Champs supplémentaires"}
+# Niveaux de détail (FD-GRAPHICS-006), indices dans les lignes
+# [type — champs, nom, table] : vue d'ensemble sans texte, normal = nom seul,
+# detail = toutes les lignes. Le panneau garde les informations complètes.
+LEVEL_OVERVIEW: tuple[int, ...] = ()
+LEVEL_NORMAL: tuple[int, ...] = (1,)
 SCENE_TITLE = "Entités et relations déclarées"
 SCENE_DESCRIPTION = (
     "Entités à gauche, pivots à droite. Les flèches indiquent le sens des "
@@ -44,6 +49,10 @@ def build_entity_graphic_scene(layout: EntityGraphLayout) -> dict[str, Any]:
                     "height": item.height,
                 },
                 "lines": lines,
+                "levels": {
+                    "overview": list(LEVEL_OVERVIEW),
+                    "normal": list(LEVEL_NORMAL),
+                },
                 "presentation": {"variant": _VARIANTS[node.kind]},
                 "data": {
                     "kind-label": kind,

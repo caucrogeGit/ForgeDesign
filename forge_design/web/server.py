@@ -62,6 +62,7 @@ def _graph_script(request: Request) -> Response:
 # Graphic Core : liste fermée de modules ES, servis par routes fixes (aucun
 # serveur de fichiers générique).
 GRAPHICS_MODULES = (
+    "detail-level",
     "engine",
     "geometry",
     "model",

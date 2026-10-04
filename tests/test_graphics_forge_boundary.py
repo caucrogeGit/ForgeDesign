@@ -31,6 +31,7 @@ def test_single_forge_mvc_composition() -> None:
 def test_graphics_assets_are_fixed_forge_routes() -> None:
     server = (PACKAGE / "web/server.py").read_text()
     assert GRAPHICS_MODULES == (
+        "detail-level",
         "engine",
         "geometry",
         "model",

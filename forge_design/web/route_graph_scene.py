@@ -36,6 +36,12 @@ _VARIANTS: dict[GraphNodeKind, str] = {
 _WARNING: frozenset[TemplatePresenceStatus] = frozenset(
     {"missing", "invalid-path", "unreadable"}
 )
+# Niveaux de détail (FD-GRAPHICS-006), indices dans les lignes [type, nom,
+# présence] : la vue d'ensemble ne garde que la forme et la catégorie (un texte
+# de ~4 px n'informe pas), normal ajoute type et nom, detail toutes les lignes.
+# Le nom complet reste dans le label accessible et le panneau de détails.
+LEVEL_OVERVIEW: tuple[int, ...] = ()
+LEVEL_NORMAL: tuple[int, ...] = (0, 1)
 SCENE_TITLE = "Graphe des routes"
 SCENE_DESCRIPTION = (
     "Relations connues de gauche à droite : routes, handlers, contrôleurs, "
@@ -72,6 +78,10 @@ def build_route_graphic_scene(layout: RouteGraphLayout) -> dict[str, Any]:
                     item.label,
                     PRESENCE_LABELS[node.presence],
                 ],
+                "levels": {
+                    "overview": list(LEVEL_OVERVIEW),
+                    "normal": list(LEVEL_NORMAL),
+                },
                 "presentation": {
                     "variant": _VARIANTS[node.kind],
                     "tone": "warning" if node.presence in _WARNING else "default",

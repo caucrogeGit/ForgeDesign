@@ -1,11 +1,13 @@
-// Graphic Core — instance de moteur graphique (FD-GRAPHICS-002, viewport FD-GRAPHICS-004).
+// Graphic Core — instance de moteur graphique (FD-GRAPHICS-002, viewport FD-GRAPHICS-004,
+// niveau de détail FD-GRAPHICS-006).
 // Une instance par conteneur, sans singleton ni état global : scène validée,
 // index, sélection et viewport runtime, rendu et écouteurs lui appartiennent ;
 // destroy() les libère. Le moteur ne lit ni n'écrit aucun projet et ne persiste rien.
 
+import { detailLevelForScale } from "./detail-level.js";
 import { validateScene } from "./model.js";
 import { createSelection, indexScene } from "./scene.js";
-import { applySelection, renderScene } from "./svg-renderer.js";
+import { applyDetailLevel, applySelection, renderScene } from "./svg-renderer.js";
 import { createViewport, wheelFactor } from "./viewport.js";
 
 // Déplacement clavier (Maj + flèches) : fraction de la zone visible.
@@ -46,6 +48,10 @@ export function createGraphicEngine(container, input, options = {}) {
   let nodeElements = new Set();
   let view = null;
   let panning = null;
+  let detailLevel = null;
+  // L'hystérésis ne s'appuie que sur un niveau obtenu avec une zone mesurée :
+  // l'échelle provisoire d'avant la première mesure ne fait pas historique.
+  let levelMeasured = false;
   let destroyed = false;
 
   function measure() {
@@ -60,6 +66,14 @@ export function createGraphicEngine(container, input, options = {}) {
     const box = viewport.viewBox();
     view.svg.setAttribute("viewBox", `${box.x} ${box.y} ${box.width} ${box.height}`);
     scaleText.textContent = `${Math.round(viewport.state().scale * 100)} %`;
+    // Le DOM n'est touché que si le niveau change, jamais à chaque zoom.
+    const level = detailLevelForScale(viewport.state().scale, levelMeasured ? detailLevel : null);
+    if (level !== detailLevel) {
+      detailLevel = level;
+      applyDetailLevel(view, level);
+    }
+    const { width, height } = viewport.area();
+    levelMeasured = width > 0 && height > 0;
     return viewportState();
   }
 
@@ -150,6 +164,7 @@ export function createGraphicEngine(container, input, options = {}) {
       { signal },
     );
     applySelection(view, selection.current());
+    if (detailLevel !== null) applyDetailLevel(view, detailLevel);
     applyViewport();
     return view.svg;
   }
@@ -252,6 +267,10 @@ export function createGraphicEngine(container, input, options = {}) {
     viewport: () => {
       alive();
       return viewportState();
+    },
+    detailLevel: () => {
+      alive();
+      return detailLevel;
     },
     selection: () => selection.current(),
     node: (nodeId) => index.nodes.get(nodeId) ?? null,

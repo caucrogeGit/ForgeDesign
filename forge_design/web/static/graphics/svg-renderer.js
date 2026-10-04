@@ -3,6 +3,7 @@
 // textContent, attributs fixes ou numériques : aucun balisage injecté, aucun style en
 // ligne, aucune référence d'identifiant (pas de marqueur partagé entre instances).
 
+import { DETAIL_LEVELS } from "./detail-level.js";
 import { arrowHead, formatPoints } from "./geometry.js";
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -49,9 +50,16 @@ function renderNode(document, node) {
   const title = element(document, "title");
   title.textContent = node.label;
   group.append(title, element(document, "rect", { class: "gx-node-box", x, y, width, height, rx: 6 }));
+  // Toutes les lignes sont rendues une fois, à leur place ; leurs classes
+  // gx-at-<niveau> disent à quels niveaux elles restent visibles (CSS).
   node.lines.forEach((line, index) => {
+    const levels = DETAIL_LEVELS.filter((level) => node.levels[level].includes(index)).map((level) => `gx-at-${level}`);
     group.append(
-      textElement(document, line, { class: "gx-node-text", x: x + LINE_INSET, y: y + LINE_TOP + index * LINE_STEP }),
+      textElement(document, line, {
+        class: ["gx-node-text", ...levels].join(" "),
+        x: x + LINE_INSET,
+        y: y + LINE_TOP + index * LINE_STEP,
+      }),
     );
   });
   return group;
@@ -107,4 +115,12 @@ export function applySelection(view, state) {
     node.setAttribute("aria-pressed", String(selected));
   }
   for (const [id, edge] of view.edges) edge.classList.toggle("gx-related", edgeIds.has(id));
+}
+
+// Niveau de détail actif : une classe sur le SVG racine (O(1)), la CSS masque les
+// lignes absentes du niveau et, en overview, les libellés d'arêtes. Aucun élément
+// n'est recréé : identités, sélection et focus sont inchangés.
+export function applyDetailLevel(view, level) {
+  for (const name of DETAIL_LEVELS) view.svg.classList.toggle(`gx-detail-${name}`, name === level);
+  view.svg.setAttribute("data-detail-level", level);
 }

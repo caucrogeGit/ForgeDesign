@@ -28,7 +28,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | Commit | `88f95b75` — feat(drawciel): intégrer Circuit au tunnel de l’activité |
 | Date du commit | 3 octobre 2026 |
 | Date d'analyse | 3 octobre 2026 |
-| Ticket | FD-GRAPHICS-005 |
+| Ticket | FD-GRAPHICS-006 |
 
 ## Journal des références
 
@@ -43,6 +43,7 @@ copie automatique, aucun suivi du HEAD en runtime.
 | FD-GRAPHICS-003 | `aac36b27` | `aac36b27` | Vide (`git fetch` : `origin/main` inchangé) | Aucun : migration d'un client plateforme, aucun élément DrawCiel repris |
 | FD-GRAPHICS-004 | `aac36b27` | `3a1753a2` | Un commit SéquenCiel (confirmation de documents), aucun fichier DrawCiel modifié | Viewport : `zoomAt` (formule du point fixe) ADAPT ; `fit`, `viewportWorld`, `centerWorldPoint` REWRITE ; geste du bouton du milieu repris ; `applyTransform` CSS et état global non repris |
 | FD-GRAPHICS-005 | `3a1753a2` | `88f95b75` | Un commit (ADR-309, Circuit dans le tunnel d'activité : mode aperçu en lecture seule, essai d'aperçu non persisté dans `tp.js`, adaptateurs hôte) ; `app.js` inchangé | Aucun sur le routage. Routage étudié (`cleanRoute`, `routeObstructed`, `astarGrid`, `simplifyExact`) : routage fil par fil sur grille avec obstacles, sans allocation globale de couloirs ; principes seulement, aucun code repris. Dette encore vraie : cas particulier par type de composant dans `routeObstructed`, non reproduit |
+| FD-GRAPHICS-006 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Aucun semantic zoom dans DrawCiel : zoom borné 0,25–3, tolérances d'interaction constantes à l'écran (`11/zoom`, `10/zoom`), minicarte canvas, zoom de zone ; rien n'est affiché ou masqué selon l'échelle. Aucune provenance |
 
 ## Procédure de delta
 

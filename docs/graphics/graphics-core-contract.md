@@ -732,6 +732,25 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
   Entity 5 → 5 (deux colonnes : tous les parcours traversent la même
   gouttière).
 
+## Semantic zoom / niveau de détail — FD-GRAPHICS-006
+
+- **Décidé** : le moteur **sélectionne un niveau de présentation** (`overview`,
+  `normal`, `detail`) à partir de la seule échelle du viewport ; il **ne classe
+  pas les informations métier**. Chaque adaptateur déclare, pour ses propres
+  lignes, lesquelles restent visibles à `overview` et à `normal` (`levels`,
+  indices dans `lines`, sans texte dupliqué) ; `detail` les montre toutes.
+- Seuils dérivés de tailles écran mesurées (texte de 12 : 7 px pour le texte
+  principal, 9 px pour le secondaire), avec une hystérésis de 0,5 px ;
+  constantes du moteur, jamais dans la scène.
+- Le niveau ne change ni la géométrie, ni la topologie, ni les identités, ni
+  la sélection, ni le focus, ni le nom accessible : seul le contenu visuel
+  change. Aucun objet n'est retiré à `overview`.
+- Libellés d'arêtes : politique générique, masqués à `overview`. Aucune
+  déclaration par arête en V1 : aucun des deux clients n'en a besoin.
+- Le repli sans JavaScript reste le rendu statique complet, sans niveau.
+- DrawCiel ne possède pas de semantic zoom (vérifié à `88f95b75`) : aucune
+  provenance.
+
 ## Questions reportées
 
 | Question | Ticket attendu |
@@ -741,7 +760,8 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 | Représentation des entrées d'historique (inverse ou instantané) | Avec les commandes (non traité par FD-GRAPHICS-005) |
 | Choix du renderer (SVG, Canvas, hybride) | FD-GRAPHICS-004 |
 | Re-projection complète ou incrémentale | Avec les commandes (non traité par FD-GRAPHICS-005) |
-| Lisibilité au fit des grands graphes (niveaux de détail, couloirs entre colonnes) | Selon l'usage observé (rapport FD-GRAPHICS-005) |
+| Lisibilité au fit des grands graphes (niveaux de détail, couloirs entre colonnes) | **Niveaux de détail tranchés par FD-GRAPHICS-006** ; compaction horizontale selon l'usage |
+| Niveau de détail déclaré par arête ou seuils par instance | Quand un client en aura besoin |
 | Routage de recours (A\*) et évitement d'obstacles complet | Après FD-GRAPHICS-003 |
 | Annotations graphiques, rappels, trait libre | Quand un domaine en a besoin |
 | Groupes, verrous, alignement, pivot commun de rotation | FUTUR |

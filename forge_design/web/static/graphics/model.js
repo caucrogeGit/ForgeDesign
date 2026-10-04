@@ -115,8 +115,27 @@ function dataOf(value, path) {
   return Object.freeze(result);
 }
 
+// Lignes visibles par niveau (FD-GRAPHICS-006) : indices dans `lines`, sans texte
+// dupliqué. `detail` montre toujours toutes les lignes ; `overview` ⊆ `normal`.
+// Sans `levels`, toutes les lignes restent visibles à tous les niveaux.
+function levelsOf(value, path, count) {
+  const all = Object.freeze([...Array(count).keys()]);
+  if (value === undefined) return Object.freeze({ overview: all, normal: all, detail: all });
+  object(value, path, ["overview", "normal"]);
+  const indices = (name) =>
+    list(value[name], `${path}.${name}`, MAX_GRAPHIC_LINES).map((item, position, items) => {
+      if (!Number.isInteger(item) || item < 0 || item >= count) fail(`${path}.${name}[${position}]`, "indice de ligne inexistant");
+      if (position > 0 && item <= items[position - 1]) fail(`${path}.${name}[${position}]`, "indices strictement croissants attendus");
+      return item;
+    });
+  const overview = indices("overview");
+  const normal = indices("normal");
+  if (overview.some((item) => !normal.includes(item))) fail(`${path}.overview`, "toute ligne de overview doit figurer dans normal");
+  return Object.freeze({ overview: Object.freeze(overview), normal: Object.freeze(normal), detail: all });
+}
+
 function nodeOf(value, path) {
-  object(value, path, ["id", "label", "rect"], ["kind", "lines", "presentation", "data"]);
+  object(value, path, ["id", "label", "rect"], ["kind", "lines", "levels", "presentation", "data"]);
   const presentation = value.presentation ?? {};
   object(presentation, `${path}.presentation`, [], ["variant", "tone"]);
   const lines = list(value.lines ?? [], `${path}.lines`, MAX_GRAPHIC_LINES).map((line, index) =>
@@ -128,6 +147,7 @@ function nodeOf(value, path) {
     label: text(value.label, `${path}.label`, MAX_GRAPHIC_LABEL_CHARS),
     rect: rectOf(value.rect, `${path}.rect`),
     lines: Object.freeze(lines),
+    levels: levelsOf(value.levels, `${path}.levels`, lines.length),
     presentation: Object.freeze({
       variant: oneOf(presentation.variant ?? "default", `${path}.presentation.variant`, NODE_VARIANTS),
       tone: oneOf(presentation.tone ?? "default", `${path}.presentation.tone`, NODE_TONES),

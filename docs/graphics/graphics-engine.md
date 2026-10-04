@@ -15,7 +15,8 @@ ES modules natifs, sans build, sans npm, sans dépendance ni CDN, livrés dans
 | `geometry.js` | `point`, `rect`, `rectCenter`, `arrowHead`, `formatPoints`, `isFiniteNumber`, `MAX_COORDINATE` |
 | `model.js` | `validateScene`, `GraphicSceneError`, limites, présentations autorisées |
 | `scene.js` | `indexScene`, `neighbourhood`, `createSelection` (sans DOM) |
-| `svg-renderer.js` | `renderScene`, `applySelection` (renderer remplaçable) |
+| `svg-renderer.js` | `renderScene`, `applySelection`, `applyDetailLevel` (renderer remplaçable) |
+| `detail-level.js` | Niveau de détail pur (FD-GRAPHICS-006) : `detailLevelForScale`, `DETAIL_LEVELS`, `THRESHOLDS`, tailles écran de référence |
 | `viewport.js` | Viewport pur (FD-GRAPHICS-004) : `createViewport`, `fitState`, `zoomAtState`, `panState`, `resizeState`, `viewBox`, `wheelFactor`, bornes |
 | `engine.js` | `createGraphicEngine` (instance, barre d'outils, interactions, cycle de vie) |
 
@@ -48,6 +49,7 @@ facultatifs (accessibilité).
 | `label` | Libellé complet, accessible (`aria-label`, `<title>`), toujours texte |
 | `rect` | `{x, y, width, height}`, dimensions strictement positives |
 | `lines` | Facultatif, au plus 4 lignes affichées (≤ 256 caractères), texte |
+| `levels` | Facultatif (FD-GRAPHICS-006) : `{"overview": [indices], "normal": [indices]}`, indices de `lines` strictement croissants, `overview ⊆ normal` ; `detail` montre toujours toutes les lignes. Absent : toutes les lignes à tous les niveaux |
 | `presentation` | `variant` ∈ `default`, `category-1`…`category-6` ; `tone` ∈ `default`, `warning`, `muted` |
 | `data` | Facultatif, ≤ 16 paires `clé-kebab → chaîne` ; opaque, jamais rendu ni interprété, restitué par `node(id)` |
 
@@ -122,6 +124,43 @@ n'est jamais modifiée ; rien n'est persisté (ni stockage navigateur, ni cookie
 | Zone non mesurée | État neutre et viewBox de la scène : jamais NaN ni Infinity |
 | Barre d'outils | `role="toolbar"`, boutons natifs « Ajuster », « + », « − » (titre et nom accessible), échelle courante en texte |
 
+## Detail levels (semantic zoom)
+
+FD-GRAPHICS-006. **Le moteur décide quand changer de niveau ; le client décide
+quoi montrer.** Trois niveaux génériques de densité de présentation,
+`overview`, `normal`, `detail`, dérivés de la seule échelle réelle du viewport
+(`viewport.scale`, quelle que soit son origine : fit, boutons, molette,
+resize). Le pan ne change pas l'échelle, donc jamais le niveau.
+
+| Seuil | Échelle | Texte de 12 → écran |
+|---|---:|---:|
+| overview → normal (entrée) | 7/12 ≈ 0,583 | 7 px |
+| normal → overview (sortie) | 6,5/12 ≈ 0,542 | 6,5 px |
+| normal → detail (entrée) | 9/12 = 0,75 | 9 px |
+| detail → normal (sortie) | 8,5/12 ≈ 0,708 | 8,5 px |
+
+Tailles mesurées sur un rendu réel (Chromium, DPR 1) : c'est une lisibilité
+mesurée, pas un critère d'accessibilité. Hystérésis de 0,5 px écran, pour
+qu'un pincement oscillant autour d'un seuil ne fasse pas clignoter le texte.
+L'historique ne commence qu'avec une zone mesurée. Les seuils sont des
+constantes du moteur : ni dans la scène, ni configurables par client en V1.
+
+| Élément | overview | normal | detail |
+|---|---|---|---|
+| Géométrie des nœuds | identique | identique | identique |
+| Lignes de nœud | `levels.overview` | `levels.normal` | toutes |
+| Arêtes | toutes | toutes | toutes |
+| Libellés d'arêtes | masqués | visibles | visibles |
+| Catégories (`category-1…4`) | teintes renforcées | teintes normales | teintes normales |
+| `aria-label`, `<title>`, sélection, focus | inchangés | inchangés | inchangés |
+
+Rendu : toutes les lignes sont créées une seule fois, à leur position, avec
+des classes `gx-at-<niveau>`. Une transition ne fait que changer la classe
+`gx-detail-<niveau>` et l'attribut `data-detail-level` du SVG racine (O(1)) ;
+la CSS masque le reste. Aucun élément n'est recréé, et rien n'est touché tant
+que le niveau ne change pas. `engine.detailLevel()` lit le niveau courant ; il
+n'existe pas de `setDetailLevel`.
+
 ## Instance lifecycle
 
 ```js
@@ -130,6 +169,7 @@ engine.select(id); engine.clearSelection(); engine.focus(id);
 engine.selection(); engine.node(id); engine.edge(id); engine.scene();
 engine.fit(); engine.home(); engine.zoomIn(); engine.zoomOut();
 engine.zoomAt({x, y}, factor); engine.panBy(dx, dy); engine.resize(); engine.viewport();
+engine.detailLevel();   // "overview" | "normal" | "detail", dérivé de l'échelle
 engine.render();   // re-rendu, écouteurs précédents retirés
 engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 ```
@@ -157,7 +197,8 @@ relations parallèles distinctes), entité → `category-1`, pivot → `category
 accessible « Entité nom » / « Pivot table », données `kind-label`, `name`,
 `table`, `field-count`, `field-label` ; arêtes avec `data` `kind` et `name`,
 libellé seulement s'il existe. Le client liste les relations directes via
-`edge(id)`.
+`edge(id)`. Niveaux (FD-GRAPHICS-006) : `overview` sans texte, `normal` le nom
+seul, `detail` toutes les lignes.
 
 ## Route Explorer adapter
 
@@ -168,7 +209,9 @@ d'arête dérivée de `(source, cible, type)`, `route`/`handler`/`controller`/
 `template` → `category-1`…`category-4`, présence absente/refusée/non
 vérifiable → `tone: warning` (toujours accompagné du texte de présence), arête
 de cycle → `line: dashed` et libellé « (cycle) ». Les libellés métier du
-panneau de détails passent par `data`.
+panneau de détails passent par `data`. Niveaux (FD-GRAPHICS-006) :
+`overview` sans texte (forme et catégorie), `normal` type et nom, `detail`
+toutes les lignes (présence comprise).
 
 Côté navigateur, `/route-graph.js` (module) lit la scène, crée une instance et
 masque le repli serveur ; il ne manipule jamais le SVG lui-même.
@@ -232,8 +275,9 @@ et l'annonce.
 
 Prouvé par deux clients réels : graphes positionnés, nœuds, arêtes (y compris
 parallèles), libellés, sélection, voisins directs, SVG, viewport (fit, zoom,
-pan, resize), couloirs partagés côté serveur (FD-GRAPHICS-005). Pas encore :
-layout générique, ports, routeur orthogonal interactif (obstacles, A\*,
-stabilité au déplacement), grille, glisser de nœuds, édition, commandes,
-historique, multi-sélection, groupes, minicarte, niveaux de détail. Debug
-Center garde son rendu propre.
+pan, resize), couloirs partagés côté serveur (FD-GRAPHICS-005), niveau de
+détail selon l'échelle (FD-GRAPHICS-006). Pas encore : layout générique, ports,
+routeur orthogonal interactif (obstacles, A\*, stabilité au déplacement),
+grille, glisser de nœuds, édition, commandes, historique, multi-sélection,
+groupes, minicarte, niveaux de détail des arêtes déclarés par le client.
+Debug Center garde son rendu propre.

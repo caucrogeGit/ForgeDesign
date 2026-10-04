@@ -322,7 +322,9 @@ fait      FD-GRAPHICS-004  viewport générique (fit, zoom, pan, home, resize) p
 fait      FD-GRAPHICS-005  allocation générique de couloirs partagée par Route et Entity
                            (Route : 19 → 9 couloirs, hauteur −18 %, 0 croisement ;
                            Entity : aucun gain possible à deux colonnes)
-suivant   FD-GRAPHICS-006  à décider sur l'usage observé (voir rapport FD-GRAPHICS-005)
+fait      FD-GRAPHICS-006  niveau de détail générique (overview, normal, detail) selon l'échelle ;
+                           Route au fit en vue structurelle, Entity au fit en normal
+suivant   FD-GRAPHICS-007  à décider sur l'usage observé (voir rapport FD-GRAPHICS-006)
 ensuite   ports et routage orthogonal extrait de DrawCiel, commandes et historique
 en attente du socle Graphics :
           FD-CIRCUIT-004   projection Circuit → scène, commandes Circuit
