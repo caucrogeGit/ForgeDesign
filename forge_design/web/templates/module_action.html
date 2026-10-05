@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block title %}Action refusée — {{ module_label }} — Forge Design{% endblock %}
+{% block content %}
+<p class="eyebrow">Module spécialisé · action</p>
+<h1>Action non appliquée — {{ module_label }}</h1>
+<p role="alert">{{ error }}</p>
+{% if issues %}
+<h2>Diagnostics</h2>
+<ul data-action-issues>{% for issue in issues %}<li>{{ issue.severity }} · <code>{{ issue.code }}</code> · {{ issue.level }} : {{ issue.message }}{% if issue.location %} ({{ issue.location | join('/') }}){% endif %}</li>{% endfor %}</ul>
+{% endif %}
+<p>{% if resource_link %}<a href="{{ resource_link }}">Recharger la ressource</a> · {% endif %}<a href="{{ module.descriptor.base_url }}">Retour au module</a></p>
+{% endblock %}

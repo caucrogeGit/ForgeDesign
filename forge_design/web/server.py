@@ -30,7 +30,12 @@ from forge_design.web.inspector import (
     refresh_project,
     show_inspector,
 )
-from forge_design.web.modules import module_asset, show_module, show_module_resource
+from forge_design.web.modules import (
+    module_action,
+    module_asset,
+    show_module,
+    show_module_resource,
+)
 from forge_design.web.real_preview import (
     RealPreviewPanel,
     RealPreviewRuntime,
@@ -323,7 +328,8 @@ def create_application(
         no_store=True,
     )
     # Modules : routes exactes, seulement pour les modules exposés munis d'une
-    # UiEntry ; jamais de motif dynamique ni de POST sous /modules.
+    # UiEntry ; jamais de motif dynamique. Seuls POST : une route exacte par
+    # action exposée (capacité et save disponibles), sous garde d'origine locale.
     for entry in host.navigation():
 
         def page(request: Request, module_id: str = entry.module_id) -> Response:
@@ -339,6 +345,18 @@ def create_application(
             add(
                 "GET", url, module_asset(host, entry.module_id, asset.name), public=True
             )
+        for action in host.actions(entry.module_id):
+
+            def act(
+                request: Request,
+                module_id: str = entry.module_id,
+                action_id: str = action.id,
+            ) -> Response:
+                return module_action(request, host, module_id, action_id, context)
+
+            url = host.module(entry.module_id).descriptor.action_url(action.id)
+            # Sans session : is_local_action est contrôlée par module_action.
+            add("POST", url, act, public=True, csrf=False, no_store=True)
     return Application(router, api_routes_module=None)
 
 

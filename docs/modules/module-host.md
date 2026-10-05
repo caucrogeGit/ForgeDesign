@@ -45,12 +45,17 @@ Pour un module `<id>` exposé muni d'une `UiEntry`, et seulement celles-ci :
 | `GET /modules/<id>/` | Libellé, version, API, capacités disponibles, dépendances indisponibles, ressources du projet courant par type | `no-store` |
 | `GET /modules/<id>/resource?type=<type>&path=<chemin>` | Métadonnées (module, type, chemin, version du format, révision `sha256` et taille, validation), diagnostics, visualisation | `no-store` |
 | `GET /modules/<id>/assets/<name>` | Un asset déclaré, avec le type MIME fixé par le cœur | politique des assets du cœur |
+| `POST /modules/<id>/actions/<action>` | Action exposée (FD-EDIT-001) : 303 vers la page ressource, ou page d'erreur au statut de la [matrice](module-actions.md#statuts-http) | `no-store` |
 
-Tout le reste (`/modules/<id>/foo`, `/modules/<id>/actions/…`, un asset non
-déclaré, un autre module, une traversée) répond 404, et un POST répond 405.
+Tout le reste (`/modules/<id>/foo`, une action non déclarée ou non exposée,
+un asset non déclaré, un autre module, une traversée) répond 404. Un POST
+sur une page GET répond 405, de même qu'un GET sur une route d'action.
 L'ordre de la zone « Modules » est l'ordre d'activation.
 
-Paramètres de `/resource` : exactement `type` et `path`, une valeur chacun.
+Paramètres de `/resource` : exactement `type` et `path`, une valeur chacun,
+plus `notice` facultatif (`saved` ou `unchanged`, retour d'action affiché en
+`role="status"`). Si le type a une action exposée, la ligne « Révision »
+porte le jeton public `data-revision-token`.
 
 | Cas | Statut |
 |---|---|
@@ -96,6 +101,8 @@ rendu SVG côté serveur pour un module.
 
 ## Limites V1
 
-Pas d'édition (aucun bouton Enregistrer, Modifier, Créer ou Supprimer), pas
-d'actions POST, pas de JS ni de template fournis par le module, pas d'icône
-d'`UiEntry` affichée, pas de découverte automatique ni d'installation.
+Pas d'interface d'édition (aucun bouton Enregistrer, Modifier, Créer ou
+Supprimer) : les actions POST existent (FD-EDIT-001,
+[contrat](module-actions.md)), mais aucun formulaire n'est livré par le cœur.
+Pas de JS ni de template fournis par le module, pas d'icône d'`UiEntry`
+affichée, pas de découverte automatique ni d'installation.

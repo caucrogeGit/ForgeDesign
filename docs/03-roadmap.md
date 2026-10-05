@@ -366,7 +366,13 @@ fait      FD-MODULES-002  hôte Web des modules : --module PAQUET, routes GET ex
 fait      FD-MODULES-003  extraction de Circuit dans ForgeDesign-Circuit (forge-design-circuit,
                           forge_design_circuit), provenance explicite, projection
                           CircuitDocument → GraphicScene dans le module, retrait du cœur
-suivant   tickets du module Circuit (édition, export, simulation), chaque
+fait      FD-EDIT-001     actions bornées des modules : POST exact par action exposée, payload
+                          formulaire borné, jeton de révision opaque, handler pur du module,
+                          écriture et historique par le cœur ; témoin de test, aucune action
+                          Circuit
+suivant   ForgeDesign-Circuit : premier geste d'édition réel (déplacer un composant)
+          sur ce contrat
+puis      autres tickets du module Circuit (édition, export, simulation), chaque
           capacité générique d'édition étant extraite vers le cœur quand elle sert
 ```
 

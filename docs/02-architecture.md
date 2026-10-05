@@ -776,6 +776,25 @@ ForgeDesign-Circuit (FD-MODULES-003) : distribution `forge-design-circuit`,
 paquet `forge_design_circuit`, activé par `--module forge_design_circuit`. Le
 cœur ne livre plus aucun code Circuit ([renvoi](circuit/README.md)).
 
+Actions bornées (FD-EDIT-001, [contrat](modules/module-actions.md)) :
+
+```text
+POST /modules/<id>/actions/<action>   (route exacte, action exposée seulement)
+   ─▶ is_local_action · formulaire encodé ≤ 16 Kio · type, path, revision, champs exacts
+   ─▶ ModuleHost.execute_action
+        ├── read_specialized_resource (cœur) ─▶ jeton de révision courant = jeton reçu ?
+        ├── action.handler(document, payload) (module, pur) ─▶ ModuleActionResult
+        ├── encodage identique ─▶ aucune écriture (no-op)
+        └── write_specialized_resource(expected_revision) ─▶ validation, conflit,
+            publication atomique, history.jsonl
+   ─▶ statut décidé par le cœur : 303 vers la page ressource, ou 400/403/404/409/422/500
+```
+
+Le module ne reçoit ni Request, ni racine, ni chemin : seulement le document
+décodé et un `ModuleActionPayload` borné. Capability gate au démarrage :
+capacité de l'action et `save` disponibles, sinon la route n'existe pas. API
+de modules inchangée (1) : `ModuleDescriptor.actions` est additif.
+
 ## 14. Écriture
 
 Principe :

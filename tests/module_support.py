@@ -4,10 +4,14 @@ Ils sont fournis par un importeur injecté (aucun paquet installé, aucun sys.pa
 modifié). Leur asset réutilise une feuille du cœur (forge_design.web,
 static/shell.css) sous le nom témoin « <id>.css » : c'est un témoin, pas un
 produit. Codec et projection enregistrent les types d'arguments reçus.
+
+FD-EDIT-001 : action témoin « rename-title » (payload : title), handler pur qui
+rend une nouvelle instance ; elle aussi interne aux tests.
 """
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -22,6 +26,9 @@ from specialized_support import (
 from forge_design.modules import (
     DESCRIPTOR_ATTRIBUTE,
     MODULE_API_VERSION,
+    ModuleAction,
+    ModuleActionPayload,
+    ModuleActionResult,
     ModuleActivation,
     ModuleAsset,
     ModuleDescriptor,
@@ -49,6 +56,17 @@ class RecordingCodec(WitnessCodec):
     def decode(self, data: bytes) -> WitnessDocument:
         self.received.append(type(data))
         return super().decode(data)
+
+
+def rename_title(
+    document: WitnessDocument, payload: ModuleActionPayload
+) -> ModuleActionResult:
+    """Action témoin : nouveau titre, nouvelle instance, aucune entrée/sortie."""
+    title = payload.text("title", max_chars=200, empty=False)
+    return ModuleActionResult(replace(document, title=title))
+
+
+RENAME = ModuleAction("rename-title", "document", ("title",), rename_title)
 
 
 def witness_scene(document: WitnessDocument) -> dict[str, Any]:
@@ -101,6 +119,8 @@ def witness_module(
     assets: tuple[ModuleAsset, ...] | None = None,
     api_version: int = MODULE_API_VERSION,
     probe: Callable[[], dict[str, bool]] | None = None,
+    actions: tuple[ModuleAction, ...] = (),
+    edit_dependency: bool = False,
 ) -> ModuleDescriptor:
     resource_type = witness_type(
         source_prefix=prefix(module_id), suffix=suffix(module_id)
@@ -108,10 +128,14 @@ def witness_module(
     changes: dict[str, Any] = {}
     if probe is not None:
         capabilities = (*witness_tool().capabilities, SIMULATE)
+        # edit_dependency : la capacité plateforme « edit » dépend de la sonde.
+        served = (SpecializedCapability.platform("edit"),) if edit_dependency else ()
         changes = {
             "capabilities": capabilities,
             "optional_dependencies": (
-                OptionalDependency("spice", "Moteur de simulation", (SIMULATE,)),
+                OptionalDependency(
+                    "spice", "Moteur de simulation", (SIMULATE, *served)
+                ),
             ),
         }
     definition = witness_tool(
@@ -131,6 +155,7 @@ def witness_module(
         if assets is None
         else assets,
         dependency_probe=probe,
+        actions=actions,
     )
 
 

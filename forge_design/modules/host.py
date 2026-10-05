@@ -9,8 +9,16 @@ L'hôte inventorie et lit les ressources par le contrat spécialisé
 Graphics en isolant ses échecs, et sert ses assets déclarés, lus et vérifiés à
 la construction. Un module ne reçoit jamais de racine de projet, de chemin
 système, de Router ni de Request.
+
+FD-EDIT-001 : l'hôte expose aussi les actions déclarées dont la capacité et
+``save`` sont réellement disponibles, et les exécute selon un cycle fermé :
+lecture, contrôle du jeton de révision, handler pur du module, comparaison des
+encodages (no-op), puis write_specialized_resource (validation bloquante,
+conflit, publication atomique, historique). Le résultat est un code d'issue ;
+le statut HTTP est décidé par la couche Web du cœur.
 """
 
+import hmac
 import json
 import logging
 from collections.abc import Mapping
@@ -18,7 +26,7 @@ from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal
 
 from forge_design.forge.project_root import (
     ProjectRootNotDirectoryError,
@@ -26,6 +34,16 @@ from forge_design.forge.project_root import (
     ProjectRootResolutionError,
 )
 from forge_design.forge.project_version import NotForgeProjectError
+from forge_design.modules.actions import (
+    ModuleAction,
+    ModuleActionPayload,
+    ModuleActionPayloadError,
+    ModuleActionRefused,
+    bounded_message,
+    is_action_result,
+    is_revision_token,
+    revision_token,
+)
 from forge_design.modules.activation import (
     ActiveModule,
     ModuleActivation,
@@ -33,11 +51,20 @@ from forge_design.modules.activation import (
 )
 from forge_design.modules.descriptor import ModuleAsset
 from forge_design.specialized import (
+    InvalidSpecializedResourceError,
+    SpecializedIssue,
     SpecializedReadResult,
+    SpecializedResourceConflictError,
+    SpecializedResourceError,
+    SpecializedResourceHistoryError,
     SpecializedResourceListing,
+    SpecializedResourceRefusedError,
+    SpecializedResourceRevision,
     SpecializedResourceType,
+    UnsupportedSpecializedVersionError,
     list_specialized_resources,
     read_specialized_resource,
+    write_specialized_resource,
 )
 from forge_design.specialized.models import is_kebab_case
 
@@ -78,6 +105,35 @@ class ModuleResourceView:
     scene: Mapping[str, Any] | None
     scene_error: str | None
     runtime_error: str | None
+    # Jeton public de la révision lue, seulement si le type a des actions exposées.
+    revision_token: str | None = None
+
+
+ActionOutcomeCode = Literal[
+    "saved",
+    "unchanged",
+    "payload-invalid",
+    "type-mismatch",
+    "resource-not-found",
+    "resource-refused",
+    "resource-unusable",
+    "conflict",
+    "refused",
+    "invalid-resource",
+    "module-error",
+    "write-failed",
+]
+
+
+@dataclass(frozen=True)
+class ModuleActionOutcome:
+    """Issue d'une action : code fermé, message borné, jamais une trace."""
+
+    code: ActionOutcomeCode
+    message: str
+    issues: tuple[SpecializedIssue, ...] = ()
+    truncated: bool = False
+    revision: SpecializedResourceRevision | None = None
 
 
 def _runtime(module_id: str, what: str, error: Exception) -> str:
@@ -102,6 +158,18 @@ class ModuleHost:
         self._modules = tuple(exposed)
         self._diagnostics = tuple(diagnostics)
         self._assets = MappingProxyType(assets)
+        # Capability gate au démarrage : une action dont la capacité ou save est
+        # indisponible (sonde) n'est jamais exposée, donc jamais routée.
+        self._actions = MappingProxyType(
+            {
+                module.descriptor.id: tuple(
+                    action
+                    for action in module.descriptor.actions
+                    if {action.capability, "save"} <= module.available_capabilities
+                )
+                for module in exposed
+            }
+        )
 
     @staticmethod
     def _load_assets(
@@ -156,6 +224,16 @@ class ModuleHost:
         """Octets et type MIME fixés par le cœur ; KeyError hors liste déclarée."""
         return self._assets[(module_id, name)]
 
+    def actions(self, module_id: str) -> tuple[ModuleAction, ...]:
+        """Actions exposées du module (déclarées et réellement disponibles)."""
+        return self._actions[self.module(module_id).descriptor.id]
+
+    def action(self, module_id: str, action_id: str) -> ModuleAction:
+        for action in self.actions(module_id):
+            if action.id == action_id:
+                return action
+        raise KeyError(action_id)
+
     def resource_type(self, module_id: str, type_id: str) -> SpecializedResourceType:
         if not is_kebab_case(type_id):
             raise KeyError(type_id)
@@ -193,8 +271,150 @@ class ModuleHost:
         scene, scene_error = None, None
         if read.resource is not None and binding.scene is not None:
             scene, scene_error = self._project(module_id, binding.scene, read.resource)
+        token = None
+        if read.revision is not None and any(
+            action.resource_type == type_id for action in self.actions(module_id)
+        ):
+            token = revision_token(module_id, type_id, path, read.revision)
         return ModuleResourceView(
-            module, resource_type, path, read, scene, scene_error, None
+            module, resource_type, path, read, scene, scene_error, None, token
+        )
+
+    def execute_action(
+        self,
+        module_id: str,
+        action_id: str,
+        root: Path,
+        type_id: str,
+        path: str,
+        token: str,
+        fields: Mapping[str, str],
+    ) -> ModuleActionOutcome:
+        """Lire, vérifier la révision, transformer (module), puis écrire (cœur).
+
+        KeyError si l'action n'est pas exposée ; erreurs de racine propagées.
+        Le handler ne reçoit que le document décodé et le payload borné.
+        """
+        action = self.action(module_id, action_id)
+        if type_id != action.resource_type:
+            return ModuleActionOutcome(
+                "type-mismatch", "Type de ressource étranger à cette action."
+            )
+        if set(fields) != set(action.fields):
+            expected = ", ".join(action.fields) or "aucun"
+            return ModuleActionOutcome(
+                "payload-invalid", f"Champs attendus : {expected}."
+            )
+        try:
+            payload = ModuleActionPayload(fields)
+        except ValueError as error:
+            return ModuleActionOutcome("payload-invalid", str(error))
+        if not is_revision_token(token):
+            return ModuleActionOutcome("payload-invalid", "Jeton de révision invalide.")
+        module = self.module(module_id)
+        definition = module.descriptor.definition
+        resource_type = definition.resource_type(type_id)
+        codec = module.descriptor.binding(type_id).codec
+
+        def failed(what: str, error: Exception) -> ModuleActionOutcome:
+            return ModuleActionOutcome("module-error", _runtime(module_id, what, error))
+
+        try:
+            read = read_specialized_resource(
+                root, definition, resource_type, path, codec
+            )
+        except _PROJECT_ERRORS:
+            raise
+        except Exception as error:  # codec du module : isolé
+            return failed("Décodage", error)
+        if read.error == "resource-not-found":
+            return ModuleActionOutcome("resource-not-found", "Ressource introuvable.")
+        if read.error == "resource-refused":
+            return ModuleActionOutcome(
+                "resource-refused", "Chemin de ressource refusé."
+            )
+        if read.error is not None or read.resource is None or read.revision is None:
+            return ModuleActionOutcome(
+                "resource-unusable",
+                "Ressource illisible, invalide ou d'une autre version : "
+                "aucune action possible.",
+                read.issues,
+                read.truncated,
+            )
+        current = revision_token(module_id, type_id, path, read.revision)
+        if not hmac.compare_digest(current, token):
+            return ModuleActionOutcome(
+                "conflict",
+                "La ressource a changé depuis son affichage : rechargez-la.",
+            )
+        try:
+            before = codec.encode(read.resource)
+        except Exception as error:
+            return failed("Encodage", error)
+        try:
+            result = action.handler(read.resource, payload)
+        except ModuleActionPayloadError as error:
+            return ModuleActionOutcome("payload-invalid", bounded_message(error))
+        except ModuleActionRefused as error:
+            return ModuleActionOutcome("refused", bounded_message(error))
+        except Exception as error:  # handler du module : isolé, jamais exposé
+            return failed("Action", error)
+        if not is_action_result(result):
+            return ModuleActionOutcome(
+                "module-error", "L'action du module ne rend pas un ModuleActionResult."
+            )
+        try:
+            if codec.encode(read.resource) != before:
+                return ModuleActionOutcome(
+                    "module-error", "L'action du module a modifié le document lu."
+                )
+            after = codec.encode(result.resource)
+        except Exception as error:
+            return failed("Encodage", error)
+        if after == before:
+            return ModuleActionOutcome("unchanged", "Aucune modification.")
+        try:
+            written = write_specialized_resource(
+                root,
+                definition,
+                resource_type,
+                path,
+                result.resource,
+                codec,
+                expected_revision=read.revision,
+            )
+        except _PROJECT_ERRORS:
+            raise
+        except InvalidSpecializedResourceError as error:
+            return ModuleActionOutcome(
+                "invalid-resource",
+                "Modification refusée par la validation bloquante.",
+                error.issues,
+                error.truncated,
+            )
+        except SpecializedResourceConflictError:
+            return ModuleActionOutcome(
+                "conflict",
+                "La ressource a changé pendant l'action : rechargez-la.",
+            )
+        except SpecializedResourceRefusedError as error:
+            return ModuleActionOutcome("invalid-resource", str(error))
+        except UnsupportedSpecializedVersionError as error:
+            return failed("Écriture", error)
+        except SpecializedResourceHistoryError:
+            return ModuleActionOutcome(
+                "write-failed",
+                "Ressource écrite, mais le journal n'a pas pu être complété.",
+            )
+        except SpecializedResourceError:
+            return ModuleActionOutcome(
+                "write-failed",
+                "Sauvegarde incertaine : relisez la ressource avant de réessayer.",
+            )
+        except Exception as error:  # codec du module pendant l'écriture
+            return failed("Écriture", error)
+        return ModuleActionOutcome(
+            "saved", "Modification enregistrée.", revision=written.revision
         )
 
     @staticmethod

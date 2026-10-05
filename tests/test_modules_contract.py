@@ -391,6 +391,11 @@ def test_module_contract_depends_only_on_the_specialized_contract() -> None:
     stdlib = {
         "re",
         "json",
+        # FD-EDIT-001 : jeton de révision (condensat), comparaison à temps
+        # constant, nombres finis du payload.
+        "hashlib",
+        "hmac",
+        "math",
         "logging",
         "importlib",
         "importlib.resources",

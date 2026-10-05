@@ -29,6 +29,8 @@ plugins universel : c'est une frontière simple, explicite, testable.
 | Validation métier | non | oui |
 | Catalogue | non | oui |
 | Adaptateur Graphics du domaine (document → GraphicScene) | non | oui |
+| Actions : routes POST, origine, payload, révision, écriture, statut HTTP | oui | non |
+| Actions : transformation métier pure (`handler`) | non | oui |
 | JS d'édition spécialisé | non | oui |
 | Simulation et ses dépendances | non | oui |
 | Dépendances optionnelles du domaine | non | oui |
@@ -68,6 +70,7 @@ Un paquet de module expose l'attribut `FORGE_DESIGN_MODULE`, un
 | `asset_package` | Paquet Python contenant les assets (lu par l'hôte via `importlib.resources`) |
 | `assets` | Liste fermée (au plus 32) de `ModuleAsset(name, source)` : nom `[a-z0-9-]+.(js\|css\|svg)`, source relative sans segment vide, `.`, `..` ou caché |
 | `dependency_probe` | Sonde facultative, sans effet de bord : `{id de dépendance: disponible}` |
+| `actions` | Facultatif (`()`, FD-EDIT-001) : au plus 32 `ModuleAction`, chacune sur un type déclaré, modifiable, qui offre `save` et sa capacité ([actions](module-actions.md)) |
 
 Le descripteur ne reçoit ni Router, ni Application, ni Request, ni racine de
 projet. Il n'a donc aucun moyen d'enregistrer une route, d'injecter un
@@ -166,10 +169,11 @@ V1 (FD-MODULES-002) : **ouvrir et visualiser** seulement.
   SVG côté serveur.
 - Le module ne fournit pas de handler Forge MVC : il ne voit ni Request, ni
   Response, ni Router.
-- L'édition viendra par des **actions bornées** POST
-  (`/modules/<id>/actions/<nom>`), avec le contrôle d'origine du cœur et une
-  sauvegarde par `write_specialized_resource`. Le contrat ne fige pas ces
-  actions avant le premier besoin réel.
+- **Actions bornées** (FD-EDIT-001, [contrat](module-actions.md)) : un POST
+  exact `/modules/<id>/actions/<action>` par action exposée, sous la garde
+  d'origine du cœur. Le module ne fournit qu'une transformation pure
+  `handler(document, payload)` ; lecture, jeton de révision, validation,
+  `write_specialized_resource`, historique et statut HTTP restent au cœur.
 
 ## Namespace
 
@@ -206,6 +210,8 @@ disponibles, simulation indisponible. Aucune installation automatique (ni
 |---|---|---|
 | lire un fichier du projet | oui, par l'hôte | non directement |
 | écrire un fichier du projet | oui, par l'hôte | non directement |
+| transformer un document (action) | non | oui, handler pur |
+| décider le statut HTTP d'une action | oui | non |
 | décoder des octets métier | non | oui |
 | encoder des octets métier | non | oui |
 | servir un asset déclaré | oui | le déclare |
@@ -300,8 +306,9 @@ expose pour cela `loads_strict_json`, `MAX_SPECIALIZED_ISSUES` et
 - Découverte automatique, entry points, `pkgutil`, chargement de paquets
   inconnus.
 - Sandbox de processus pour un module.
-- Handlers Forge MVC fournis par un module ; actions d'édition (POST).
-- Sauvegarde depuis l'interface, glisser, simulation.
+- Handlers Forge MVC fournis par un module (les actions POST passent par
+  l'hôte, voir [actions](module-actions.md)).
+- UI d'édition, glisser, undo/redo, simulation.
 - Solveur de dépendances entre modules.
 - Moteur 3D : ce n'est pas une extension automatique du Graphic Core 2D ;
   ce serait une capacité ou un module séparé, à étudier le moment venu.

@@ -9,6 +9,10 @@ assets en liste fermée, sonde de dépendances optionnelles.
 Un descripteur ne reçoit ni Router, ni Application, ni Request, ni racine de
 projet : il ne peut ni enregistrer une route, ni lire ou écrire le projet. Les
 routes et URLs d'assets sont calculées par l'hôte, sous /modules/<id>/.
+
+FD-EDIT-001 ajoute ``actions`` (facultatif, ``()`` par défaut) : des mutations
+métier pures, exécutées et persistées par l'hôte. L'ajout est additif : un
+descripteur d'API 1 sans action reste valide tel quel.
 """
 
 import re
@@ -17,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, cast
 
+from forge_design.modules.actions import MAX_MODULE_ACTIONS, ModuleAction
 from forge_design.specialized import SpecializedToolDefinition
 
 # Version d'API hôte des modules. Un module déclare la version qu'il cible ;
@@ -131,6 +136,7 @@ class ModuleDescriptor:
     asset_package: str | None = None
     assets: tuple[ModuleAsset, ...] = ()
     dependency_probe: DependencyProbe | None = None
+    actions: tuple[ModuleAction, ...] = ()
 
     def __post_init__(self) -> None:
         if not _is_instance(self.definition, SpecializedToolDefinition):
@@ -164,6 +170,30 @@ class ModuleDescriptor:
             raise ValueError(f"Paquet d'assets invalide : {self.asset_package!r}")
         if self.dependency_probe is not None and not callable(self.dependency_probe):
             raise ValueError("La sonde de dépendances doit être appelable.")
+        self._check_actions()
+
+    def _check_actions(self) -> None:
+        """Action : type déclaré, modifiable, offrant save et sa capacité."""
+        if not _tuple_of(self.actions, ModuleAction):
+            raise ValueError("actions doit être un tuple de ModuleAction.")
+        if len(self.actions) > MAX_MODULE_ACTIONS:
+            raise ValueError(f"Au plus {MAX_MODULE_ACTIONS} actions par module.")
+        ids = [item.id for item in self.actions]
+        if len(set(ids)) != len(ids):
+            raise ValueError("Identifiant d'action dupliqué.")
+        declared = {item.id: item for item in self.definition.resource_types}
+        for action in self.actions:
+            resource_type = declared.get(action.resource_type)
+            if resource_type is None:
+                raise ValueError(f"Action {action.id} : type de ressource non déclaré.")
+            if not resource_type.editable or not resource_type.has_capability("save"):
+                raise ValueError(
+                    f"Action {action.id} : le type n'est pas modifiable (save)."
+                )
+            if not resource_type.has_capability(action.capability):
+                raise ValueError(
+                    f"Action {action.id} : capacité {action.capability} non déclarée."
+                )
 
     @property
     def id(self) -> str:
@@ -178,6 +208,11 @@ class ModuleDescriptor:
         if name not in {item.name for item in self.assets}:
             raise KeyError(name)
         return f"{self.base_url}assets/{name}"
+
+    def action_url(self, action_id: str) -> str:
+        if action_id not in {item.id for item in self.actions}:
+            raise KeyError(action_id)
+        return f"{self.base_url}actions/{action_id}"
 
     def binding(self, resource_type: str) -> ResourceBinding:
         for item in self.bindings:

@@ -6,6 +6,7 @@
 <h1>Ressource — {{ module_label }}</h1>
 <p><a href="{{ module.descriptor.base_url }}">Retour au module</a></p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if notice %}<p role="status" data-action-notice>{{ notice }}</p>{% endif %}
 {% if view %}
 <section aria-labelledby="resource-summary">
 <h2 id="resource-summary">Ressource</h2>
@@ -14,7 +15,7 @@
 <dt>Type</dt><dd><code>{{ view.resource_type.id }}</code> ({{ view.resource_type.format_id }})</dd>
 <dt>Chemin</dt><dd><code>{{ view.path }}</code></dd>
 {% if view.read and view.read.ref %}<dt>Version du format</dt><dd>{{ view.read.ref.format_version }}</dd>{% endif %}
-{% if view.read and view.read.revision %}<dt>Révision</dt><dd><code>sha256:{{ view.read.revision.digest[:16] }}</code> · {{ view.read.revision.size }} octets</dd>{% endif %}
+{% if view.read and view.read.revision %}<dt>Révision</dt><dd{% if view.revision_token %} data-revision-token="{{ view.revision_token }}"{% endif %}><code>sha256:{{ view.read.revision.digest[:16] }}</code> · {{ view.read.revision.size }} octets</dd>{% endif %}
 <dt>Validation</dt><dd>{% if view.runtime_error %}runtime-error{% elif view.read.error %}{{ view.read.error }}{% elif view.read.issues %}valide, avec avertissements{% else %}valide{% endif %}</dd>
 </dl>
 {% if view.runtime_error %}<p role="alert">{{ view.runtime_error }}</p>{% endif %}
