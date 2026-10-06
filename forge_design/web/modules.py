@@ -9,6 +9,11 @@ Actions (FD-EDIT-001) : un POST exact par action exposée,
 taille, l'enveloppe (type, path, revision) et les champs, puis délègue le cycle
 lecture → handler → écriture à ModuleHost ; il choisit seul le statut HTTP et
 redirige (303) vers la page ressource après succès ou absence de changement.
+
+Édition (FD-GRAPHICS-EDIT-001) : la page ressource transporte, en JSON inerte, le
+contexte calculé par l'hôte pour le script d'édition déclaré par le module ; le
+client générique /module-resource.js l'importe. Aucun script de module n'est
+chargé ailleurs.
 """
 
 from collections.abc import Callable
@@ -180,6 +185,11 @@ def show_module_resource(
         if view is not None and view.scene is not None
         else None
     )
+    editor = (
+        scene_json_payload(dict(view.editor))
+        if view is not None and view.editor is not None
+        else None
+    )
     return render_page(
         "module_resource.html",
         {
@@ -187,6 +197,7 @@ def show_module_resource(
             "view": view,
             "error": error,
             "scene": scene,
+            "editor": editor,
             "notice": NOTICES.get(notice or "") if error is None else None,
         },
         status=status,

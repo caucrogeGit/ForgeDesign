@@ -795,6 +795,21 @@ décodé et un `ModuleActionPayload` borné. Capability gate au démarrage :
 capacité de l'action et `save` disponibles, sinon la route n'existe pas. API
 de modules inchangée (1) : `ModuleDescriptor.actions` est additif.
 
+Édition graphique (FD-GRAPHICS-EDIT-001, [hôte](modules/module-host.md#édition),
+[moteur](graphics/graphics-engine.md#node-move-opt-in)) :
+
+```text
+page ressource (action exposée + editor_script) ─▶ contexte JSON inerte (hôte)
+   ─▶ /module-resource.js : import() du script déclaré ─▶ createResourceEditor(context)
+   ─▶ createGraphicEngine(..., { nodeMove })  (opt-in : canMove, keyboardStep, constrain)
+        glisser (seuil 4 px écran) ou Ctrl + Maj + flèche ─▶ aperçu runtime O(degré)
+        ─▶ onMove({ nodeId, from, to, delta }) en coordonnées monde, une fois
+   ─▶ script du module : monde → coordonnées métier, POST de l'action, 303 ─▶ rechargement
+```
+
+Le moteur ne persiste rien et ne connaît aucun domaine ; Route, Entity et Debug
+ne passent pas `nodeMove`.
+
 ## 14. Écriture
 
 Principe :

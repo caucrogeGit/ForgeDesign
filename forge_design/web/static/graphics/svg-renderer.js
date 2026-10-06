@@ -117,6 +117,50 @@ export function applySelection(view, state) {
   for (const [id, edge] of view.edges) edge.classList.toggle("gx-related", edgeIds.has(id));
 }
 
+// Nœuds déplaçables (FD-GRAPHICS-EDIT-001) : classe et raccourcis annoncés, rien d'autre.
+export function applyMovable(view, nodeIds, shortcuts) {
+  for (const [id, node] of view.nodes) {
+    const movable = nodeIds.has(id);
+    node.classList.toggle("gx-movable", movable);
+    if (movable) node.setAttribute("aria-keyshortcuts", shortcuts);
+    else node.removeAttribute("aria-keyshortcuts");
+  }
+}
+
+function edgeGeometry(group, edge, points) {
+  group.querySelector(".gx-edge-path").setAttribute("points", formatPoints(points));
+  if (edge.presentation.arrow !== "end") return;
+  const head = arrowHead(points);
+  let arrow = group.querySelector(".gx-edge-arrow");
+  if (head === null) {
+    if (arrow) arrow.remove();
+    return;
+  }
+  if (!arrow) {
+    arrow = element(group.ownerDocument, "polygon", { class: "gx-edge-arrow" });
+    group.querySelector(".gx-edge-path").after(arrow);
+  }
+  arrow.setAttribute("points", formatPoints(head));
+}
+
+// Aperçu runtime d'un déplacement : le nœud est translaté, les extrémités de ses
+// arêtes incidentes suivent (premier point si source, dernier si cible), les points
+// intermédiaires restent fixes. O(degré) ; la scène validée n'est jamais modifiée.
+// Un delta nul restaure exactement le rendu de la scène.
+export function previewNodeMove(view, nodeId, edges, delta) {
+  const node = view.nodes.get(nodeId);
+  const still = delta.x === 0 && delta.y === 0;
+  if (still) node.removeAttribute("transform");
+  else node.setAttribute("transform", `translate(${delta.x} ${delta.y})`);
+  for (const edge of edges) {
+    const points = edge.points.map((point) => ({ x: point.x, y: point.y }));
+    const last = points.length - 1;
+    if (edge.source === nodeId) points[0] = { x: points[0].x + delta.x, y: points[0].y + delta.y };
+    if (edge.target === nodeId) points[last] = { x: points[last].x + delta.x, y: points[last].y + delta.y };
+    edgeGeometry(view.edges.get(edge.id), edge, still ? edge.points : points);
+  }
+}
+
 // Niveau de détail actif : une classe sur le SVG racine (O(1)), la CSS masque les
 // lignes absentes du niveau et, en overview, les libellés d'arêtes. Aucun élément
 // n'est recréé : identités, sélection et focus sont inchangés.

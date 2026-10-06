@@ -121,6 +121,8 @@ def witness_module(
     probe: Callable[[], dict[str, bool]] | None = None,
     actions: tuple[ModuleAction, ...] = (),
     edit_dependency: bool = False,
+    editor_script: str | None = None,
+    editor_config: Callable[[Any], Any] | None = None,
 ) -> ModuleDescriptor:
     resource_type = witness_type(
         source_prefix=prefix(module_id), suffix=suffix(module_id)
@@ -149,7 +151,15 @@ def witness_module(
         definition=definition,
         version="0.2.0",
         api_version=api_version,
-        bindings=(ResourceBinding("document", codec or RecordingCodec(), scene),),
+        bindings=(
+            ResourceBinding(
+                "document",
+                codec or RecordingCodec(),
+                scene,
+                editor_script=editor_script,
+                editor_config=editor_config,
+            ),
+        ),
         asset_package=ASSET_PACKAGE,
         assets=(ModuleAsset(f"{module_id}.css", ASSET_SOURCE),)
         if assets is None

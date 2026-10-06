@@ -34,7 +34,9 @@ Un paquet expose `FORGE_DESIGN_MODULE = ModuleDescriptor(...)` :
 `SpecializedToolDefinition` (avec `UiEntry` pour apparaître dans le shell),
 version, `api_version`, un `ResourceBinding(type, codec, scene)` par type,
 `asset_package` et `assets`, et une sonde facultative. Il ne reçoit ni
-Router, ni Request, ni racine de projet, ni chemin système.
+Router, ni Request, ni racine de projet, ni chemin système. Un binding peut
+ajouter `editor_script` (nom d'un asset `.js` déclaré) et `editor_config`
+(document → JSON) : voir [Édition](#édition).
 
 ## Routes
 
@@ -99,10 +101,48 @@ Sans JavaScript, les métadonnées et diagnostics restent lisibles, avec le
 message « La visualisation graphique nécessite JavaScript. ». Il n'y a pas de
 rendu SVG côté serveur pour un module.
 
+## Édition
+
+FD-GRAPHICS-EDIT-001 (premier client : ForgeDesign-Circuit, FDC-EDIT-001).
+Le cœur ne contient aucun éditeur métier ; il charge, de façon générique, le
+script d'édition déclaré par le module, et seulement là où il sert.
+
+| Condition (toutes requises) | Effet |
+|---|---|
+| Le type a une action **exposée** (capability gate), la lecture donne une révision, la projection une scène, et le binding déclare `editor_script` | La page ressource porte un bloc inerte `<script type="application/json" data-module-editor>` et une zone `data-editor-status` (`role="status"`) |
+| Sinon (module en lecture seule, capacité indisponible, ressource illisible, projection en échec) | Page inchangée : aucun bloc, aucun script de module |
+
+Contexte calculé par l'hôte, jamais par le module :
+
+| Clé | Valeur |
+|---|---|
+| `script` | `/modules/<id>/assets/<editor_script>` |
+| `type`, `path` | Type et chemin de la ressource affichée |
+| `revision` | Jeton public de la révision lue (`data-revision-token`) |
+| `actions` | `{ id: URL }` des seules actions exposées de ce type |
+| `config` | Résultat de `editor_config(document)` : isolé (exception → message borné, trace journalisée), objet JSON strict sans `NaN`, au plus 1 Mio (`MAX_MODULE_EDITOR_CONFIG_BYTES`), copie détachée |
+
+Le JSON est échappé comme la scène (`scene_json_payload`). Si la
+configuration échoue, la scène reste affichée et la page annonce « Édition
+indisponible : … ».
+
+Côté navigateur, `/module-resource.js` (générique) lit ce contexte, vérifie
+que chaque URL est un chemin absolu du même serveur, importe le script par
+`import()` (CSP `script-src 'self'` inchangée) et appelle
+`createResourceEditor(context)` avec un contexte gelé
+(`resourceType`, `path`, `revision`, `actions`, `config`, `announce`). Le
+résultat peut fournir l'option `nodeMove` du moteur et `attach(engine)`.
+Script introuvable, export absent, exception, option refusée par le moteur ou
+`attach` en échec : la vue est montée en consultation seule et l'indisponibilité
+est annoncée. Le script du module envoie lui-même l'action (formulaire encodé,
+URL et jeton du contexte) ; la page d'erreur du cœur marque son message
+`data-action-error`.
+
 ## Limites V1
 
-Pas d'interface d'édition (aucun bouton Enregistrer, Modifier, Créer ou
-Supprimer) : les actions POST existent (FD-EDIT-001,
-[contrat](module-actions.md)), mais aucun formulaire n'est livré par le cœur.
-Pas de JS ni de template fournis par le module, pas d'icône d'`UiEntry`
-affichée, pas de découverte automatique ni d'installation.
+Pas de formulaire d'édition générique dans le cœur (aucun bouton Enregistrer,
+Modifier, Créer ou Supprimer) : l'édition passe par le script déclaré du module
+et les actions POST (FD-EDIT-001, [contrat](module-actions.md)). Un seul
+script d'édition par type, chargé seulement sur la page ressource. Pas de
+template fourni par le module, pas d'icône d'`UiEntry` affichée, pas de
+découverte automatique ni d'installation.

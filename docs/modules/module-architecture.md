@@ -66,7 +66,7 @@ Un paquet de module expose l'attribut `FORGE_DESIGN_MODULE`, un
 | `definition` | `SpecializedToolDefinition` existante : `id` (kebab-case, au plus 32 caractères), nom, description, types de ressources, capacités, dépendances optionnelles, entrée UI |
 | `version` | Version du paquet, observable (même forme que les versions de format) |
 | `api_version` | Version de l'API hôte ciblée (entier) |
-| `bindings` | Un `ResourceBinding` par type de ressource déclaré, ni plus ni moins : codec `SpecializedResourceCodec` (octets seulement) et projection facultative `document → GraphicScene` |
+| `bindings` | Un `ResourceBinding` par type de ressource déclaré, ni plus ni moins : codec `SpecializedResourceCodec` (octets seulement), projection facultative `document → GraphicScene`, et, facultatifs (FD-GRAPHICS-EDIT-001), `editor_script` (asset `.js` déclaré, exige une projection) et `editor_config` (`document → JSON`, exige un script) ([édition](module-host.md#édition)) |
 | `asset_package` | Paquet Python contenant les assets (lu par l'hôte via `importlib.resources`) |
 | `assets` | Liste fermée (au plus 32) de `ModuleAsset(name, source)` : nom `[a-z0-9-]+.(js\|css\|svg)`, source relative sans segment vide, `.`, `..` ou caché |
 | `dependency_probe` | Sonde facultative, sans effet de bord : `{id de dépendance: disponible}` |
@@ -103,6 +103,12 @@ composition HTTP, puis est injectée dans `create_application(modules=…)`.
   gouverne l'activation.
 - Incompatible : diagnostic `api-incompatible`, module non activé, les
   autres continuent.
+- Ajouts additifs restés en API 1 : `actions` (FD-EDIT-001), `editor_script`
+  et `editor_config` (FD-GRAPHICS-EDIT-001), tous facultatifs. Un module qui
+  les utilise, chargé par un cœur antérieur, échoue à la construction de son
+  descripteur (`module-import-failed`) ; la version de distribution du cœur
+  (`0.1.0.dev0`) n'a pas changé, la contrainte `forge-design>=…` ne peut donc
+  pas encore l'exprimer.
 
 ## Resource types
 
@@ -174,6 +180,11 @@ V1 (FD-MODULES-002) : **ouvrir et visualiser** seulement.
   d'origine du cœur. Le module ne fournit qu'une transformation pure
   `handler(document, payload)` ; lecture, jeton de révision, validation,
   `write_specialized_resource`, historique et statut HTTP restent au cœur.
+- **Script d'édition** (FD-GRAPHICS-EDIT-001, [hôte](module-host.md#édition)) :
+  un asset JS déclaré par le binding, importé par le client générique de la
+  page ressource seulement si une action du type est exposée ; il reçoit un
+  contexte calculé par l'hôte (URLs, jeton, configuration) et peut fournir
+  l'option `nodeMove` du Graphic Core. Il ne reçoit ni Router, ni racine.
 
 ## Namespace
 
@@ -308,7 +319,9 @@ expose pour cela `loads_strict_json`, `MAX_SPECIALIZED_ISSUES` et
 - Sandbox de processus pour un module.
 - Handlers Forge MVC fournis par un module (les actions POST passent par
   l'hôte, voir [actions](module-actions.md)).
-- UI d'édition, glisser, undo/redo, simulation.
+- UI d'édition générique dans le cœur, undo/redo, simulation (le glisser
+  opt-in du Graphic Core et le script d'édition déclaré existent depuis
+  FD-GRAPHICS-EDIT-001).
 - Solveur de dépendances entre modules.
 - Moteur 3D : ce n'est pas une extension automatique du Graphic Core 2D ;
   ce serait une capacité ou un module séparé, à étudier le moment venu.

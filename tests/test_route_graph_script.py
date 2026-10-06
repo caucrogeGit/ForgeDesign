@@ -79,7 +79,7 @@ def test_node_check(path: Path) -> None:
 
 
 def test_node_suites() -> None:
-    assert len(SUITES) == 14
+    assert len(SUITES) == 15
     result = subprocess.run(
         [_node(), "--test", *map(str, SUITES)],
         capture_output=True,

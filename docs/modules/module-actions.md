@@ -232,8 +232,11 @@ module qui déclare des actions et serait chargé par un cœur antérieur échou
 ## Limites V1
 
 - Pas d'UI d'action générique : le cœur n'affiche aucun formulaire métier.
-  Le futur éditeur JS du module enverra le formulaire encodé avec le jeton
-  publié.
+  Le script d'édition déclaré du module (FD-GRAPHICS-EDIT-001,
+  [hôte](module-host.md#édition)) envoie le formulaire encodé avec l'URL et le
+  jeton du contexte calculé par l'hôte ; `fetch` suit le 303, et en cas
+  d'échec le message de la page d'erreur est repéré par `data-action-error`.
+  Premier client : `move-component` de ForgeDesign-Circuit (FDC-EDIT-001).
 - Une action vise une seule ressource ; pas de lot, pas de transaction
   multi-ressources.
 - Payload scalaire texte ; pas de liste ni d'objet.

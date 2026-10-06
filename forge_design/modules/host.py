@@ -16,6 +16,12 @@ lecture, contrôle du jeton de révision, handler pur du module, comparaison des
 encodages (no-op), puis write_specialized_resource (validation bloquante,
 conflit, publication atomique, historique). Le résultat est un code d'issue ;
 le statut HTTP est décidé par la couche Web du cœur.
+
+FD-GRAPHICS-EDIT-001 : si le type a une action exposée, une scène et un
+``editor_script``, la vue porte un contexte d'édition inerte (URL du script,
+type, chemin, jeton, URLs des actions exposées du type, configuration du
+module). Tout est calculé par l'hôte ; la configuration du module est isolée et
+bornée comme la projection.
 """
 
 import hmac
@@ -71,6 +77,8 @@ from forge_design.specialized.models import is_kebab_case
 # Une GraphicScene projetée par un module est bornée avant transport ; sa forme
 # exacte est validée par le vrai validateScene du Graphic Core dans le navigateur.
 MAX_MODULE_SCENE_BYTES = 8 * 1024 * 1024
+# Configuration d'édition d'un module : données de travail du script, pas une scène.
+MAX_MODULE_EDITOR_CONFIG_BYTES = 1024 * 1024
 
 _LOGGER = logging.getLogger("forge_design.modules")
 
@@ -107,6 +115,9 @@ class ModuleResourceView:
     runtime_error: str | None
     # Jeton public de la révision lue, seulement si le type a des actions exposées.
     revision_token: str | None = None
+    # Contexte du script d'édition (JSON inerte), ou message borné si indisponible.
+    editor: Mapping[str, Any] | None = None
+    editor_error: str | None = None
 
 
 ActionOutcomeCode = Literal[
@@ -272,12 +283,44 @@ class ModuleHost:
         if read.resource is not None and binding.scene is not None:
             scene, scene_error = self._project(module_id, binding.scene, read.resource)
         token = None
-        if read.revision is not None and any(
-            action.resource_type == type_id for action in self.actions(module_id)
-        ):
+        actions = tuple(
+            action
+            for action in self.actions(module_id)
+            if action.resource_type == type_id
+        )
+        if read.revision is not None and actions:
             token = revision_token(module_id, type_id, path, read.revision)
+        editor, editor_error = None, None
+        if token is not None and scene is not None and binding.editor_script:
+            config: Mapping[str, Any] = {}
+            if binding.editor_config is not None:
+                config, editor_error = self._editor_config(
+                    module_id, binding.editor_config, read.resource
+                )
+            if editor_error is None:
+                descriptor = module.descriptor
+                editor = {
+                    "script": descriptor.asset_url(binding.editor_script),
+                    "type": type_id,
+                    "path": path,
+                    "revision": token,
+                    "actions": {
+                        action.id: descriptor.action_url(action.id)
+                        for action in actions
+                    },
+                    "config": config,
+                }
         return ModuleResourceView(
-            module, resource_type, path, read, scene, scene_error, None, token
+            module,
+            resource_type,
+            path,
+            read,
+            scene,
+            scene_error,
+            None,
+            token,
+            editor,
+            editor_error,
         )
 
     def execute_action(
@@ -416,6 +459,28 @@ class ModuleHost:
         return ModuleActionOutcome(
             "saved", "Modification enregistrée.", revision=written.revision
         )
+
+    @staticmethod
+    def _editor_config(
+        module_id: str, configure: Any, resource: object
+    ) -> tuple[Mapping[str, Any], str | None]:
+        """Configuration du module, isolée et bornée ; copie JSON détachée."""
+        unavailable = "Édition indisponible : "
+        try:
+            produced = configure(resource)
+        except Exception as error:
+            return {}, unavailable + _runtime(
+                module_id, "Configuration d'édition", error
+            )
+        if not isinstance(produced, Mapping):
+            return {}, unavailable + "la configuration du module n'est pas un objet."
+        try:
+            text = json.dumps(produced, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError, RecursionError):
+            return {}, unavailable + "la configuration du module n'est pas du JSON."
+        if len(text.encode("utf-8")) > MAX_MODULE_EDITOR_CONFIG_BYTES:
+            return {}, unavailable + "la configuration du module est trop volumineuse."
+        return json.loads(text), None
 
     @staticmethod
     def _project(

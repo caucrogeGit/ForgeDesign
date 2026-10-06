@@ -56,6 +56,9 @@ export class FakeElement {
   getAttribute(name) {
     return this.attributes.has(name) ? this.attributes.get(name) : null;
   }
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
   set innerHTML(_value) {
     throw new Error("innerHTML interdit");
   }
@@ -78,6 +81,11 @@ export class FakeElement {
   prepend(...nodes) {
     for (const node of nodes) node.parent = this;
     this.children.unshift(...nodes);
+  }
+  after(...nodes) {
+    const siblings = this.parent.children;
+    for (const node of nodes) node.parent = this.parent;
+    siblings.splice(siblings.indexOf(this) + 1, 0, ...nodes);
   }
   remove() {
     if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this);

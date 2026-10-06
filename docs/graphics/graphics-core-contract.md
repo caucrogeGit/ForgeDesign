@@ -781,6 +781,26 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
   l'échelle 0,523, donc la vue d'ensemble sans texte ; une politique
   d'ajustement lisible reste à arbitrer.
 
+## Déplacement de nœuds — FD-GRAPHICS-EDIT-001
+
+- **Décidé** : le déplacement est une capacité générique du moteur, **opt-in**
+  par une option runtime du client (`nodeMove`), jamais un champ persisté de la
+  `GraphicScene`. Route, Entity et Debug ne sont pas déplaçables.
+- Le moteur convertit écran → monde, applique un aperçu runtime (nœud et
+  extrémités des arêtes incidentes, points intermédiaires fixes, O(degré)) et
+  signale une seule intention `{ nodeId, from, to, delta, input }`. Il ne
+  persiste rien et ne connaît ni document, ni grille métier, ni HTTP.
+- L'alignement (grille) et les bornes sont une contrainte du client
+  (`constrain`) ; la conversion monde → coordonnées métier appartient au
+  module (Circuit : `circuit-editor.js`).
+- Clavier obligatoire pour annoncer un nœud déplaçable : Ctrl + Maj + flèches
+  (Alt + flèches écarté : historique des navigateurs).
+- Premier client : ForgeDesign-Circuit (FDC-EDIT-001), par le script d'édition
+  déclaré du module ([hôte des modules](../modules/module-host.md#édition)).
+- Provenance : seuil écran constant et un seul enregistrement par geste
+  (DrawCiel `startComponentDrag` / `endPointer`, `6ecb8e10`) ADAPT ; aucun code
+  copié.
+
 ## Questions reportées
 
 | Question | Ticket attendu |
@@ -793,6 +813,7 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 | Lisibilité au fit des grands graphes (niveaux de détail, couloirs entre colonnes) | **Niveaux de détail tranchés par FD-GRAPHICS-006** ; compaction horizontale selon l'usage |
 | Niveau de détail déclaré par arête ou seuils par instance | Quand un client en aura besoin |
 | Routage de recours (A\*) et évitement d'obstacles complet | Après FD-GRAPHICS-003 |
+| Re-routage des connexions après un déplacement (points intermédiaires persistés laissés en place) | Constat FDC-EDIT-001 ; candidat au ticket suivant |
 | Annotations graphiques, rappels, trait libre | Quand un domaine en a besoin |
 | Groupes, verrous, alignement, pivot commun de rotation | FUTUR |
 | Miroir, rotation libre, redimensionnement | FUTUR |

@@ -71,6 +71,9 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .gx-viewport.gx-panning { cursor: grabbing; }
 .gx-scene { display: block; width: 100%; height: 100%; }
 .gx-node { cursor: pointer; }
+/* Nœuds déplaçables (FD-GRAPHICS-EDIT-001, opt-in client) et glisser en cours. */
+.gx-node.gx-movable { cursor: move; user-select: none; }
+.gx-viewport.gx-moving, .gx-viewport.gx-moving .gx-node { cursor: grabbing; }
 .gx-node-box { fill: #fff; stroke: #667085; stroke-width: 1.5; }
 .gx-node-text { font: 12px monospace; fill: #172033; }
 .gx-variant-category-1 .gx-node-box { fill: #f5f8fc; }

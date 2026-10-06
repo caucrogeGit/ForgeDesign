@@ -32,6 +32,9 @@
 <p data-graphic-fallback>La visualisation graphique nécessite JavaScript.</p>
 <script type="application/json" data-graphic-scene>{{ scene }}</script>
 <p data-selection-status role="status" aria-live="polite">La sélection du graphe nécessite JavaScript.</p>
+{% if editor %}<script type="application/json" data-module-editor>{{ editor }}</script>
+<p data-editor-status role="status" aria-live="polite" hidden></p>{% endif %}
+{% if view.editor_error %}<p data-editor-unavailable>{{ view.editor_error }}</p>{% endif %}
 </section>
 <script type="module" src="/module-resource.js"></script>
 {% elif view.scene_error %}

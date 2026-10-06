@@ -187,13 +187,14 @@ l'état du viewport.
 ## Instance lifecycle
 
 ```js
-const engine = createGraphicEngine(container, scene, { onSelectionChange(state) {} });
+const engine = createGraphicEngine(container, scene, { onSelectionChange(state) {}, nodeMove });
 engine.select(id); engine.clearSelection(); engine.focus(id);
 engine.selection(); engine.node(id); engine.edge(id); engine.scene();
 engine.fit(); engine.home(); engine.zoomIn(); engine.zoomOut();
 engine.zoomAt({x, y}, factor); engine.panBy(dx, dy); engine.resize(); engine.viewport();
 engine.detailLevel();   // "overview" | "normal" | "detail", dérivé de l'échelle
 engine.centerAt({x, y}); engine.minimap();   // recentrage ; inspection de la minicarte
+engine.movableNodes(); engine.movePreview();   // déplacement (lecture seule)
 engine.render();   // re-rendu, écouteurs précédents retirés
 engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 ```
@@ -201,6 +202,44 @@ engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 Chaque instance possède sa scène, son index, sa sélection, son rendu et ses
 écouteurs : deux instances sont indépendantes. Après `destroy()`, toute
 opération lève une erreur.
+
+## Node move (opt-in)
+
+FD-GRAPHICS-EDIT-001, motivé par le premier geste d'édition de
+ForgeDesign-Circuit (FDC-EDIT-001). Le moteur sait qu'un nœud est déplacé d'une
+position monde vers une autre ; il ne sait rien du document, du domaine, d'une
+grille métier ni du réseau.
+
+```js
+createGraphicEngine(container, scene, {
+  nodeMove: {
+    canMove(node) {},                 // opt-in par nœud (nœud validé, lecture seule)
+    keyboardStep: 40,                 // pas monde de Ctrl + Maj + flèche (obligatoire)
+    constrain({ nodeId, delta }) {},  // facultatif : delta monde aligné ou borné
+    onMove({ nodeId, from, to, delta, input }) {},  // true | Promise<boolean>
+  },
+});
+```
+
+| Règle | Comportement |
+|---|---|
+| Opt-in | Sans `nodeMove`, aucun nœud n'est déplaçable ; Route, Entity et Debug ne le passent pas. Option runtime du client, jamais un champ de la `GraphicScene` |
+| Clavier obligatoire | `keyboardStep` est exigé : un nœud n'est annoncé déplaçable (`gx-movable`, `aria-keyshortcuts`) que si le pointeur **et** le clavier le sont |
+| Pointeur | Appui sur un nœud déplaçable (bouton principal) ; au-delà de `DRAG_THRESHOLD` = 4 pixels **écran** (constant quel que soit le zoom), c'est un glisser ; en deçà, un clic (sélection inchangée). La capture du pointeur ne commence qu'au seuil |
+| Coordonnées | Le moteur convertit lui-même écran → monde par son viewport : `delta` et `from`/`to` (origine du rectangle) sont en coordonnées de scène, justes sous zoom et pan |
+| Contrainte | `constrain` reçoit chaque delta brut et rend le delta appliqué ; un résultat non fini ou une exception ignore le mouvement |
+| Aperçu | Runtime, O(degré) : `transform` du nœud et extrémités des arêtes incidentes (premier point si source, dernier si cible, flèche recalculée) ; points intermédiaires, libellés et minicarte inchangés ; la scène validée n'est jamais modifiée |
+| Intention | Une seule, au relâcher (ou à l'appui de Ctrl + Maj + flèche) ; aucune pendant `pointermove` ; aucune si le delta est nul |
+| Résultat | `true` (ou promesse de `true`) : le client accepte, l'aperçu reste jusqu'au remplacement de la scène et tout nouveau geste est bloqué ; `false`, rejet ou exception : rendu autoritaire rétabli |
+| Annulation | Échap, `pointercancel` ou perte de capture : aperçu retiré, aucun appel, sélection conservée |
+| Sélection et focus | Le nœud glissé est sélectionné et reçoit le focus ; le clic qui suit un glisser est ignoré |
+| Pan | Fond (bouton principal) et bouton du milieu, y compris sur un nœud : toujours le pan ; Maj + flèches : toujours le pan |
+
+Clavier : **Ctrl + Maj + flèches**, un `keyboardStep` par appui. Alt + flèches
+est écarté : c'est Précédent / Suivant dans Chromium et Firefox sous Linux et
+Windows, et entre deux pages (rechargement après une action) aucun gestionnaire
+ne l'intercepterait. Ctrl + flèches change d'espace de travail sous macOS ;
+Maj + flèches est le pan.
 
 ## Clients
 
@@ -289,7 +328,9 @@ orthogonal interactif (ports, obstacles, A\*), qui reste à construire.
 SVG racine `role="group"`, `aria-label` (titre), `<title>`, `<desc>` ; chaque
 nœud `role="button"`, `tabindex="0"`, `aria-pressed`, `aria-label` et
 `<title>` ; focus visible (`:focus-visible`) ; aucune information portée par
-la couleur seule (ton + texte, trait pointillé + libellé « (cycle) »).
+la couleur seule (ton + texte, trait pointillé + libellé « (cycle) »). Un nœud
+déplaçable annonce `aria-keyshortcuts` (Ctrl + Maj + flèches) ; le
+déplacement n'est jamais réservé à la souris.
 
 ## Limits
 
@@ -314,8 +355,10 @@ Prouvé par deux clients réels : graphes positionnés, nœuds, arêtes (y compr
 parallèles), libellés, sélection, voisins directs, SVG, viewport (fit, zoom,
 pan, resize), couloirs partagés côté serveur (FD-GRAPHICS-005), niveau de
 détail selon l'échelle (FD-GRAPHICS-006), minicarte et recentrage
-(FD-GRAPHICS-007). Pas encore : layout générique, ports, routeur orthogonal
-interactif (obstacles, A\*, stabilité au déplacement), grille, glisser de
-nœuds, édition, commandes, historique, multi-sélection, groupes, niveaux de
-détail des arêtes déclarés par le client.
+(FD-GRAPHICS-007), déplacement opt-in d'un nœud avec aperçu des extrémités
+incidentes (FD-GRAPHICS-EDIT-001). Pas encore : layout générique, ports,
+routeur orthogonal interactif (obstacles, A\*, stabilité au déplacement),
+grille propre au moteur (l'alignement est une contrainte du client),
+commandes, undo/redo, multi-sélection, groupes, niveaux de détail des arêtes
+déclarés par le client.
 Debug Center est le troisième client depuis FD-GRAPHICS-008.

@@ -13,6 +13,11 @@ routes et URLs d'assets sont calculées par l'hôte, sous /modules/<id>/.
 FD-EDIT-001 ajoute ``actions`` (facultatif, ``()`` par défaut) : des mutations
 métier pures, exécutées et persistées par l'hôte. L'ajout est additif : un
 descripteur d'API 1 sans action reste valide tel quel.
+
+FD-GRAPHICS-EDIT-001 ajoute à ResourceBinding ``editor_script`` (un asset JS
+déclaré) et ``editor_config`` (document → JSON inerte), tous deux facultatifs :
+l'hôte ne charge ce script que sur la page ressource d'un type dont une action
+est exposée. Ajout additif, API 1 inchangée.
 """
 
 import re
@@ -45,6 +50,7 @@ ASSET_MEDIA_TYPES: Mapping[str, str] = {
 _CODEC_METHODS = ("detect_version", "decode", "encode", "validate")
 
 SceneProjection = Callable[[Any], Mapping[str, Any]]
+EditorConfig = Callable[[Any], Mapping[str, Any]]
 DependencyProbe = Callable[[], Mapping[str, bool]]
 
 
@@ -105,11 +111,19 @@ class ResourceBinding:
 
     Le codec (SpecializedResourceCodec) ne voit que des octets ; la projection,
     facultative, transforme un document décodé en GraphicScene sérialisable.
+
+    ``editor_script`` nomme un asset ``.js`` déclaré par le module : un module ES
+    qui exporte ``createResourceEditor(context)`` et que le client générique de la
+    page ressource importe ; ``editor_config``, facultative, rend du document une
+    configuration JSON transmise inerte à ce script. Aucun des deux ne reçoit de
+    chemin, de requête ni d'hôte.
     """
 
     resource_type: str
     codec: Any
     scene: SceneProjection | None = None
+    editor_script: str | None = None
+    editor_config: EditorConfig | None = None
 
     def __post_init__(self) -> None:
         if not _is_str(self.resource_type) or not self.resource_type:
@@ -123,6 +137,19 @@ class ResourceBinding:
             raise ValueError(f"Codec incomplet : {', '.join(missing)}.")
         if self.scene is not None and not callable(self.scene):
             raise ValueError("La projection Graphics doit être appelable.")
+        if self.editor_script is not None and (
+            not _is_str(self.editor_script)
+            or not _ASSET_NAME.fullmatch(self.editor_script)
+            or not self.editor_script.endswith(".js")
+        ):
+            raise ValueError("Le script d'édition est un nom d'asset .js.")
+        if self.editor_config is not None:
+            if not callable(self.editor_config):
+                raise ValueError("La configuration d'édition doit être appelable.")
+            if self.editor_script is None:
+                raise ValueError("Une configuration d'édition exige un script.")
+        if self.editor_script is not None and self.scene is None:
+            raise ValueError("Un script d'édition exige une projection Graphics.")
 
 
 @dataclass(frozen=True)
@@ -170,6 +197,11 @@ class ModuleDescriptor:
             raise ValueError(f"Paquet d'assets invalide : {self.asset_package!r}")
         if self.dependency_probe is not None and not callable(self.dependency_probe):
             raise ValueError("La sonde de dépendances doit être appelable.")
+        for binding in self.bindings:
+            if binding.editor_script is not None and binding.editor_script not in names:
+                raise ValueError(
+                    f"Script d'édition non déclaré : {binding.editor_script}."
+                )
         self._check_actions()
 
     def _check_actions(self) -> None:

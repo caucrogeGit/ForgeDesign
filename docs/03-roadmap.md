@@ -328,8 +328,9 @@ fait      FD-GRAPHICS-007  minicarte générique et recentrage (centerAt), affic
                            la scène dépasse la zone ; mêmes mécanismes pour Route et Entity
 fait      FD-GRAPHICS-008  Debug Center troisième client (flux séquentiel) ; moteur inchangé,
                            trois clients sur les mêmes modules
-état      Graphics : socle de visualisation éprouvé (trois clients) ; édition graphique à
-                           construire, pilotée par un module réel (Phase Modules)
+état      Graphics : socle de visualisation éprouvé (trois clients) ; édition graphique
+                           pilotée par un module réel (Phase Modules) : déplacement de nœud
+                           opt-in depuis FD-GRAPHICS-EDIT-001
 extrait   Circuit hors du cœur (FD-MODULES-003) : dépôt ForgeDesign-Circuit ; les tickets
                            suivants sont des tickets du module :
 fait      (module)         projection Circuit → scène en consultation (FD-MODULES-003)
@@ -370,8 +371,15 @@ fait      FD-EDIT-001     actions bornées des modules : POST exact par action e
                           formulaire borné, jeton de révision opaque, handler pur du module,
                           écriture et historique par le cœur ; témoin de test, aucune action
                           Circuit
-suivant   ForgeDesign-Circuit : premier geste d'édition réel (déplacer un composant)
-          sur ce contrat
+fait      FD-GRAPHICS-EDIT-001  déplacement de nœud opt-in du Graphic Core (coordonnées monde,
+                          seuil écran, aperçu des extrémités incidentes, Ctrl + Maj + flèches,
+                          Échap / pointercancel) et script d'édition déclaré par un module,
+                          chargé par le client générique de la page ressource
+fait      FDC-EDIT-001    (module) premier geste réel : déplacer un composant Circuit
+                          (move-component, capacité edit, une écriture par geste, routes
+                          persistées inchangées)
+suivant   (module) re-routage des connexions après déplacement, si les constats de
+          FDC-EDIT-001 le confirment (extrémités reprojetées, points intermédiaires figés)
 puis      autres tickets du module Circuit (édition, export, simulation), chaque
           capacité générique d'édition étant extraite vers le cœur quand elle sert
 ```
