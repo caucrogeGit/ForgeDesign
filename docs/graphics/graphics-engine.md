@@ -187,7 +187,7 @@ l'état du viewport.
 ## Instance lifecycle
 
 ```js
-const engine = createGraphicEngine(container, scene, { onSelectionChange(state) {}, nodeMove });
+const engine = createGraphicEngine(container, scene, { onSelectionChange(state) {}, onViewChange(state) {}, nodeMove });
 engine.select(id); engine.clearSelection(); engine.focus(id);
 engine.selection(); engine.node(id); engine.edge(id); engine.scene();
 engine.fit(); engine.home(); engine.zoomIn(); engine.zoomOut();
@@ -195,6 +195,8 @@ engine.zoomAt({x, y}, factor); engine.panBy(dx, dy); engine.resize(); engine.vie
 engine.detailLevel();   // "overview" | "normal" | "detail", dérivé de l'échelle
 engine.centerAt({x, y}); engine.minimap();   // recentrage ; inspection de la minicarte
 engine.movableNodes(); engine.movePreview();   // déplacement (lecture seule)
+engine.addOverlay({ label });   // calque monde d'un client : { root, remove() }
+engine.worldAt({ clientX, clientY });   // point écran → point monde
 engine.render();   // re-rendu, écouteurs précédents retirés
 engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 ```
@@ -240,6 +242,41 @@ est écarté : c'est Précédent / Suivant dans Chromium et Firefox sous Linux e
 Windows, et entre deux pages (rechargement après une action) aucun gestionnaire
 ne l'intercepterait. Ctrl + flèches change d'espace de travail sous macOS ;
 Maj + flèches est le pan.
+
+## World overlays and view changes
+
+FD-GRAPHICS-EDIT-002, motivé par la création de connexions de
+ForgeDesign-Circuit (FDC-EDIT-004) : un client doit poser ses propres éléments
+interactifs **dans le dessin** sans dépendre de la structure DOM privée du
+renderer ni reconstruire le viewport. Le moteur ne sait rien de ces éléments :
+ni port, ni borne, ni fil, ni domaine.
+
+```js
+const engine = createGraphicEngine(container, scene, {
+  onViewChange({ scale, x, y, width, height, detailLevel }) {},  // état gelé
+});
+const overlay = engine.addOverlay({ label: "Nom accessible du calque" });
+overlay.root;      // <g class="gx-overlay" role="group"> dédié, vide, coordonnées monde
+overlay.remove();  // idempotent
+engine.worldAt({ clientX, clientY });  // { x, y } monde, gelé
+```
+
+| Règle | Comportement |
+|---|---|
+| Racine dédiée | `addOverlay` crée un groupe SVG vide propre au client, placé après les nœuds dans le SVG de scène : le viewBox du viewport s'y applique (coordonnées monde). Aucun calque interne du renderer n'est exposé |
+| Contenu client | Le client crée ses éléments (`createElementNS`, attributs, `textContent`) dans `root` ; le moteur n'y dessine rien et n'impose aucune taille |
+| Rendu | `render()` recrée la scène et rattache les mêmes racines, dans l'ordre de création : le contenu client survit |
+| Pointeur | Un appui dans un calque n'est jamais un pan (comme un nœud) ; le client gère ses propres gestes et peut convertir un point écran par `worldAt` |
+| Clavier | Une touche dont le client a déjà fait `preventDefault()` n'est pas reprise par le moteur (Échap de désélection, Maj + flèches de pan) |
+| Cycle de vie | `remove()` retire un calque ; `destroy()` retire tous les calques de l'instance ; après `destroy()`, `addOverlay` et `worldAt` lèvent une erreur |
+| Instances | Calques et notifications appartiennent à leur instance : aucun état partagé |
+| Nom accessible | `label` facultatif, une ligne, borné à 200 caractères |
+| `onViewChange` | Appelé avec l'état observable (échelle, origine, taille de zone, niveau de détail) quand il change : zoom, pan, fit, home, recentrage, redimensionnement, changement de niveau ; jamais sans changement ; une exception du client est isolée |
+| Thème | `shell.css` fournit des classes génériques, couleurs et traits seulement : `gx-overlay-item`, `gx-overlay-handle`, `gx-overlay-hit`, `gx-overlay-active`, `gx-overlay-candidate`, `gx-overlay-path` (CSP `style-src 'self'` : aucun style en ligne) |
+
+Route, Entity et Debug n'appellent ni `addOverlay` ni `onViewChange` : leur
+rendu est inchangé. Premier client : le script d'édition de ForgeDesign-Circuit,
+qui y dessine ses poignées et son aperçu ([hôte des modules](../modules/module-host.md#édition)).
 
 ## Clients
 
@@ -356,7 +393,9 @@ parallèles), libellés, sélection, voisins directs, SVG, viewport (fit, zoom,
 pan, resize), couloirs partagés côté serveur (FD-GRAPHICS-005), niveau de
 détail selon l'échelle (FD-GRAPHICS-006), minicarte et recentrage
 (FD-GRAPHICS-007), déplacement opt-in d'un nœud avec aperçu des extrémités
-incidentes (FD-GRAPHICS-EDIT-001). Pas encore : layout générique, ports,
+incidentes (FD-GRAPHICS-EDIT-001), calques monde des clients et notification
+de vue (FD-GRAPHICS-EDIT-002). Pas encore : layout générique, ports (un client
+peut en dessiner dans son calque, le moteur ne les connaît pas),
 routeur orthogonal interactif (obstacles, A\*, stabilité au déplacement),
 grille propre au moteur (l'alignement est une contrainte du client),
 commandes, undo/redo, multi-sélection, groupes, niveaux de détail des arêtes

@@ -131,7 +131,10 @@ que chaque URL est un chemin absolu du même serveur, importe le script par
 `import()` (CSP `script-src 'self'` inchangée) et appelle
 `createResourceEditor(context)` avec un contexte gelé
 (`resourceType`, `path`, `revision`, `actions`, `config`, `announce`). Le
-résultat peut fournir l'option `nodeMove` du moteur et `attach(engine)`.
+résultat peut fournir les options `nodeMove` et `onViewChange`
+(FD-GRAPHICS-EDIT-002) du moteur et `attach(engine)` ; dans `attach`, le script
+peut créer ses calques monde par `engine.addOverlay()`
+([moteur](../graphics/graphics-engine.md#world-overlays-and-view-changes)).
 Script introuvable, export absent, exception, option refusée par le moteur ou
 `attach` en échec : la vue est montée en consultation seule et l'indisponibilité
 est annoncée. Le script du module envoie lui-même l'action (formulaire encodé,

@@ -810,6 +810,12 @@ page ressource (action exposée + editor_script) ─▶ contexte JSON inerte (h�
 Le moteur ne persiste rien et ne connaît aucun domaine ; Route, Entity et Debug
 ne passent pas `nodeMove`.
 
+Calques monde (FD-GRAPHICS-EDIT-002,
+[moteur](graphics/graphics-engine.md#world-overlays-and-view-changes)) : le
+script d'un module peut demander `engine.addOverlay()`, une racine SVG dédiée en
+coordonnées monde, et recevoir `onViewChange` (échelle, niveau de détail) pour y
+placer ses propres éléments interactifs ; le moteur n'en connaît pas le contenu.
+
 ## 14. Écriture
 
 Principe :

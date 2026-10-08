@@ -25,10 +25,10 @@ copie automatique, aucun suivi du HEAD en runtime.
 
 | Champ | Valeur |
 |---|---|
-| Commit | `6ecb8e10` — fix(contenus): remplacer EveryCircuit par DrawCiel dans la séquence circuits |
-| Date du commit | 5 octobre 2026 |
-| Date d'analyse | 6 octobre 2026 |
-| Ticket | FDC-EDIT-001 (ForgeDesign-Circuit) et FD-GRAPHICS-EDIT-001 (cœur) |
+| Commit | `2e04a22f` — fix(temps): saisir les durées en heures et minutes |
+| Date du commit | 7 octobre 2026 |
+| Date d'analyse | 8 octobre 2026 |
+| Ticket | FDC-EDIT-004 (ForgeDesign-Circuit) et FD-GRAPHICS-EDIT-002 (cœur) |
 
 ## Journal des références
 
@@ -48,6 +48,9 @@ copie automatique, aucun suivi du HEAD en runtime.
 | FD-GRAPHICS-008 | `88f95b75` | `88f95b75` | Vide (`git fetch` : `origin/main` inchangé) | Aucun : migration d'un client plateforme (Debug Center), aucun élément DrawCiel repris |
 | FD-MODULES-003 | `88f95b75` | `9a38dce8` | Un commit SéquenCiel (palette de texte de l'éditeur riche), aucun fichier DrawCiel modifié | Projection Circuit du module ForgeDesign-Circuit : composant centré et emprise permutée à 90° (`componentBox`) ADAPT ; borne = position locale tournée (`localTerminal`, `terminalPort`) et ordre N → E → S → W (`rotateSide`) REWRITE en arithmétique entière ; routes persistées respectées, A* et nettoyage de route non repris ; aucun code DrawCiel copié |
 | FDC-EDIT-001 / FD-GRAPHICS-EDIT-001 | `9a38dce8` | `6ecb8e10` | Deux commits : `837f0b3e` (périphériques R4, `app.js` : une ligne de décoration de carte R4 et `renderR4Matrix`), `6ecb8e10` (contenus) ; aucun changement du glisser. Deux commits locaux non publiés (`ddd8660a`, `49439b27`, séances) signalés, hors DrawCiel | Glisser de composant (`startComponentDrag`, `workspacePointerMove`, `endPointer`) : seuil écran 4/zoom ADAPT (constante écran du moteur), sélection au glisser et un seul `commit` par geste ADAPT (une action par geste) ; conversion `point()` REWRITE (viewport du moteur) ; alignement du delta `snap()` REWRITE (contrainte du client, grille Circuit) ; re-routage `prepareStableRoutesForMove` / `translateInternalWireRoutes`, guides d'alignement, groupes, multi-sélection, verrous et jonctions automatiques non repris ; comportement de `pointercancel` rejeté (DrawCiel y valide le déplacement par `commit` ; ici il annule sans écriture) ; aucun déplacement clavier dans DrawCiel ; aucun code copié |
+| FDC-EDIT-002 (module) | `6ecb8e10` | `bd76fca0` | Quatre commits hors DrawCiel (séances, éditeur riche, dépendances) ; `app.js` identique | Adaptation locale de route (`adaptedRoute` : glissement du voisin d'extrémité ; `simplifyExact`) REWRITE ; `cleanRoute`, translation interne, A\*, obstacles, jonctions automatiques non repris ; aucun code copié |
+| FDC-EDIT-003 (module) | `bd76fca0` | `2e04a22f` | Trois commits hors DrawCiel (durées, ADR) ; `app.js` identique | Sortie orientée des bornes : ancre de sortie de `terminalPort` et `rotateSide` REWRITE (talon d'une unité de grille), `adaptedRoute` REWRITE local (détour du seul corps de la borne) ; A\* et obstacles non repris ; aucun code copié |
+| FDC-EDIT-004 (module) / FD-GRAPHICS-EDIT-002 | `2e04a22f` | `2e04a22f` | Vide sur `origin/main` ; commit local non publié `4de07ee1` (carte R4, cosimulation ; `app.js` : actions de carte R4) signalé, non retenu | Création de fil (`terminalClick`, `beginOrCompleteWire`, `renderPreview`, `previewPoints`, `cancelWire`) : bornes cibles de rayon fixe et classes « en attente / cible » ADAPT (poignées d'un calque monde, rayon écran stable) ; clic-clic REWRITE en glisser + clavier ; aperçu talon + coude ADAPT ; refus des doublons (`sameWire`) et dérivation sur fil (jonction automatique) non repris ; route enregistrée calculée par le module ; aucun code copié |
 
 ## Procédure de delta
 

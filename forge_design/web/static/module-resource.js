@@ -6,9 +6,10 @@
 //
 // Édition (FD-GRAPHICS-EDIT-001) : si l'hôte a placé un contexte d'édition inerte
 // (data-module-editor), le script déclaré par le module est importé depuis l'URL
-// calculée par l'hôte ; son createResourceEditor(context) peut fournir l'option
-// nodeMove du moteur et reçoit ensuite l'instance. En cas d'échec, la vue reste en
-// consultation et l'indisponibilité est annoncée.
+// calculée par l'hôte ; son createResourceEditor(context) peut fournir les options
+// nodeMove et onViewChange (FD-GRAPHICS-EDIT-002) du moteur et reçoit ensuite
+// l'instance. En cas d'échec, la vue reste en consultation et l'indisponibilité est
+// annoncée.
 
 import { createGraphicEngine } from "./graphics/engine.js";
 
@@ -30,6 +31,7 @@ export function mountModuleResource(container, editor = null) {
         status.textContent = node ? `Élément sélectionné : ${node.label}` : IDLE;
       },
       ...(editor && editor.nodeMove ? { nodeMove: editor.nodeMove } : {}),
+      ...(editor && typeof editor.onViewChange === "function" ? { onViewChange: editor.onViewChange } : {}),
     });
   } catch (error) {
     status.textContent = `Vue interactive indisponible (${error.message}).`;

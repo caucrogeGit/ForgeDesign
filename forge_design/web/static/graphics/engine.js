@@ -1,6 +1,6 @@
 // Graphic Core — instance de moteur graphique (FD-GRAPHICS-002, viewport FD-GRAPHICS-004,
 // niveau de détail FD-GRAPHICS-006, minicarte FD-GRAPHICS-007, déplacement de nœuds
-// FD-GRAPHICS-EDIT-001).
+// FD-GRAPHICS-EDIT-001, calques monde et onViewChange FD-GRAPHICS-EDIT-002).
 // Une instance par conteneur, sans singleton ni état global : scène validée,
 // index, sélection et viewport runtime, rendu et écouteurs lui appartiennent ;
 // destroy() les libère. Le moteur ne lit ni n'écrit aucun projet et ne persiste rien.
@@ -16,7 +16,15 @@ import {
 } from "./minimap.js";
 import { validateScene } from "./model.js";
 import { createSelection, indexScene } from "./scene.js";
-import { applyDetailLevel, applyMovable, applySelection, previewNodeMove, renderScene } from "./svg-renderer.js";
+import {
+  applyDetailLevel,
+  applyMovable,
+  applySelection,
+  attachOverlays,
+  createOverlayRoot,
+  previewNodeMove,
+  renderScene,
+} from "./svg-renderer.js";
 import { createViewport, wheelFactor } from "./viewport.js";
 
 // Minicarte : en deçà de ce déplacement (pixels écran), un appui-relâcher est un clic.
@@ -34,6 +42,8 @@ export const DRAG_THRESHOLD = 4;
 const MOVES = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 export const MOVE_SHORTCUTS =
   "Control+Shift+ArrowLeft Control+Shift+ArrowRight Control+Shift+ArrowUp Control+Shift+ArrowDown";
+// Nom accessible d'un calque : une ligne courte, fournie par le client.
+const MAX_OVERLAY_LABEL = 200;
 
 function htmlElement(document, name, attributes = {}, text = "") {
   const element = document.createElement(name);
@@ -76,6 +86,9 @@ export function createGraphicEngine(container, input, options = {}) {
   const index = indexScene(scene);
   const selection = createSelection(index);
   const onSelectionChange = typeof options.onSelectionChange === "function" ? options.onSelectionChange : null;
+  // État de vue observable (échelle, origine, zone, niveau de détail) : notifié
+  // seulement quand il change, jamais à chaque événement.
+  const onViewChange = typeof options.onViewChange === "function" ? options.onViewChange : null;
   const nodeMove = moveOptions(options.nodeMove);
   const document = container.ownerDocument;
   const frame = htmlElement(document, "div", { class: "gx-frame" });
@@ -117,6 +130,9 @@ export function createGraphicEngine(container, input, options = {}) {
   let moving = null;
   let submitted = null;
   let swallowClick = false;
+  // Calques des clients (racines dédiées, ordre de création) et dernier état notifié.
+  const overlays = new Set();
+  let lastView = null;
 
   function measure() {
     return { width: Math.max(0, area.clientWidth || 0), height: Math.max(0, area.clientHeight || 0) };
@@ -139,7 +155,31 @@ export function createGraphicEngine(container, input, options = {}) {
     const { width, height } = viewport.area();
     levelMeasured = width > 0 && height > 0;
     updateMinimap();
+    notifyView();
     return viewportState();
+  }
+
+  function notifyView() {
+    if (!onViewChange) return;
+    const { scale, x, y, width, height } = viewportState();
+    const last = lastView;
+    if (
+      last &&
+      last.scale === scale &&
+      last.x === x &&
+      last.y === y &&
+      last.width === width &&
+      last.height === height &&
+      last.detailLevel === detailLevel
+    ) {
+      return;
+    }
+    lastView = Object.freeze({ scale, x, y, width, height, detailLevel });
+    try {
+      onViewChange(lastView);
+    } catch {
+      // Client isolé : son erreur ne casse ni le moteur ni la navigation.
+    }
   }
 
   // O(1) : seuls le rectangle visible et le nom accessible changent ; la structure jamais.
@@ -190,9 +230,10 @@ export function createGraphicEngine(container, input, options = {}) {
     return { x: event.clientX - box.left - (area.clientLeft || 0), y: event.clientY - box.top - (area.clientTop || 0) };
   }
 
+  // Un nœud ou un calque client : jamais le fond (pas de pan depuis ces éléments).
   function onNode(target) {
     for (let element = target; element && element !== area; element = element.parentNode) {
-      if (nodeElements.has(element)) return true;
+      if (nodeElements.has(element) || overlays.has(element)) return true;
     }
     return false;
   }
@@ -314,6 +355,22 @@ export function createGraphicEngine(container, input, options = {}) {
   }
 
   // Point monde sous un événement pointeur : le moteur seul connaît son viewport.
+  // Public (FD-GRAPHICS-EDIT-002) : un calque client convertit ainsi ses pointeurs.
+  function worldPoint(point) {
+    alive();
+    if (
+      point === null ||
+      typeof point !== "object" ||
+      typeof point.clientX !== "number" ||
+      typeof point.clientY !== "number" ||
+      !Number.isFinite(point.clientX) ||
+      !Number.isFinite(point.clientY)
+    ) {
+      throw new TypeError("worldAt : clientX et clientY finis attendus.");
+    }
+    return Object.freeze(worldAt(point));
+  }
+
   function worldAt(event) {
     const point = local(event);
     const { scale, x, y } = viewport.state();
@@ -444,6 +501,8 @@ export function createGraphicEngine(container, input, options = {}) {
     // La minicarte précède la zone : juste après la barre d'outils dans l'ordre de tabulation.
     minimap = renderMinimap(stage, scene, miniLayout);
     view = renderScene(area, scene);
+    // Les calques clients survivent au rendu : mêmes racines, même contenu.
+    attachOverlays(view, overlays);
     nodeElements = new Set(view.nodes.values());
     nodeListeners = new AbortController();
     const { signal } = nodeListeners;
@@ -480,6 +539,8 @@ export function createGraphicEngine(container, input, options = {}) {
     view.svg.addEventListener(
       "keydown",
       (event) => {
+        // Touche déjà traitée (par un calque client) : rien à faire ici.
+        if (event.defaultPrevented) return;
         // Échap pendant un glisser : le geste est annulé, la sélection conservée.
         if (event.key === "Escape" && moving) {
           event.preventDefault();
@@ -561,7 +622,7 @@ export function createGraphicEngine(container, input, options = {}) {
   // Maj + flèches : déplacement accessible sans glisser.
   on(area, "keydown", (event) => {
     const direction = ARROWS[event.key];
-    if (!direction || !event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.defaultPrevented || !direction || !event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
     panStep(direction);
   });
@@ -572,8 +633,35 @@ export function createGraphicEngine(container, input, options = {}) {
     observer.observe(area);
   }
 
+  // Calque monde d'un client : une racine dédiée, vide, attachée à cette instance et
+  // soumise à son viewport ; remove() la retire, destroy() retire toutes les racines.
+  function addOverlay(settings = {}) {
+    alive();
+    if (settings === null || typeof settings !== "object") throw new TypeError("addOverlay : objet attendu.");
+    const label =
+      typeof settings.label === "string" && settings.label.trim()
+        ? settings.label.trim().slice(0, MAX_OVERLAY_LABEL)
+        : null;
+    const root = createOverlayRoot(document, label);
+    overlays.add(root);
+    if (view) attachOverlays(view, [root]);
+    let removed = false;
+    return Object.freeze({
+      root,
+      remove() {
+        if (removed) return;
+        removed = true;
+        overlays.delete(root);
+        root.remove();
+      },
+    });
+  }
+
   function destroy() {
     if (destroyed) return;
+    for (const root of overlays) root.remove();
+    overlays.clear();
+    lastView = null;
     detach();
     frameListeners.abort();
     if (observer) observer.disconnect();
@@ -627,6 +715,8 @@ export function createGraphicEngine(container, input, options = {}) {
       alive();
       return detailLevel;
     },
+    addOverlay,
+    worldAt: worldPoint,
     selection: () => selection.current(),
     // Déplacement (lecture seule) : nœuds déplaçables et aperçu en cours.
     movableNodes: () => {

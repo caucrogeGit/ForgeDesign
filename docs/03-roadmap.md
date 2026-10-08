@@ -378,6 +378,11 @@ fait      FD-GRAPHICS-EDIT-001  déplacement de nœud opt-in du Graphic Core (co
 fait      FDC-EDIT-001    (module) premier geste réel : déplacer un composant Circuit
                           (move-component, capacité edit, une écriture par geste, routes
                           persistées inchangées)
+fait      FD-GRAPHICS-EDIT-002  calques monde des clients (addOverlay : racine dédiée soumise
+                          au viewport, survivant au rendu, retirée au destroy), notification
+                          onViewChange (échelle, origine, zone, niveau de détail) et worldAt ;
+                          aucun vocabulaire de domaine ; premier client : création de
+                          connexions Circuit (FDC-EDIT-004, module)
 suivant   (module) re-routage des connexions après déplacement, si les constats de
           FDC-EDIT-001 le confirment (extrémités reprojetées, points intermédiaires figés)
 puis      autres tickets du module Circuit (édition, export, simulation), chaque

@@ -104,6 +104,21 @@ export function renderScene(container, scene) {
   return { svg, nodes, edges };
 }
 
+// Calque d'un client (FD-GRAPHICS-EDIT-002) : un groupe dédié, créé vide, dans le
+// SVG de scène et donc en coordonnées monde (le viewBox du viewport s'y applique).
+// Le moteur n'y dessine rien et n'y met aucun vocabulaire ; le client y place ses
+// propres éléments. Aucune structure interne du renderer n'est exposée.
+export function createOverlayRoot(document, label) {
+  const attributes = { class: "gx-overlay", role: "group" };
+  if (label) attributes["aria-label"] = label;
+  return element(document, "g", attributes);
+}
+
+// Les calques suivent les nœuds, dans l'ordre de leur création, à chaque rendu.
+export function attachOverlays(view, roots) {
+  for (const root of roots) view.svg.append(root);
+}
+
 // Applique un état de sélection (ou null) aux éléments rendus.
 export function applySelection(view, state) {
   const edgeIds = new Set(state ? state.edgeIds : []);

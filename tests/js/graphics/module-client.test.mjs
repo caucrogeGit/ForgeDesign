@@ -140,6 +140,33 @@ test("boot avec contexte : script de l'hôte importé, contexte gelé, nodeMove 
   assert.equal(view.editorStatus.textContent, "Message du module");
 });
 
+test("onViewChange du script transmis au moteur ; calque disponible dans attach", async () => {
+  const view = page(JSON.stringify(SCENE), CONTEXT);
+  const states = [];
+  let overlay = null;
+  const engine = await bootModuleResource(view.root, {
+    load: async () => ({
+      createResourceEditor: () => ({
+        onViewChange: (state) => states.push(state),
+        attach(instance) {
+          overlay = instance.addOverlay({ label: "Calque du module" });
+        },
+      }),
+    }),
+  });
+  assert.ok(states.length >= 1);
+  assert.equal(states.at(-1).detailLevel, engine.detailLevel());
+  assert.equal(overlay.root.parentNode, rendered(view.host).svg);
+  const count = states.length;
+  engine.zoomIn();
+  assert.equal(states.length, count + 1);
+  // Sans fonction, l'option n'est pas transmise.
+  const plain = await bootModuleResource(page(JSON.stringify(SCENE), CONTEXT).root, {
+    load: async () => ({ createResourceEditor: () => ({ onViewChange: "non" }) }),
+  });
+  assert.ok(plain);
+});
+
 test("échecs du script : consultation seule et indisponibilité annoncée", async () => {
   const failures = [
     ["chargement", async () => Promise.reject(new Error("404"))],

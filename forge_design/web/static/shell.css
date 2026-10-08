@@ -74,6 +74,15 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 /* Nœuds déplaçables (FD-GRAPHICS-EDIT-001, opt-in client) et glisser en cours. */
 .gx-node.gx-movable { cursor: move; user-select: none; }
 .gx-viewport.gx-moving, .gx-viewport.gx-moving .gx-node { cursor: grabbing; }
+/* Calques des clients (FD-GRAPHICS-EDIT-002) : couleurs et traits seulement ; la
+   géométrie (positions, rayons) appartient au client. Aucun vocabulaire métier. */
+.gx-overlay-handle { fill: #fff; stroke: #344054; stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: crosshair; }
+.gx-overlay-hit { fill: transparent; stroke: none; cursor: crosshair; }
+.gx-overlay-handle.gx-overlay-active { fill: #fbe9e1; stroke: #824029; stroke-width: 3; }
+.gx-overlay-handle.gx-overlay-candidate { fill: #824029; stroke: #824029; stroke-width: 3; }
+.gx-overlay-item:focus { outline: none; }
+.gx-overlay-item:focus-visible .gx-overlay-handle { stroke: #824029; stroke-width: 3; stroke-dasharray: 3 2; }
+.gx-overlay-path { fill: none; stroke: #824029; stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .gx-node-box { fill: #fff; stroke: #667085; stroke-width: 1.5; }
 .gx-node-text { font: 12px monospace; fill: #172033; }
 .gx-variant-category-1 .gx-node-box { fill: #f5f8fc; }

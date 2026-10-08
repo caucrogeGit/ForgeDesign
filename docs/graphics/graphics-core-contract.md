@@ -801,6 +801,24 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
   (DrawCiel `startComponentDrag` / `endPointer`, `6ecb8e10`) ADAPT ; aucun code
   copié.
 
+## Calques monde et vue — FD-GRAPHICS-EDIT-002
+
+- **Décidé** : un client peut demander un **calque monde** (`addOverlay`) : une
+  racine SVG dédiée, vide, placée dans la scène et soumise au viewport ; le
+  moteur la rattache à chaque rendu et la retire au `destroy()`. Aucun calque
+  interne du renderer n'est exposé.
+- `onViewChange` notifie l'état observable de la vue (échelle, origine, zone,
+  niveau de détail) seulement quand il change ; `worldAt` convertit un point
+  écran en point monde.
+- Le moteur ne dessine rien dans un calque et n'en connaît pas le contenu : ni
+  port, ni borne, ni fil, ni domaine. Un appui dans un calque n'est pas un pan ;
+  une touche déjà traitée par le client n'est pas reprise.
+- Motif : sans point d'insertion public, un client qui veut des éléments
+  interactifs dans le dessin dépendrait des internals SVG ou reconstruirait le
+  viewport en parallèle (constat FDC-EDIT-004). Premier client : le script
+  d'édition de ForgeDesign-Circuit (poignées de bornes, aperçu de connexion).
+- Route, Entity et Debug ne l'utilisent pas ; leur rendu est inchangé.
+
 ## Questions reportées
 
 | Question | Ticket attendu |
@@ -817,7 +835,7 @@ vocabulaire). Sérialisation commune extraite dans `web/graphics.py`.
 | Annotations graphiques, rappels, trait libre | Quand un domaine en a besoin |
 | Groupes, verrous, alignement, pivot commun de rotation | FUTUR |
 | Miroir, rotation libre, redimensionnement | FUTUR |
-| Ports flottants (accroche n'importe où sur le bord, UML) | À étudier avec UML |
+| Ports flottants (accroche n'importe où sur le bord, UML) | À étudier avec UML ; un client peut dessiner ses ports dans un calque monde (FD-GRAPHICS-EDIT-002), le moteur ne les connaît pas |
 | Convergence des graphes en lecture seule existants (routes, entités, debug) vers les primitives communes | **Faite** : Route (002), Entity (003), Debug (008) |
 | Ajustement lisible des scènes allongées (fit en vue d'ensemble pour un flux long et plat) | Constat FD-GRAPHICS-008 ; à arbitrer |
 | Provenance et licence des symboles SVG DrawCiel | Avant toute reprise de symboles |
