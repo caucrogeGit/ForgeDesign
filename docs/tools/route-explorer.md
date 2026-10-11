@@ -76,6 +76,44 @@ et noms commençant par `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`
 sont refusés. Cette politique lexicale est aussi appliquée aux templates analysés.
 Elle ne reconnaît pas un secret caché sous un nom de template ordinaire.
 
+## Chaînes des routes
+
+FD-ROUTES-021 : la section « Chaînes des routes » relie, pour chaque route
+affichée, ce que l’analyse statique connaît déjà : route → handler → contrôleur
+et méthode → template(s) → contrat(s) de vue → diagnostics. Chaque route est un
+élément `<details>` : le résumé donne la chaîne compacte et son état, le détail
+les faits, sources, liens et diagnostics. Tout est lisible sans JavaScript ; les
+filtres de la page s’y appliquent.
+
+| Élément | Valeurs |
+|---|---|
+| Handler | Méthode de contrôleur, fonction (non analysée), référence non résolue (aucun import de contrôleur), handler dynamique |
+| Contrôleur | Résolu, fichier absent, classe absente, méthode absente, ambigu, non vérifiable, non applicable |
+| Template | **Exact** (un seul `render` littéral), **plusieurs possibles** (plusieurs littéraux), **partiel** (des littéraux et au moins un rendu non déterminable), **non déterminable statiquement**, **aucun rendu détecté** (ce n’est pas une preuve d’absence de template), non applicable (méthode non résolue) |
+| Contrat de vue | Contrat associé, plusieurs contrats (ambigu), aucun contrat (optionnel), liaison inconnue, non applicable (template non présent) |
+| État de la chaîne | **Complète** : méthode résolue, template exact présent, aucune erreur ; **problématique** : au moins une erreur démontrée ; **partielle** : tous les autres cas |
+
+Les littéraux de `render` sont conservés comme candidats, dans l’ordre de la
+source, avec leur présence ; syntaxe et dépendances ne sont analysées que pour un
+template exact. Aucune convention de nom n’est utilisée : une route n’atteint un
+contrat que par un template qu’elle rend. Un contrat invalide n’a pas de cible
+lisible : il figure dans la section « Contrats de vue » de la page, jamais dans
+la chaîne d’une route ; une route sans contrat le signale seulement par une
+mention contextuelle.
+
+Chaque diagnostic d’une chaîne garde son code, sa sévérité, son message et son
+origine (route, handler, contrôleur, template, dépendance, contrat), dérivée du
+code. Ce sont les diagnostics existants de la page, plus les anomalies de liaison
+des contrats des templates de la route (avertissements). Une incertitude
+statique reste un avertissement, jamais une erreur.
+
+Liens : contrôleur, classe, méthode et contrat vers la vue source en lecture
+seule ; template présent vers Template Viewer (`/templates/view?path=…`).
+
+Par affichage, l’inventaire des templates (Template Viewer) et l’analyse des
+liens contrats ↔ templates sont faits une fois, puis indexés par chemin : aucune
+relecture par route.
+
 ## Compatibilité et limites
 
 Baseline vérifiée : Forge main
@@ -93,7 +131,9 @@ C’est une compatibilité structurelle vérifiée, pas une matrice de versions.
   comme `mvc.controllers.pivot.*` ne sont pas suivis. Les références syntaxiques
   ne prouvent pas l’identité runtime des symboles ; les portées et réaffectations
   dynamiques ne sont pas interprétées.
-- Seul `BaseController.render` avec chemin littéral est reconnu.
+- Seul `BaseController.render` avec chemin littéral est reconnu ; plusieurs
+  littéraux dans une méthode sont tous gardés comme candidats, sans interpréter
+  les branches.
   `VIEWS_DIR` personnalisé, configuration, environnement cible, extensions Jinja
   personnalisées et loaders d’opt-ins ne sont pas chargés.
 - Les dépendances statiques sont analysées sous `mvc/views`, sans rendu.
@@ -130,6 +170,8 @@ un statut non applicable à la limite ne signifie pas absence.
 | `RoutesResult`, `RouteInfo`, `HandlerInfo`, `TemplateResolution`, `TemplateDependencyGraph` | Dataclasses gelées, tuples immuables, champs optionnels avec valeurs par défaut compatibles |
 | `RouteExplorerTool.run(Path)` | Façade du Bridge, aucun état ou cache persistant |
 | `build_route_diagnostics(result)` | Transformation pure, codes et ordre déterministes |
+| `TemplateResolution.candidates`, `TemplateCandidate` | Littéraux de `render` dans l’ordre de la source, avec présence ; ajout compatible (statut inchangé) |
+| `build_route_linkage(result, diagnostics, links)` | Transformation pure : chaîne, confiance, contrats par template, diagnostics avec origine, état |
 | `build_route_graph(result)` | Transformation pure des relations déjà connues, extrémités présentes |
 | `layout_route_graph(graph)` | Présentation pure, identifiants uniques et extrémités existantes exigés |
 

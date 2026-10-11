@@ -48,6 +48,40 @@
 </table>
 {% else %}<p>Aucune route ne correspond aux filtres.</p>{% endif %}
 {% endif %}
+{% if result and linkage %}
+{% set chain_states = {"complete": "✓ Complète", "partial": "◐ Partielle", "problematic": "✕ Problématique"} %}
+{% set confidences = {"exact": "Template exact", "multiple": "Plusieurs templates possibles", "partial": "Partiel : au moins un rendu non déterminable", "unknown": "Non déterminable statiquement", "none": "Aucun rendu détecté (pas une preuve d’absence de template)", "not-applicable": "Non applicable : méthode non résolue"} %}
+{% set handler_kinds = {"controller-method": "Méthode de contrôleur", "function": "Fonction (non analysée)", "unresolved": "Référence non résolue", "dynamic": "Handler dynamique"} %}
+{% set controller_states = {"resolved": "Résolu", "file-missing": "Fichier absent", "class-missing": "Classe absente", "method-missing": "Méthode absente", "ambiguous": "Ambigu", "unreadable": "Non vérifiable", "not-applicable": "Non applicable"} %}
+{% set contract_states = {"linked": "Contrat associé", "ambiguous": "Plusieurs contrats (ambigu)", "without-contract": "Aucun contrat (optionnel)", "unknown": "Liaison inconnue", "not-applicable": "Non applicable (template non présent)"} %}
+{% set presences = {"present": "Présent", "missing": "Absent", "invalid-path": "Chemin refusé", "unreadable": "Non vérifiable", "not-applicable": "Non vérifié"} %}
+{% set origins = {"route": "Route", "handler": "Handler", "controller": "Contrôleur", "template": "Template", "dependency": "Dépendance", "contract": "Contrat"} %}
+{% set severities = {"error": "Erreur", "warning": "Avertissement", "info": "Information"} %}
+<section aria-labelledby="chains-title" class="route-chains">
+<h2 id="chains-title">Chaînes des routes</h2>
+<p>Route → handler → contrôleur et méthode → template(s) → contrat(s) de vue, connus statiquement, sans exécution du projet. Une chaîne est complète si la méthode est résolue, le template exact et présent, sans erreur ; problématique si une erreur est démontrée ; partielle sinon.</p>
+{% if chains %}<ul class="route-chain-list">{% for chain in chains %}{% set route = chain.route %}
+<li id="route-chain-{{ chain.index }}" data-chain-state="{{ chain.state }}" data-confidence="{{ chain.confidence }}">
+<details><summary><span class="route-chain">{{ route.method }} {{ route.path }} → {% if route.handler %}{{ route.handler.reference }}{% else %}{{ handler_kinds[chain.handler_kind] | lower }}{% endif %} → {% if chain.templates %}{% for template in chain.templates %}{{ template.path }}{% if not loop.last %} | {% endif %}{% endfor %}{% if chain.confidence == "partial" %} | ?{% endif %}{% elif chain.confidence == "unknown" %}template non déterminable{% elif chain.confidence == "none" %}aucun rendu détecté{% else %}—{% endif %} → {% if chain.templates %}{% for template in chain.templates %}{% if template.contracts %}{{ template.contracts | join(", ") }}{% elif template.contract_state == "without-contract" %}sans contrat{% else %}contrat ?{% endif %}{% if not loop.last %} | {% endif %}{% endfor %}{% else %}—{% endif %}</span> — <strong class="chain-state" data-state="{{ chain.state }}">{{ chain_states[chain.state] }}</strong></summary>
+<dl>
+<dt>Route</dt><dd>{{ route.method }} {{ route.path }}{% if route.name %} — nom {{ route.name }}{% endif %} — {{ 'publique' if route.public else 'protégée' }}{% if route.source %} — {{ location(route.source) }}{% endif %}</dd>
+<dt>Handler</dt><dd>{{ handler_kinds[chain.handler_kind] }}{% if route.handler %} : {{ route.handler.reference }}{% endif %}</dd>
+<dt>Contrôleur</dt><dd>{{ controller_states[chain.controller_state] }}{% if route.handler %}{% if route.handler.controller_file %} — <a href="{{ source_url(route.handler.controller_file) }}">{{ route.handler.controller_file }}</a>{% elif route.handler.missing_controller %} — {{ route.handler.missing_controller }}{% endif %}{% if route.handler.class_source %} — classe {{ location(route.handler.class_source) }}{% endif %}{% if route.handler.method_source %} — méthode {{ location(route.handler.method_source) }}{% endif %}{% endif %}</dd>
+<dt>Template</dt><dd>{{ confidences[chain.confidence] }}
+{% if chain.templates %}<ul>{% for template in chain.templates %}<li data-template="{{ template.path }}">{% if template.presence == "present" %}<a href="{{ template_url(template.path) }}">{{ template.path }}</a>{% else %}{{ template.path }}{% endif %} — {{ presences[template.presence] }} — {{ contract_states[template.contract_state] }}{% for contract in template.contracts %}{% set url = contract_url(contract) %} — {% if url %}<a href="{{ url }}">{{ contract }}</a>{% else %}{{ contract }}{% endif %}{% endfor %}{% if template.contract_state == "without-contract" and linkage.contracts.invalid %} — des contrats invalides non associables existent (voir « Contrats de vue »){% endif %}</li>{% endfor %}</ul>{% endif %}</dd>
+</dl>
+{% if chain.diagnostics %}<ul class="chain-diagnostics">{% for item in chain.diagnostics %}<li data-origin="{{ item.origin }}" data-diagnostic-code="{{ item.code }}" data-severity="{{ item.severity }}">{{ origins[item.origin] }} · {{ severities[item.severity] }} — {{ item.message }} <code>{{ item.code }}</code>{% if item.source %} — {{ location(item.source, item.source_available) }}{% endif %}</li>{% endfor %}</ul>{% else %}<p>Aucun diagnostic pour cette route.</p>{% endif %}
+</details></li>{% endfor %}</ul>{% else %}<p>Aucune route à afficher.</p>{% endif %}
+</section>
+<section aria-labelledby="route-contracts-title">
+<h2 id="route-contracts-title">Contrats de vue</h2>
+{% if linkage.contracts.available %}
+<p>{{ linkage.contracts.total }} contrat(s) de vue, dont {{ linkage.contracts.invalid }} invalide(s).{% if not linkage.contracts.complete %} Liaison incomplète.{% endif %} Une route n’est reliée à un contrat que par un template qu’elle rend.</p>
+{% if linkage.contracts.invalid %}<p>Un contrat invalide n’a pas de cible lisible : il n’est rattaché à aucune route.</p>{% endif %}
+{% if linkage.contracts.diagnostics %}<ul>{% for item in linkage.contracts.diagnostics %}<li data-origin="{{ item.origin }}" data-diagnostic-code="{{ item.code }}">{{ origins[item.origin] }} · {{ severities[item.severity] }} — {{ item.message }} <code>{{ item.code }}</code>{% if item.source %} — {{ location(item.source, item.source_available) }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+{% else %}<p role="alert">{{ linkage.contracts.reason }}</p>{% endif %}
+</section>
+{% endif %}
 {% if result %}
 <section aria-labelledby="cycles-title">
   <h2 id="cycles-title">Cycles de templates</h2>

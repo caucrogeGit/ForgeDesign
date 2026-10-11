@@ -1,10 +1,16 @@
 """Page de routes en lecture seule, utilisant le contexte existant."""
 
 from dataclasses import replace
+from pathlib import Path
 
 from core.http.request import Request
 from core.http.response import Response
 
+from forge_design.contracts.linkage import (
+    ViewContractLinksResult,
+    analyze_view_contract_links,
+)
+from forge_design.contracts.reader import view_contract_source
 from forge_design.current_project import CurrentProjectContext
 from forge_design.forge.project_root import (
     ProjectRootNotDirectoryError,
@@ -18,16 +24,50 @@ from forge_design.forge.routes import (
     RoutesSourceUnreadableError,
 )
 from forge_design.forge.template_cycles import TemplateCycle
+from forge_design.forge.templates import TemplatesResult
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.route_diagnostics import build_route_diagnostics
 from forge_design.tools.route_filters import RouteFilter, filter_route_explorer
 from forge_design.tools.route_graph import build_route_graph
+from forge_design.tools.route_linkage import (
+    RouteLinkage,
+    RouteLinkageReport,
+    build_route_linkage,
+)
 from forge_design.web.graphics import scene_json_payload
 from forge_design.web.rendering import render_page
 from forge_design.web.route_filters import parse_route_filter
 from forge_design.web.route_graph_layout import layout_route_graph
 from forge_design.web.route_graph_scene import build_route_graphic_scene
 from forge_design.web.source import source_url
+from forge_design.web.template_viewer import template_url
+
+_PROJECT_ERRORS = (
+    ProjectRootNotFoundError,
+    ProjectRootNotDirectoryError,
+    ProjectRootResolutionError,
+    NotForgeProjectError,
+)
+
+
+def contract_url(path: str) -> str | None:
+    """Vue source en lecture seule d'un contrat (chemin relatif à mvc/views)."""
+    source = view_contract_source(path)
+    return source_url(source) if source is not None else None
+
+
+def _contract_links(
+    registry: ToolRegistry, root: Path
+) -> tuple[ViewContractLinksResult | None, str | None]:
+    """Un inventaire des templates (Template Viewer) et une analyse des liens
+    contrats ↔ templates par affichage, jamais par route."""
+    try:
+        templates = registry.get("template-viewer").run(root)
+        if not isinstance(templates, TemplatesResult):
+            raise TypeError("template-viewer doit retourner TemplatesResult.")
+        return analyze_view_contract_links(root, templates), None
+    except _PROJECT_ERRORS as exc:
+        return None, f"Analyse des contrats de vue indisponible : {exc}"
 
 
 def show_routes(
@@ -58,16 +98,26 @@ def show_routes(
             error = str(exc)
         if result is not None and not isinstance(result, RoutesResult):
             raise TypeError("route-explorer doit retourner RoutesResult.")
-    if result is not None:
+    linkage: RouteLinkageReport | None = None
+    chains: tuple[RouteLinkage, ...] = ()
+    if result is not None and context.root is not None:
         methods = tuple(dict.fromkeys(route.method for route in result.routes))
         total_routes = len(result.routes)
         diagnostics = build_route_diagnostics(result)
         try:
             view = filter_route_explorer(result, diagnostics, filters)
-            diagnostics = view.diagnostics
-            result = replace(result, routes=view.routes)
         except ValueError as exc:
             error, status, result = str(exc), 400, None
+        else:
+            # Chaînes construites sur le résultat complet (indices des
+            # diagnostics), puis restreintes aux routes affichées.
+            links, reason = _contract_links(registry, context.root)
+            linkage = build_route_linkage(
+                result, diagnostics, links, contracts_reason=reason
+            )
+            chains = linkage.select(view.routes)
+            diagnostics = view.diagnostics
+            result = replace(result, routes=view.routes)
     elif error is None and filters.method is not None:
         error, status = "Méthode absente de l’inventaire des routes.", 400
     cycles: dict[tuple[tuple[str, str, str], ...], TemplateCycle] = {}
@@ -103,6 +153,10 @@ def show_routes(
                 else None
             ),
             "graph_nodes": {node.id: node for node in graph.nodes} if graph else {},
+            "linkage": linkage,
+            "chains": chains,
+            "template_url": template_url,
+            "contract_url": contract_url,
         },
         status=status,
     )

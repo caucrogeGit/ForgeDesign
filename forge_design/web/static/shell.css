@@ -47,6 +47,15 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .health-diagnostics { padding-left: 1.25rem; }
 .health-empty { margin-top: 2rem; }
 
+/* Chaînes des routes (FD-ROUTES-021) : l'état est écrit et marqué. */
+.route-chain-list { padding-left: 0; list-style: none; }
+.route-chain-list > li { margin-block: .75rem; }
+.route-chain { overflow-wrap: anywhere; }
+.chain-state[data-state="complete"] { color: #2f6b47; }
+.chain-state[data-state="partial"] { color: #8a5a00; }
+.chain-state[data-state="problematic"] { color: #973a27; }
+.chain-diagnostics { padding-left: 1.25rem; }
+
 .graph-edges { padding-left: 1.5rem; }
 .graph-edges li { margin-block: .5rem; overflow-wrap: anywhere; }
 

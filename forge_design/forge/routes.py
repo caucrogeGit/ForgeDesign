@@ -99,6 +99,19 @@ class TemplateDependencyGraph:
 
 
 @dataclass(frozen=True)
+class TemplateCandidate:
+    """Référence littérale de ``BaseController.render`` trouvée dans la méthode.
+
+    Présence seulement (métadonnées, comme ``_template_presence``) : la syntaxe
+    et les dépendances ne sont analysées que pour un template exact.
+    """
+
+    path: str
+    presence: TemplatePresenceStatus = "not-applicable"
+    source: SourceLocation | None = None
+
+
+@dataclass(frozen=True)
 class TemplateResolution:
     status: TemplateResolutionStatus = "not-applicable"
     path: str | None = None
@@ -109,6 +122,9 @@ class TemplateResolution:
     dependencies: tuple[TemplateDependency, ...] = ()
     dependency_graph: TemplateDependencyGraph | None = None
     source: SourceLocation | None = None
+    # FD-ROUTES-021 : littéraux de render() dans l'ordre de la source, conservés
+    # aussi pour « ambiguous » et « dynamic » (le statut reste inchangé).
+    candidates: tuple[TemplateCandidate, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -283,8 +299,12 @@ def _verify(
 
 
 def _template(method: ast.FunctionDef | ast.AsyncFunctionDef) -> TemplateResolution:
-    """Collecter BaseController.render sans interpréter les branches ou les noms."""
-    paths: set[str] = set()
+    """Collecter BaseController.render sans interpréter les branches ou les noms.
+
+    Les littéraux sont gardés dans l'ordre de la source, sans doublon, même quand
+    le statut est « ambiguous » ou « dynamic ».
+    """
+    paths: dict[str, None] = {}
     dynamic = False
     pending: list[ast.AST] = list(reversed(method.body))
     while pending:
@@ -312,16 +332,17 @@ def _template(method: ast.FunctionDef | ast.AsyncFunctionDef) -> TemplateResolut
                 and isinstance(arguments[0], ast.Constant)
                 and isinstance(arguments[0].value, str)
             ):
-                paths.add(arguments[0].value)
+                paths[arguments[0].value] = None
             else:
                 dynamic = True
         pending.extend(reversed(list(ast.iter_child_nodes(node))))
+    candidates = tuple(TemplateCandidate(path) for path in paths)
     if dynamic:
-        return TemplateResolution("dynamic")
+        return TemplateResolution("dynamic", candidates=candidates)
     if len(paths) > 1:
-        return TemplateResolution("ambiguous")
+        return TemplateResolution("ambiguous", candidates=candidates)
     if paths:
-        return TemplateResolution("found", next(iter(paths)))
+        return TemplateResolution("found", next(iter(paths)), candidates=candidates)
     return TemplateResolution("none")
 
 
@@ -511,16 +532,34 @@ def _with_template_presence(
             checked, dependency_graph=replace(graph, cycles=cycles)
         )
 
+    presences: dict[str, TemplatePresenceStatus] = {
+        reference: checked.presence for reference, checked in cache.items()
+    }
+
+    def candidate(item: TemplateCandidate) -> TemplateCandidate:
+        # Même politique de présence (métadonnées seulement) ; une fois par chemin.
+        if item.path not in presences:
+            presences[item.path] = _template_presence(root, item.path)
+        return TemplateCandidate(
+            item.path, presences[item.path], template_source(item.path)
+        )
+
     enriched: list[RouteInfo] = []
     for route in routes:
         handler = route.handler
-        if handler is not None and handler.template.status == "found":
-            reference = handler.template.path
-            if reference is not None:
-                route = replace(
-                    route, handler=replace(handler, template=cache[reference])
-                )
-        enriched.append(route)
+        if handler is None:
+            enriched.append(route)
+            continue
+        template = handler.template
+        if template.status == "found" and template.path is not None:
+            # Résolution partagée du cache, qui ne porte pas les candidats.
+            template = cache[template.path]
+        if handler.template.candidates:
+            template = replace(
+                template,
+                candidates=tuple(candidate(c) for c in handler.template.candidates),
+            )
+        enriched.append(replace(route, handler=replace(handler, template=template)))
     return tuple(enriched)
 
 
