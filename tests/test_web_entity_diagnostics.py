@@ -61,6 +61,10 @@ def test_http_diagnostics(
         assert "Aucun projet ouvert." in html and 'id="entity-diagnostics"' not in html
         assert calls == []
         call(app, "/inspector", method="POST", value=str(root))
+        # L'ouverture affiche la synthèse de Project Inspector, qui lit ce
+        # domaine une fois (FD-PROJECT-006) ; seule la page est comptée ensuite.
+        assert calls == [root]
+        calls.clear()
         status, html, headers = call(app, "/entities")
         assert status == 200 and headers["Cache-Control"] == "no-store"
         assert calls == [root]

@@ -145,3 +145,58 @@ def test_unreadable_signature(project: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(Path, "lstat", denied)
     result = detect_forge_project(project)
     assert result.errors == ("app.py : impossible de vérifier le type.",)
+
+
+def test_structured_entries_match_the_messages(project: Path) -> None:
+    """FD-PROJECT-006 : état structuré de chaque élément, messages inchangés."""
+    from forge_design.forge.project_detection import (
+        OPTIONAL_MVC_DIRECTORIES,
+        StructureEntry,
+    )
+
+    assert OPTIONAL_MVC_DIRECTORIES == OPTIONAL
+    (project / "mvc/views").mkdir()
+    (project / "mvc/forms").write_text("pas un dossier")
+    (project / "mvc/models").symlink_to(project / "mvc/views")
+    result = detect_forge_project(project)
+    assert result.entries == (
+        StructureEntry("app.py", True, "present"),
+        StructureEntry("bootstrap.py", True, "present"),
+        StructureEntry("config.py", True, "present"),
+        StructureEntry("mvc", True, "present"),
+        StructureEntry("mvc/routes", True, "present"),
+        StructureEntry("mvc/controllers", False, "absent"),
+        StructureEntry("mvc/entities", False, "absent"),
+        StructureEntry("mvc/forms", False, "invalid"),
+        StructureEntry("mvc/helpers", False, "absent"),
+        StructureEntry("mvc/models", False, "invalid"),
+        StructureEntry("mvc/validators", False, "absent"),
+        StructureEntry("mvc/views", False, "present"),
+    )
+    assert result.warnings == (
+        "mvc/controllers : absent.",
+        "mvc/entities : absent.",
+        "mvc/forms : type incorrect, dossier attendu.",
+        "mvc/helpers : absent.",
+        "mvc/models : lien symbolique non accepté.",
+        "mvc/validators : absent.",
+    )
+    (project / "app.py").unlink()
+    (project / "mvc/routes").rmdir()
+    (project / "mvc/routes").symlink_to(project / "mvc/views")
+    broken = detect_forge_project(project)
+    assert broken.errors == (
+        "app.py : absent.",
+        "mvc/routes : lien symbolique non accepté.",
+    )
+    assert broken.entries[0] == StructureEntry("app.py", True, "absent")
+    assert broken.entries[4] == StructureEntry("mvc/routes", True, "invalid")
+
+
+def test_entries_stop_when_mvc_is_invalid(project: Path) -> None:
+    import shutil
+
+    shutil.rmtree(project / "mvc")
+    entries = detect_forge_project(project).entries
+    assert [(entry.label, entry.state) for entry in entries][-1] == ("mvc", "absent")
+    assert len(entries) == 4

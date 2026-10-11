@@ -62,6 +62,10 @@ def test_http_graph(
         html = call(app, "/entities")[1]
         assert "<svg" not in html and calls == []
         call(app, "/inspector", method="POST", value=str(root))
+        # L'ouverture affiche la synthèse de Project Inspector, qui lit ce
+        # domaine une fois (FD-PROJECT-006) ; seule la page est comptée ensuite.
+        assert calls == [root]
+        calls.clear()
         status, html, headers = call(app, "/entities")
         assert status == 200 and headers["Cache-Control"] == "no-store"
         assert calls == [root]

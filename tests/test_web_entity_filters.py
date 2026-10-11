@@ -74,6 +74,10 @@ def test_http_filters(
     store = RecentProjects(tmp_path / "config/recent.json")
     with running(store) as app:
         call(app, "/inspector", method="POST", value=str(root))
+        # L'ouverture affiche la synthèse de Project Inspector, qui lit ce
+        # domaine une fois (FD-PROJECT-006) ; seule la page est comptée ensuite.
+        assert calls == [root]
+        calls.clear()
         before = store.path.read_bytes(), store.path.stat().st_mtime_ns
         status, html, headers = call(app, "/entities?" + query)
         assert status == 200 and headers["Cache-Control"] == "no-store"

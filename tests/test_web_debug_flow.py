@@ -73,6 +73,10 @@ def test_flow_http(
         status, html, _ = call(app, "/debug/event?line=1&id=same")
         assert status == 409 and "<svg" not in html and not calls
         call(app, "/inspector", method="POST", value=str(root))
+        # L'ouverture affiche la synthèse de Project Inspector, qui lit ce
+        # domaine une fois (FD-PROJECT-006) ; seule la page est comptée ensuite.
+        assert calls == [root]
+        calls.clear()
         before = (path.read_bytes(), path.stat().st_mtime_ns)
         status, html, headers = call(app, "/debug/event?line=1&id=same")
         assert status == 200 and headers["Cache-Control"] == "no-store"

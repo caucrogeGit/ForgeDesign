@@ -1,8 +1,38 @@
 {% extends "layout.html" %}
+{% set status_labels = {"ok": "OK", "attention": "Attention", "erreur": "Erreur", "indisponible": "Indisponible"} %}
+{% set status_marks = {"ok": "✓", "attention": "!", "erreur": "✕", "indisponible": "–"} %}
+{% set severity_labels = {"error": "Erreur", "warning": "Avertissement", "info": "Information"} %}
+{% macro health_status(status) -%}
+<span class="health-status" data-status="{{ status }}"><span class="health-mark" aria-hidden="true">{{ status_marks[status] }}</span> {{ status_labels[status] }}</span>
+{%- endmacro %}
 {% block title %}Project Inspector — Forge Design{% endblock %}
 {% block content %}
     <h1>Project Inspector</h1>
     <p class="intro">Consultez la structure et la version déclarée d’un projet Forge.</p>
+    {% if health %}
+    <section class="health-summary" aria-labelledby="health-title" data-health-status="{{ health.status }}">
+      <h2 id="health-title">Synthèse du projet {{ health.name }}</h2>
+      <p class="health-global">État global : {{ health_status(health.status) }}</p>
+      <p>Synthèse en lecture seule, recalculée à chaque affichage ; aucun fichier du projet n’est modifié.</p>
+      {% for section in health.sections %}
+      <section class="health-section" aria-labelledby="health-{{ section.key }}" data-health-section="{{ section.key }}" data-status="{{ section.status }}">
+        <h3 id="health-{{ section.key }}">{{ section.title }} — {{ health_status(section.status) }}</h3>
+        <p>{{ section.summary }}</p>
+        {% if section.facts %}
+        <dl>{% for label, value in section.facts %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
+        {% endif %}
+        {% if section.diagnostic_total %}
+        <p>{{ section.diagnostic_total }} diagnostic{% if section.diagnostic_total > 1 %}s{% endif %}{% if section.diagnostic_total > section.diagnostics | length %} ; {{ section.diagnostics | length }} premiers affichés{% endif %}.</p>
+        <ul class="health-diagnostics">{% for item in section.diagnostics %}<li data-severity="{{ item.severity }}">{{ severity_labels[item.severity] }} : {{ item.message }}{% if item.subject %} <code>{{ item.subject }}</code>{% endif %}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if section.action %}<p><a href="{{ section.action.url }}">{{ section.action.label }}</a></p>{% endif %}
+      </section>
+      {% endfor %}
+    </section>
+    {% else %}
+    <p class="health-empty" role="status">Aucun projet sélectionné : aucune analyse. Saisissez le chemin d’un projet Forge ci-dessous, ou <a href="/">ouvrez un projet récent depuis l’accueil</a>.</p>
+    {% endif %}
+    <h2>Ouvrir un projet</h2>
     <form action="/inspector" method="post">
       <label for="project-path">Chemin du projet</label>
       <input id="project-path" name="path" type="text" value="{{ path }}"
@@ -13,21 +43,21 @@
     </form>
     {% if message %}<p role="status">{{ message }}</p>{% endif %}
     {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
-    {% if result %}
-    <section aria-labelledby="inspection-title">
-      <h2 id="inspection-title">{% if result.valid %}Projet Forge reconnu{% else %}Projet Forge non reconnu{% endif %}</h2>
+    {% if details %}
+    <section id="inspection-details" aria-labelledby="inspection-title">
+      <h2 id="inspection-title">{% if details.valid %}Projet Forge reconnu{% else %}Projet Forge non reconnu{% endif %}</h2>
       <dl>
-        <dt>Racine</dt><dd>{{ result.root }}</dd>
-        <dt>Version Forge</dt><dd>{{ result.forge_version or 'indéterminée' }}</dd>
-        <dt>Source</dt><dd>{{ result.forge_version_source or 'indéterminée' }}</dd>
+        <dt>Racine</dt><dd>{{ details.root }}</dd>
+        <dt>Version Forge</dt><dd>{{ details.forge_version or 'indéterminée' }}</dd>
+        <dt>Source</dt><dd>{{ details.forge_version_source or 'indéterminée' }}</dd>
       </dl>
-      {% if result.errors %}
+      {% if details.errors %}
       <h3>Erreurs</h3>
-      <ul class="error">{% for message in result.errors %}<li>{{ message }}</li>{% endfor %}</ul>
+      <ul class="error">{% for message in details.errors %}<li>{{ message }}</li>{% endfor %}</ul>
       {% endif %}
-      {% if result.warnings %}
+      {% if details.warnings %}
       <h3>Avertissements</h3>
-      <ul>{% for message in result.warnings %}<li>{{ message }}</li>{% endfor %}</ul>
+      <ul>{% for message in details.warnings %}<li>{{ message }}</li>{% endfor %}</ul>
       {% endif %}
     </section>
     {% endif %}

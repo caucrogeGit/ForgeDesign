@@ -4,33 +4,61 @@ from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from stat import S_ISDIR, S_ISLNK, S_ISREG
+from typing import Literal
 
 from forge_design.forge.project_root import resolve_project_root
+
+OPTIONAL_MVC_DIRECTORIES = (
+    "controllers",
+    "entities",
+    "forms",
+    "helpers",
+    "models",
+    "validators",
+    "views",
+)
+
+
+StructureState = Literal["present", "absent", "invalid"]
+
+
+@dataclass(frozen=True)
+class StructureEntry:
+    """État observé d'un élément du squelette, sans interprétation des messages."""
+
+    label: str
+    required: bool
+    state: StructureState
 
 
 @dataclass(frozen=True)
 class ForgeProjectDiagnostic:
-    """Diagnostic immuable ; les messages nomment les chemins relatifs concernés."""
+    """Diagnostic immuable ; les messages nomment les chemins relatifs concernés.
+
+    ``entries`` donne, dans l'ordre des contrôles, l'état de chaque élément
+    vérifié ; ``errors`` et ``warnings`` en restent la forme textuelle publique.
+    """
 
     valid: bool
     errors: tuple[str, ...]
     warnings: tuple[str, ...]
+    entries: tuple[StructureEntry, ...] = ()
 
 
-def _check(path: Path, label: str, *, directory: bool) -> str | None:
+def _check(path: Path, label: str, *, directory: bool) -> tuple[StructureState, str]:
     try:
         mode = path.lstat().st_mode
     except FileNotFoundError:
-        return f"{label} : absent."
+        return "absent", f"{label} : absent."
     except OSError:
-        return f"{label} : impossible de vérifier le type."
+        return "invalid", f"{label} : impossible de vérifier le type."
     if S_ISLNK(mode):
-        return f"{label} : lien symbolique non accepté."
+        return "invalid", f"{label} : lien symbolique non accepté."
     expected = S_ISDIR if directory else S_ISREG
     if not expected(mode):
         kind = "dossier" if directory else "fichier ordinaire"
-        return f"{label} : type incorrect, {kind} attendu."
-    return None
+        return "invalid", f"{label} : type incorrect, {kind} attendu."
+    return "present", ""
 
 
 def detect_forge_project(root: str | PathLike[str]) -> ForgeProjectDiagnostic:
@@ -47,24 +75,21 @@ def detect_forge_project(root: str | PathLike[str]) -> ForgeProjectDiagnostic:
     canonical = resolve_project_root(root)
     errors: list[str] = []
     warnings: list[str] = []
+    entries: list[StructureEntry] = []
+
+    def check(label: str, *, directory: bool, required: bool) -> bool:
+        state, problem = _check(canonical / label, label, directory=directory)
+        entries.append(StructureEntry(label, required, state))
+        if state != "present":
+            (errors if required else warnings).append(problem)
+        return state == "present"
+
     for name in ("app.py", "bootstrap.py", "config.py"):
-        if problem := _check(canonical / name, name, directory=False):
-            errors.append(problem)
-    if problem := _check(canonical / "mvc", "mvc", directory=True):
-        errors.append(problem)
-    else:
-        if problem := _check(canonical / "mvc/routes", "mvc/routes", directory=True):
-            errors.append(problem)
-        for name in (
-            "controllers",
-            "entities",
-            "forms",
-            "helpers",
-            "models",
-            "validators",
-            "views",
-        ):
-            label = f"mvc/{name}"
-            if problem := _check(canonical / label, label, directory=True):
-                warnings.append(problem)
-    return ForgeProjectDiagnostic(not errors, tuple(errors), tuple(warnings))
+        check(name, directory=False, required=True)
+    if check("mvc", directory=True, required=True):
+        check("mvc/routes", directory=True, required=True)
+        for name in OPTIONAL_MVC_DIRECTORIES:
+            check(f"mvc/{name}", directory=True, required=False)
+    return ForgeProjectDiagnostic(
+        not errors, tuple(errors), tuple(warnings), tuple(entries)
+    )

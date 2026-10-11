@@ -338,3 +338,24 @@ def test_non_write_unicode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         t.status == "linked" for t in result.templates
     )
     assert snapshot() == before
+
+
+def test_existing_template_inventory_is_reused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FD-PROJECT-006 : inventaire fourni réutilisé, mvc/views non rebalayé."""
+    from forge_design.forge.templates import read_templates
+
+    root, views = make_views(tmp_path)
+    (views / "page.html").write_text("<p>x</p>")
+    contract(views, "page.view.json", "page.html")
+    expected = analyze_view_contract_links(root)
+    inventory = read_templates(root)
+
+    def rescan(*args: object) -> None:
+        raise AssertionError("mvc/views rebalayé")
+
+    monkeypatch.setattr(linkage, "read_templates", rescan)
+    assert analyze_view_contract_links(root, inventory) == expected
+    with pytest.raises(AssertionError, match="rebalayé"):
+        analyze_view_contract_links(root)

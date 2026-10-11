@@ -17,7 +17,7 @@ from forge_design.forge.source import (
     source_parts,
     template_source,
 )
-from forge_design.forge.templates import TemplateIssue, read_templates
+from forge_design.forge.templates import TemplateIssue, TemplatesResult, read_templates
 from forge_design.limits import MAX_VIEW_CONTRACT_LINK_ISSUES
 
 ViewContractLinkStatus = Literal[
@@ -166,10 +166,18 @@ def _project_links(
     )
 
 
-def analyze_view_contract_links(root: Path) -> ViewContractLinksResult:
-    """Composer les lecteurs existants et inspecter chaque cible unique sans la lire."""
+def analyze_view_contract_links(
+    root: Path, templates: TemplatesResult | None = None
+) -> ViewContractLinksResult:
+    """Composer les lecteurs existants et inspecter chaque cible unique sans la lire.
+
+    ``templates`` : inventaire de Template Viewer déjà lu pour cette racine (par
+    exemple par la synthèse de Project Inspector), réutilisé tel quel pour ne
+    pas rebalayer mvc/views ; sans lui, l'inventaire est lu ici.
+    """
     canonical = resolve_project_root(root)
-    templates = read_templates(canonical)
+    if templates is None:
+        templates = read_templates(canonical)
     inventory = read_view_contracts(canonical)
     contract_issues = list(inventory.issues)
     complete = not inventory.truncated and not inventory.issues

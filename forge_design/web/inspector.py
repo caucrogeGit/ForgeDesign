@@ -14,6 +14,10 @@ from forge_design.forge.project_root import (
 )
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.project_selector import ProjectSelector
+from forge_design.tools.project_health import (
+    ProjectHealthSummary,
+    summarize_project_health,
+)
 from forge_design.tools.project_inspector import ProjectInspection
 from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
@@ -28,16 +32,36 @@ def _render(
     context: CurrentProjectContext,
     path: str = "",
     *,
+    registry: ToolRegistry | None = None,
     result: ProjectInspection | None = None,
     error: str | None = None,
     message: str | None = None,
     status: int = 200,
 ) -> Response:
+    # Synthèse du projet courant, recalculée à chaque affichage (jamais mise en
+    # cache) ; la racine vient du contexte, jamais d'un paramètre HTTP.
+    health: ProjectHealthSummary | None = None
+    if registry is not None and context.root is not None:
+        health = summarize_project_health(
+            context.root,
+            registry,
+            # Inspection que l'action vient de faire pour le projet courant :
+            # réutilisée, jamais relancée (une seule inspection par action).
+            inspection=result
+            if result is not None and result.root == context.root
+            else None,
+        )
     return render_page(
         "inspector.html",
         {
             "path": path,
             "result": result,
+            "details": result
+            if result is not None
+            else health.inspection
+            if health is not None
+            else None,
+            "health": health,
             "error": error,
             "message": message,
             "max_path_length": MAX_PATH_LENGTH,
@@ -48,9 +72,15 @@ def _render(
     )
 
 
-def show_inspector(request: Request, context: CurrentProjectContext) -> Response:
-    """Afficher un formulaire vierge, sans nouvelle inspection."""
-    return _render(context)
+def show_inspector(
+    request: Request, context: CurrentProjectContext, registry: ToolRegistry
+) -> Response:
+    """Formulaire et, si un projet est sélectionné, sa synthèse de santé.
+
+    Lecture seule : le contexte n'est jamais modifié ici, même si le projet est
+    devenu inaccessible (seul « Actualiser » ferme un projet).
+    """
+    return _render(context, registry=registry)
 
 
 def inspect_submission(
@@ -82,6 +112,7 @@ def inspect_submission(
             context, error="Le chemin dépasse la limite de 4096 caractères.", status=400
         )
     selection = selector.open(Path(path))
+    registry = selector.registry
     message = (
         f"Projet ouvert ; avertissement : {selection.recent_warning}"
         if selection.recent_warning
@@ -90,6 +121,7 @@ def inspect_submission(
     return _render(
         context,
         path,
+        registry=registry,
         result=selection.inspection,
         error=selection.error,
         message=message,
@@ -145,4 +177,6 @@ def refresh_project(
             error="Le projet n’est plus reconnu ; il a été fermé.",
         )
     context.set_project(result)
-    return _render(context, result=result, message="Projet actualisé.")
+    return _render(
+        context, registry=registry, result=result, message="Projet actualisé."
+    )

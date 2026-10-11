@@ -182,7 +182,7 @@ def create_application(
         return show_home(request, context, store, registry)
 
     def show(request: Request) -> Response:
-        return show_inspector(request, context)
+        return show_inspector(request, context, registry)
 
     def close(request: Request) -> Response:
         if not is_local_action(request):

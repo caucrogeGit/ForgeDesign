@@ -73,6 +73,10 @@ def test_matrix(
     monkeypatch.setattr(DebugCenterTool, "run", run)
     with running(RecentProjects(tmp_path / "config/recent.json")) as app:
         call(app, "/inspector", method="POST", value=str(root))
+        # L'ouverture affiche la synthèse de Project Inspector, qui lit ce
+        # domaine une fois (FD-PROJECT-006) ; seule la page est comptée ensuite.
+        assert calls == [root]
+        calls.clear()
         before = {
             p: (p.read_bytes(), p.stat().st_size, p.stat().st_mtime_ns)
             for p in tmp_path.rglob("*")

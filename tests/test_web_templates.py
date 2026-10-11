@@ -36,6 +36,10 @@ def test_list_detail_reload_and_no_write(
         assert headers["Cache-Control"] == "no-store"
         assert call(app, "/templates/view?path=page")[0] == 409
         call(app, "/inspector", method="POST", value=str(root))
+        # L'ouverture affiche la synthèse de Project Inspector, qui lit ce
+        # domaine une fois (FD-PROJECT-006) ; seule la page est comptée ensuite.
+        assert calls == [root]
+        calls.clear()
         html = call(app, "/templates")[1]
         assert "Source mvc/views/ absente" in html and calls == [root]
         views = root / "mvc/views"

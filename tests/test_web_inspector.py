@@ -313,7 +313,7 @@ def test_refresh_updates_diagnostic(server: WSGIServer, project: Path) -> None:
     status, html, headers = request(server, "ignored", target="/project/refresh")
     assert status == 200 and "Projet actualisé." in html
     assert "2.0.0" in html and "1.0.0rc9" not in html
-    assert "mvc/views" not in html and "mvc/models" in html
+    assert "mvc/views : absent." not in html and "mvc/models : absent." in html
     assert f"Projet : {project.resolve()}" in html
     assert "no-store" in headers.get("Cache-Control", "")
     assert before == {
@@ -917,6 +917,10 @@ def test_web_route_filters(
 
     monkeypatch.setattr(RouteExplorerTool, "run", counted)
     assert request(server, str(filter_project))[0] == 200
+    # L'ouverture affiche la synthèse de Project Inspector : une lecture des
+    # routes (FD-PROJECT-006), hors du comptage de la page Route Explorer.
+    assert calls == [filter_project]
+    calls.clear()
     status, html, headers = request(server, method="GET", target="/routes?" + query)
     assert status == 200 and headers["Cache-Control"] == "no-store"
     assert calls == [
@@ -989,8 +993,9 @@ def test_web_route_filters_invalid_before_analysis(
     def forbidden(*args: object, **kwargs: object) -> None:
         raise AssertionError("Paramètres refusés avant analyse")
 
-    monkeypatch.setattr(RouteExplorerTool, "run", forbidden)
+    # Après l'ouverture : sa synthèse lit légitimement les routes (FD-PROJECT-006).
     assert request(server, str(filter_project))[0] == 200
+    monkeypatch.setattr(RouteExplorerTool, "run", forbidden)
     status, html, headers = request(server, method="GET", target="/routes?" + query)
     assert status == 400 and headers["Cache-Control"] == "no-store"
     assert "Traceback" not in html and "<script>" not in html

@@ -25,6 +25,10 @@ def test_debug_http(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         assert status == 200 and "Aucun projet ouvert." in html and not calls
         assert headers["Cache-Control"] == "no-store"
         assert call(app, "/inspector", method="POST", value=str(root))[0] == 200
+        # L'ouverture affiche la synthèse de Project Inspector, qui lit ce
+        # domaine une fois (FD-PROJECT-006) ; seule la page est comptée ensuite.
+        assert calls == [root]
+        calls.clear()
         assert "Aucune erreur runtime enregistrée." in call(app, "/debug")[1]
         assert calls == [root]
         path = journal(

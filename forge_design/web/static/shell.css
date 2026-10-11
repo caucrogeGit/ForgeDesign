@@ -34,6 +34,19 @@ nav a[aria-current="page"] { font-weight: 700; text-decoration: underline; text-
 .current-project p { margin: .5rem 0; }
 .current-project form { margin-top: .75rem; }
 
+/* Synthèse de santé de Project Inspector (FD-PROJECT-006) : l'état est toujours
+   écrit et marqué ; la couleur ne fait que le souligner. */
+.health-section { margin-top: 1.25rem; }
+.health-section h3 { margin: 0 0 .5rem; font-size: 1.1rem; }
+.health-global { margin-bottom: .75rem; font-weight: 600; }
+.health-status { display: inline-block; padding: .05rem .5rem; border: 1px solid currentColor; border-radius: .3rem; font-weight: 650; }
+.health-status[data-status="ok"] { color: #2f6b47; }
+.health-status[data-status="attention"] { color: #8a5a00; }
+.health-status[data-status="erreur"] { color: #973a27; }
+.health-status[data-status="indisponible"] { color: #53615b; border-style: dashed; }
+.health-diagnostics { padding-left: 1.25rem; }
+.health-empty { margin-top: 2rem; }
+
 .graph-edges { padding-left: 1.5rem; }
 .graph-edges li { margin-block: .5rem; overflow-wrap: anywhere; }
 

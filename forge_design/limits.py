@@ -48,6 +48,13 @@ MAX_VIEW_CONTRACT_VALIDATION_ISSUES = 256
 # Plusieurs anomalies possibles par contrat ; marqueur de troncature inclus.
 MAX_VIEW_CONTRACT_LINK_ISSUES = 512
 
+# Inventaire direct de mvc/migrations (noms et tailles seulement).
+MAX_MIGRATION_DIRECTORY_ENTRIES = 4096
+
+# Synthèse de santé de Project Inspector : premiers diagnostics affichés par
+# section, le total et le lien vers l'outil détaillé complétant l'aperçu.
+MAX_HEALTH_VISIBLE_DIAGNOSTICS = 5
+
 # Imbrication design : racine incluse, profondeur racine zéro, marqueur inclus.
 MAX_DESIGN_NODES = 4096
 MAX_DESIGN_DEPTH = 128
