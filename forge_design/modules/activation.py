@@ -8,6 +8,14 @@ de type ModuleDescriptor.
 - Module absent, en échec à l'import, descripteur invalide, version d'API non
   supportée, identifiant ou type de ressource déjà pris : diagnostic, module
   non activé, les autres continuent.
+- FD-RELEASE-001 : un module peut exiger une version de Forge Design
+  (``requires_forge_design``, spécificateur PEP 440). Elle est comparée à la
+  version du cœur (``forge_design.__version__``) avant toute exposition :
+  incompatible → ``core-version-incompatible`` ; version du cœur illisible →
+  ``core-version-unknown`` (jamais supposée compatible) ; spécificateur
+  invalide → ``descriptor-invalid``. Une préversion du cœur est acceptée si elle
+  est dans l'intervalle. ``Requires-Dist`` du module reste la première barrière :
+  un module qui n'a pas pu être importé reste ``module-import-failed``.
 
 Un module installé reste du code de confiance local : l'importer exécute son
 code. Ce contrat évite les accès accidentels par construction ; il ne sandboxe
@@ -20,6 +28,10 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
+
+import forge_design
 from forge_design.modules.descriptor import (
     SUPPORTED_MODULE_API_VERSIONS,
     ModuleDescriptor,
@@ -34,6 +46,8 @@ DiagnosticCode = Literal[
     "descriptor-missing",
     "descriptor-invalid",
     "api-incompatible",
+    "core-version-incompatible",
+    "core-version-unknown",
     "duplicate-module",
     "duplicate-resource-type",
     "dependency-probe-failed",
@@ -106,10 +120,56 @@ def _availability(
     return frozenset(offered), unavailable, failure
 
 
+def _core_version(text: str) -> Version | None:
+    try:
+        return Version(text)
+    except (InvalidVersion, TypeError):
+        return None
+
+
+def _core_refusal(
+    descriptor: ModuleDescriptor, core: str, version: Version | None
+) -> tuple[DiagnosticCode, str] | None:
+    """Contrainte de version du cœur : None si satisfaite ou absente."""
+    requirement = descriptor.requires_forge_design
+    if requirement is None:
+        return None
+    try:
+        specifier = SpecifierSet(requirement)
+    except InvalidSpecifier:
+        return (
+            "descriptor-invalid",
+            f"requires_forge_design invalide : {requirement!r} "
+            "(spécificateur PEP 440 attendu).",
+        )
+    if version is None:
+        return (
+            "core-version-unknown",
+            f"Le module « {descriptor.id} » nécessite forge-design {requirement} ; "
+            "version de Forge Design indéterminée.",
+        )
+    if not specifier.contains(version, prereleases=True):
+        return (
+            "core-version-incompatible",
+            f"Le module « {descriptor.id} » nécessite forge-design {requirement} ; "
+            f"version installée : {core}.",
+        )
+    return None
+
+
 def activate_modules(
-    packages: Sequence[str], importer: Importer = importlib.import_module
+    packages: Sequence[str],
+    importer: Importer = importlib.import_module,
+    *,
+    core_version: str | None = None,
 ) -> ModuleActivation:
-    """Active, dans l'ordre configuré, les modules compatibles et valides."""
+    """Active, dans l'ordre configuré, les modules compatibles et valides.
+
+    ``core_version`` : paramètre de l'hôte, pour les tests ; par défaut
+    ``forge_design.__version__``. Un module ne le contrôle jamais.
+    """
+    core = forge_design.__version__ if core_version is None else core_version
+    version = _core_version(core)
     names = _check_configuration(packages)
     active: list[ActiveModule] = []
     diagnostics: list[ModuleDiagnostic] = []
@@ -154,6 +214,10 @@ def activate_modules(
                 f"API {descriptor.api_version} non supportée "
                 f"(supportées : {supported}).",
             )
+            continue
+        refusal = _core_refusal(descriptor, core, version)
+        if refusal is not None:
+            refuse(package, *refusal)
             continue
         if any(item.descriptor.id == descriptor.id for item in active):
             refuse(

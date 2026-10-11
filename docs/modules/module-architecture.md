@@ -99,6 +99,7 @@ Un paquet de module expose l'attribut `FORGE_DESIGN_MODULE`, un
 | `assets` | Liste fermée (au plus 32) de `ModuleAsset(name, source)` : nom `[a-z0-9-]+.(js\|css\|svg)`, source relative sans segment vide, `.`, `..` ou caché |
 | `dependency_probe` | Sonde facultative, sans effet de bord : `{id de dépendance: disponible}` |
 | `actions` | Facultatif (`()`, FD-EDIT-001) : au plus 32 `ModuleAction`, chacune sur un type déclaré, modifiable, qui offre `save` et sa capacité ([actions](module-actions.md)) |
+| `requires_forge_design` | Facultatif (`None`, FD-RELEASE-001) : spécificateur PEP 440 des versions de Forge Design acceptées (`">=0.2.0,<1"`), au plus 200 caractères imprimables ; le descripteur n'en vérifie que la forme, l'activation l'interprète ([versions](../release/versioning.md)) |
 
 Le descripteur ne reçoit ni Router, ni Application, ni Request, ni racine de
 projet. Il n'a donc aucun moyen d'enregistrer une route, d'injecter un
@@ -132,11 +133,16 @@ composition HTTP, puis est injectée dans `create_application(modules=…)`.
 - Incompatible : diagnostic `api-incompatible`, module non activé, les
   autres continuent.
 - Ajouts additifs restés en API 1 : `actions` (FD-EDIT-001), `editor_script`
-  et `editor_config` (FD-GRAPHICS-EDIT-001), tous facultatifs. Un module qui
-  les utilise, chargé par un cœur antérieur, échoue à la construction de son
-  descripteur (`module-import-failed`) ; la version de distribution du cœur
-  (`0.1.0.dev0`) n'a pas changé, la contrainte `forge-design>=…` ne peut donc
-  pas encore l'exprimer.
+  et `editor_config` (FD-GRAPHICS-EDIT-001), `requires_forge_design`
+  (FD-RELEASE-001), tous facultatifs.
+- **Version minimale du cœur** (FD-RELEASE-001, [politique](../release/versioning.md)) :
+  un module déclare les versions de distribution qu'il accepte, à la fois dans
+  `Requires-Dist` (`forge-design>=0.2.0,<1`, première barrière, pip) et dans
+  `requires_forge_design` (même spécificateur PEP 440, seconde barrière,
+  activation). Hors intervalle : `core-version-incompatible` ; version du cœur
+  illisible : `core-version-unknown` ; spécificateur invalide :
+  `descriptor-invalid`. Un module qui importe un symbole absent du cœur échoue
+  avant toute lecture de son descripteur (`module-import-failed`).
 
 ## Resource types
 
@@ -363,6 +369,9 @@ D'où l'activation explicite, jamais depuis un projet.
 | Exception à l'import | `module-import-failed` (classe de l'exception), module isolé |
 | Attribut absent ou d'un mauvais type | `descriptor-missing`, `descriptor-invalid` |
 | API non supportée | `api-incompatible` |
+| Version du cœur hors de `requires_forge_design` | `core-version-incompatible` |
+| Version du cœur illisible, module contraint | `core-version-unknown` |
+| `requires_forge_design` non conforme à PEP 440 | `descriptor-invalid` |
 | Identifiant déjà actif | `duplicate-module` |
 | Espace et suffixe déjà pris | `duplicate-resource-type` |
 | Sonde de dépendances en échec | `dependency-probe-failed`, capacités dépendantes indisponibles, module actif |
@@ -396,10 +405,11 @@ distinct rend la frontière visible à chaque import.
 
 ## Versioning
 
-Deux versions séparées : la **version du paquet** (`ModuleDescriptor.version`,
-cycle de release du module) et l'**API hôte** (`api_version`, entier
-incrémenté seulement pour une rupture du contrat). La métadonnée Python
-`forge-design >= X, < Y` complète, au niveau de l'installation.
+Trois versions séparées ([politique](../release/versioning.md)) : la
+**version du paquet** du module (`ModuleDescriptor.version`, cycle de release du
+module), l'**API hôte** (`api_version`, entier incrémenté seulement pour une
+rupture du contrat) et les **versions du cœur acceptées**
+(`requires_forge_design`, identique au `Requires-Dist` du module).
 
 Audit FD-ARCH-001 : depuis FD-MODULES-001, tous les ajouts sont **additifs et
 facultatifs** — `actions`, `editor_script`, `editor_config`, les options et

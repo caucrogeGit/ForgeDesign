@@ -30,7 +30,7 @@ Les phases numérotées ci-dessous restent l'historique de construction.
 
 | Piste | Contenu | État | Suite recommandée |
 |---|---|---|---|
-| **A. Cœur Forge Design** | Application locale Forge MVC, sélection et contexte de projet, stockage `.forge-design/`, sécurité système de fichiers, hôte de ressources, contrat spécialisé, hôte des modules, actions bornées | Socle fait ; frontières auditées et gardées (FD-ARCH-001) | **Ticket principal : FD-RELEASE-001** — version de distribution du cœur et compatibilité déclarée des modules (un module ne peut pas encore exiger un cœur portant une capacité donnée : la distribution est figée à `0.1.0.dev0`) |
+| **A. Cœur Forge Design** | Application locale Forge MVC, sélection et contexte de projet, stockage `.forge-design/`, sécurité système de fichiers, hôte de ressources, contrat spécialisé, hôte des modules, actions bornées | Socle fait ; frontières auditées et gardées (FD-ARCH-001) ; version **0.2.0** et compatibilité déclarée des modules (FD-RELEASE-001, [politique](release/versioning.md)) | Reprendre la piste B ; chaque nouvelle capacité publique du cœur : version MINEURE, puis relèvement des modules qui l'utilisent |
 | **B. Outils propres à Forge** | Project Inspector, Route Explorer, Entity Explorer, Debug Center, Template Viewer, Template Designer, preview réelle | Lecture et conception de vues faites ; Phase 5 (diagnostics Forge exécutés) et Phase 12 (intégration applicative) ouvertes | Reprendre la priorité produit après FD-RELEASE-001 : diagnostics Forge (Phase 5), puis intégration applicative (Phase 12) |
 | **C. Moteur graphique générique** | Graphic Core : scène, rendu, viewport, minicarte, niveaux de détail, sélection de nœuds, `nodeMove`, calques monde, `worldAt`, `onViewChange` | Éprouvé par trois clients du cœur et un module | Aucune capacité nouvelle sans besoin réel d'au moins un client ; la sélection d'arête n'est pas prévue |
 | **D. Modules externes** | Dépôts `ForgeDesign-<Domaine>` installés et activés explicitement | ForgeDesign-Circuit : module de validation (édition FDC-EDIT-001 à 007 dans son dépôt) | Second pilote recommandé : **Flowchart** (étapes étiquetées, arêtes orientées porteuses de sens, édition de texte et de structure, presque pas de routage géométrique) ; Circuit poursuit dans son dépôt, hors de la progression du cœur |
@@ -408,8 +408,12 @@ fait      FD-ARCH-001     audit et consolidation des frontières : matrice norma
                           publics figés, direction des dépendances, second domaine témoin
                           (flowchart-like) dans les tests, validation multi-modules avec
                           Circuit ; MODULE_API_VERSION reste 1
-suivant   piste A (FD-RELEASE-001), puis piste B ; Circuit poursuit dans son dépôt ;
-          second module pilote recommandé : Flowchart
+fait      FD-RELEASE-001  version 0.2.0 (source unique forge_design.__version__), politique
+                          de version 0.x, requires_forge_design (PEP 440) vérifié à
+                          l'activation, diagnostics core-version-incompatible / -unknown ;
+                          Circuit déclare forge-design>=0.2.0,<1 ; MODULE_API_VERSION reste 1
+suivant   piste B ; Circuit poursuit dans son dépôt ; second module pilote
+          recommandé : Flowchart
 ```
 
 ## Phase 11 — 3D

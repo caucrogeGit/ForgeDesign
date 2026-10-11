@@ -22,7 +22,7 @@ forge-design --module pkg_a --module pkg_b     # plusieurs, dans cet ordre
 |---|---|
 | Nom malformé ou listé deux fois | message, code de sortie 2, aucun serveur |
 | Module absent | `Module <paquet> non chargé (module-missing) : …` sur stderr ; Forge Design démarre |
-| Import en échec, descripteur absent ou invalide, API incompatible, doublon | diagnostic sur stderr, module non chargé |
+| Import en échec, descripteur absent ou invalide, API incompatible, version du cœur hors de `requires_forge_design` ou illisible (FD-RELEASE-001), doublon | diagnostic sur stderr, module non chargé ; Forge Design démarre |
 | Asset déclaré introuvable | module non exposé au Web, `asset-missing` sur l'accueil |
 
 L'accueil affiche un bloc « Modules non chargés » (paquet, code, message

@@ -180,6 +180,7 @@ def flow_module(
     *,
     script: str = "flow-editor.js",
     edit: bool = True,
+    requires: str | None = None,
 ) -> ModuleDescriptor:
     names: tuple[PlatformCapability, ...] = (
         ("open", "validate", "edit", "save") if edit else ("open", "validate")
@@ -227,6 +228,7 @@ def flow_module(
         # Sans capacité d'édition, aucune action n'est déclarable (le descripteur
         # refuse une action sur un type non modifiable).
         actions=(RENAME_STEP,) if edit else (),
+        requires_forge_design=requires,
     )
 
 

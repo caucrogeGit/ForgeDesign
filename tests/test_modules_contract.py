@@ -388,6 +388,9 @@ def test_module_contract_depends_only_on_the_specialized_contract() -> None:
         "forge_design.forge.project_root",
         "forge_design.forge.project_version",
     }
+    # FD-RELEASE-001 : version du cœur (source autoritaire) et spécificateurs
+    # PEP 440 de la dépendance déclarée packaging, pour requires_forge_design.
+    exact = {"forge_design", "packaging.specifiers", "packaging.version"}
     stdlib = {
         "re",
         "json",
@@ -407,6 +410,8 @@ def test_module_contract_depends_only_on_the_specialized_contract() -> None:
     }
     for path in sorted((PACKAGE / "modules").glob("*.py")):
         for name in _imports(path):
+            if name in exact:
+                continue
             if name.startswith("forge_design"):
                 assert any(name.startswith(item) for item in allowed), (path, name)
             else:

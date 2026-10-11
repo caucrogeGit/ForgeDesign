@@ -35,6 +35,8 @@ forge-design --version
 ```
 
 La commande affiche `Forge Design` suivi de la version courante du package.
+Politique de version et compatibilité des modules :
+[Versions et compatibilité](docs/release/versioning.md).
 Pour démarrer l'application Web locale :
 
 ```bash

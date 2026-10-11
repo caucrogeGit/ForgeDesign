@@ -1,6 +1,6 @@
 # Frontières du cœur, du moteur générique et des modules
 
-Statut : **normatif** (FD-ARCH-001). Ce document fixe ce qui appartient à Forge
+Statut : **normatif** (FD-ARCH-001, règle 11 : FD-RELEASE-001). Ce document fixe ce qui appartient à Forge
 Design en tant qu'outil des projets Forge, ce qui appartient à son moteur
 générique, et ce qui appartient aux modules spécialisés. Le contrat détaillé des
 modules reste dans [Architecture des modules](../modules/module-architecture.md) ;
@@ -88,6 +88,11 @@ Forge Design
    générique ; il ne contient jamais de comportement propre à un domaine.
 10. **Le cœur est complet sans module.** Sans activation : aucune route
     `/modules`, aucune zone Modules, les cinq Tools inchangés.
+11. **Versions séparées** (FD-RELEASE-001) : version de distribution du cœur
+    (`forge_design.__version__`, source unique), `MODULE_API_VERSION` (forme du
+    contrat, 1) et versions du cœur acceptées par un module
+    (`requires_forge_design` = son `Requires-Dist`). Un module hors intervalle
+    n'est pas activé et n'expose rien ([versions](../release/versioning.md)).
 
 ## Preuves
 
@@ -101,6 +106,7 @@ Forge Design
 | 7 | `test_modules_contract.py::test_module_contract_depends_only_on_the_specialized_contract`, `test_failures_are_isolated_with_diagnostics` |
 | 9 | Module témoin « flowchart-like » (`tests/flow_witness/`) : un second domaine qui déclare, projette, pose un calque, agit et recharge sans aucun code Circuit |
 | 10 | `test_web_modules.py::test_without_modules_nothing_is_exposed` |
+| 11 | `test_module_version_compatibility.py`, `test_packaging.py` |
 
 Le module témoin n'est pas livré : il vit dans les tests du cœur. Circuit
 (`ForgeDesign-Circuit`) est une **validation réelle**, jamais la définition du

@@ -36,6 +36,8 @@ SUPPORTED_MODULE_API_VERSIONS: frozenset[int] = frozenset({MODULE_API_VERSION})
 
 MAX_MODULE_ID_CHARS = 32
 MAX_MODULE_ASSETS = 32
+# Spécificateur PEP 440 de la version de Forge Design exigée (FD-RELEASE-001).
+MAX_FORGE_DESIGN_REQUIREMENT_CHARS = 200
 MODULE_URL_PREFIX = "/modules"
 
 _VERSION = re.compile(r"[0-9A-Za-z][0-9A-Za-z.+-]{0,63}")
@@ -164,6 +166,10 @@ class ModuleDescriptor:
     assets: tuple[ModuleAsset, ...] = ()
     dependency_probe: DependencyProbe | None = None
     actions: tuple[ModuleAction, ...] = ()
+    # FD-RELEASE-001 : versions de Forge Design acceptées, spécificateur PEP 440
+    # (« >=X.Y.Z,<N ») ; None : aucune contrainte au-delà de api_version. Le
+    # descripteur n'en vérifie que la forme ; l'activation l'interprète.
+    requires_forge_design: str | None = None
 
     def __post_init__(self) -> None:
         if not _is_instance(self.definition, SpecializedToolDefinition):
@@ -203,6 +209,17 @@ class ModuleDescriptor:
                     f"Script d'édition non déclaré : {binding.editor_script}."
                 )
         self._check_actions()
+        requirement = self.requires_forge_design
+        if requirement is not None and (
+            not _is_str(requirement)
+            or not requirement.strip()
+            or len(requirement) > MAX_FORGE_DESIGN_REQUIREMENT_CHARS
+            or not requirement.isprintable()
+        ):
+            raise ValueError(
+                "requires_forge_design doit être None ou un spécificateur non vide "
+                f"d'au plus {MAX_FORGE_DESIGN_REQUIREMENT_CHARS} caractères."
+            )
 
     def _check_actions(self) -> None:
         """Action : type déclaré, modifiable, offrant save et sa capacité."""
