@@ -104,6 +104,12 @@ analyse transitive. Rendu : classes `gx-selected`, `gx-related`,
 Interaction : clic, Entrée, Espace (bascule), Échap (efface et rend le focus
 au nœud).
 
+État actuel (FD-ARCH-001) : seuls les **nœuds** sont sélectionnables ; une arête
+n'est ni sélectionnable ni focalisable. Un client qui a besoin d'interagir avec
+une arête le fait dans son propre calque (`addOverlay`), comme les fils de
+ForgeDesign-Circuit ; aucune sélection d'arête n'est prévue tant qu'un besoin
+générique ne la justifie pas.
+
 ## Viewport
 
 État runtime de l'instance `{ scale, x, y }` : `(x, y)` est le point monde au
@@ -204,6 +210,36 @@ engine.destroy();  // retire SVG, écouteurs (AbortController) et état
 Chaque instance possède sa scène, son index, sa sélection, son rendu et ses
 écouteurs : deux instances sont indépendantes. Après `destroy()`, toute
 opération lève une erreur.
+
+## Public API for clients
+
+Audit FD-ARCH-001 : surface publique du moteur pour un client (Route, Entity,
+Debug, script d'édition d'un module). Tout le reste (renderer, groupes SVG,
+DOM interne, index) est privé ; aucun calque interne n'est exposé.
+
+| Capacité | Responsabilité | Entrée → sortie | Cycle de vie | Mutabilité | Garanties |
+|---|---|---|---|---|---|
+| `createGraphicEngine(container, scene, options)` | Valider la scène, monter le rendu | conteneur, `GraphicScene`, options → moteur | une instance par montage | scène validée immuable | scène invalide : `GraphicSceneError` ; instances indépendantes |
+| `scene()`, `node(id)`, `edge(id)` | Lire la scène validée | → objets gelés (ou `null`) | jusqu'à `destroy` | lecture seule | jamais la scène métier, seulement la projection |
+| `viewport()`, `detailLevel()` | État de vue courant | → état gelé, `"overview"`/`"normal"`/`"detail"` | jusqu'à `destroy` | lecture | cohérents avec le rendu |
+| `fit()`, `home()`, `zoomIn()`, `zoomOut()`, `zoomAt()`, `panBy()`, `centerAt()`, `resize()` | Navigation | → état de vue | jusqu'à `destroy` | modifie la vue seulement | bornes de zoom, jamais la scène |
+| `worldAt({clientX, clientY})` | Point écran (client) → point monde | → `{x, y}` gelé | lève après `destroy` | pure | primitive générique, exacte sous zoom et pan |
+| `onViewChange(state)` (option) | Notifier un changement de vue | `{scale, x, y, width, height, detailLevel}` gelé | appels pendant la vie de l'instance | — | seulement sur changement réel (zoom, pan, fit, home, recentrage, redimensionnement utile, niveau de détail) ; exception du client isolée |
+| `addOverlay({label})` | Calque monde d'un client | → `{root, remove()}` | `remove()` idempotent ; `destroy()` retire tout | contenu libre du client dans `root` | suit le viewport, racine dédiée, rattachée au re-rendu, appui jamais pan |
+| `select(id)`, `clearSelection()`, `focus(id)`, `selection()` ; option `onSelectionChange` | Sélection et focus de **nœuds** | id de nœud → état | jusqu'à `destroy` | sélection runtime | arêtes incidentes mises en évidence ; aucune sélection d'arête (état actuel, voir [Selection](#selection)) |
+| `nodeMove` (option), `movableNodes()`, `movePreview()` | Déplacement opt-in | voir [Node move](#node-move-opt-in) | par geste | aperçu runtime, scène jamais modifiée | désactivé par défaut ; une intention par geste |
+| `render()`, `destroy()`, `isDestroyed()` | Re-rendu, libération | — | `destroy` final | — | écouteurs retirés (`AbortController`), calques retirés ; toute opération lève ensuite |
+
+Gestes génériques existants : pan (fond, bouton du milieu, Maj + flèches),
+zoom (molette avec Ctrl, boutons, minicarte), sélection (clic, Échap),
+glisser de nœud et Ctrl + Maj + flèches (opt-in), interactions d'un client dans
+ses calques. Aucun cadre de gestes abstrait n'est fourni.
+
+Usage réel par ForgeDesign-Circuit (validation, FD-ARCH-001) : `scene`, `node`,
+`viewport`, `detailLevel`, `worldAt`, `addOverlay`, `select`, `focus`, options
+`nodeMove` et `onViewChange` ; `edge()` n'est pas utilisé (les arêtes sont lues
+dans `scene()`), ce qui ne la rend pas inutile : Route, Entity et Debug lisent
+aussi la scène par ces accesseurs génériques.
 
 ## Node move (opt-in)
 

@@ -29,3 +29,9 @@ Le cœur n'importe jamais `forge_design_circuit` et ne livre aucun code Circuit.
 Il héberge le module comme n'importe quel autre, via le contrat décrit dans
 [Architecture des modules spécialisés](../modules/module-architecture.md) et
 [Hôte des modules](../modules/module-host.md).
+
+Depuis l'audit [FD-ARCH-001](../rapports/FD-ARCH-001.md), Circuit est le
+**module de validation réelle** du moteur générique, jamais la définition de son
+contrat : l'exemple normatif est le module témoin « flowchart-like » des tests du
+cœur, et la piste « modules externes » de la [roadmap](../03-roadmap.md)
+recommande Flowchart comme second pilote.

@@ -1,9 +1,13 @@
 # Architecture des modules spécialisés
 
-Statut : **normatif pour la phase Modules** (FD-MODULES-001, hôte Web
-FD-MODULES-002). Code : `forge_design/modules/` (descripteur, activation,
-`ModuleHost`), `forge_design/specialized/listing.py` (inventaire),
-`forge_design/web/modules.py` (pages). Mode d'emploi : [Hôte des modules](module-host.md).
+Statut : **normatif** — contrat des modules (FD-MODULES-001, hôte Web
+FD-MODULES-002, actions FD-EDIT-001, édition FD-GRAPHICS-EDIT-001/002),
+consolidé par l'audit FD-ARCH-001. Code : `forge_design/modules/` (descripteur,
+activation, `ModuleHost`), `forge_design/specialized/` (contrat et hôte de
+ressources), `forge_design/web/modules.py` (pages, actions, assets),
+`forge_design/web/static/module-resource.js` (client générique). Mode d'emploi :
+[Hôte des modules](module-host.md) ; actions : [contrat](module-actions.md) ;
+frontières normatives : [cœur et modules](../architecture/core-module-boundaries.md).
 
 ## Objectif
 
@@ -12,6 +16,11 @@ Permettre à Forge Design d'héberger des **modules spécialisés externes**
 cœur. Le cœur reste complet et utilisable seul ; un module ne s'ajoute que s'il
 est installé, compatible et explicitement activé. Ce n'est pas un système de
 plugins universel : c'est une frontière simple, explicite, testable.
+
+L'exemple normatif est le **module témoin « flowchart-like »** des tests du cœur
+(`tests/flow_witness/`, [exemple minimal](#exemple-minimal)) : un domaine sans
+rapport avec Circuit. ForgeDesign-Circuit est la **validation réelle** du
+contrat, jamais sa définition.
 
 ## Frontière core / module
 
@@ -55,6 +64,25 @@ Forge Design (core) ◀── module spécialisé
 - Un module ne dépend jamais de SéquenCiel. DrawCiel reste une référence de
   développement, jamais une dépendance d'exécution ; un éventuel import de
   documents DrawCiel serait un outil de migration explicite.
+
+## API publique Python
+
+Seuls `forge_design.modules` et `forge_design.specialized` (avec leur `__all__`)
+sont l'API supportée ; leurs exports sont figés par un test
+(`test_module_boundaries.py::test_public_exports_are_a_reviewed_snapshot`) :
+tout ajout ou retrait est une décision. Sous-modules (`forge_design.modules.host`,
+`…actions`, `…descriptor`, `…activation`) et le reste de `forge_design` : internes.
+
+| Audience | `forge_design.modules` | `forge_design.specialized` |
+|---|---|---|
+| **Module** (écrire un module) | `MODULE_API_VERSION`, `ModuleDescriptor`, `ResourceBinding`, `ModuleAsset`, `ModuleAction`, `ModuleActionPayload`, `ModuleActionPayloadError`, `ModuleActionRefused`, `ModuleActionResult`, `ActionHandler`, bornes `MAX_MODULE_ACTION*`, `MAX_SAFE_INTEGER`, `RESERVED_ACTION_FIELDS` | `SpecializedToolDefinition`, `SpecializedResourceType`, `SpecializedCapability`, `PlatformCapability`, `PLATFORM_CAPABILITIES`, `OptionalDependency`, `UiEntry`, `SpecializedResourceCodec`, `SpecializedFormatError`, `SpecializedIssue`, `SpecializedValidationResult`, `MAX_SPECIALIZED_ISSUES`, `MAX_SPECIALIZED_LOCATION_DEPTH`, `loads_strict_json` |
+| **Hôte** (composition, diagnostics, tests de contrat) | `activate_modules`, `ActiveModule`, `ModuleActivation`, `ModuleDiagnostic`, `SUPPORTED_MODULE_API_VERSIONS`, `DESCRIPTOR_ATTRIBUTE`, `MODULE_URL_PREFIX`, `ASSET_MEDIA_TYPES` | Hôte de ressources : `read/write_specialized_resource`, `list_specialized_resources`, résultats (`SpecializedReadResult`, `SpecializedWriteResult`, `SpecializedResourceListing`, `SpecializedResourceRef`, `SpecializedResourceRevision`) et erreurs (`SpecializedResourceError` et sous-classes, `InvalidSpecializedResourceError`, `UnsupportedSpecializedVersionError`, `SpecializedCapabilityError`, `ErrorCategory`) |
+
+Les symboles « hôte » restent exportés (aucun défaut constaté, retrait non
+nécessaire) ; un module n'en a pas besoin : il ne lit ni n'écrit le projet et
+n'active personne. Circuit importe 8 symboles de `forge_design.modules` et 10 de
+`forge_design.specialized`, tous dans la colonne « Module », et aucun autre
+sous-module du cœur.
 
 ## ModuleDescriptor
 
@@ -152,7 +180,8 @@ persistance dans un module : `Path(racine) / …`, `open(…)`, `os.open(…)`.
   `/modules/<id>/assets/<name>`. Chaque asset est vérifié et lu à la
   construction de l'hôte ; un asset introuvable retire le module du Web avec
   le diagnostic `asset-missing`. Les CSS du module ne sont chargées que sur
-  ses pages ; aucun JS de module n'est chargé en V1.
+  ses pages ; le seul JS de module chargé est son script d'édition, sur la page
+  ressource, quand une action du type est exposée ([édition](#édition)).
 - Type MIME fixé par l'hôte selon l'extension (`.js`, `.css`, `.svg`).
 - Aucun chemin d'utilisateur, aucun serveur statique générique, aucune
   traversée possible.
@@ -186,6 +215,79 @@ V1 (FD-MODULES-002) : **ouvrir et visualiser** seulement.
   contexte calculé par l'hôte (URLs, jeton, configuration) et peut fournir
   l'option `nodeMove` du Graphic Core. Il ne reçoit ni Router, ni racine.
 
+## Édition
+
+Script et configuration d'édition (FD-GRAPHICS-EDIT-001/002) : un contrat
+**facultatif, inerte sans action exposée, borné, contrôlé par le module et
+validé par l'hôte**.
+
+| Garantie | Comportement |
+|---|---|
+| Facultatif | `editor_script` et `editor_config` valent `None` par défaut ; un module en consultation n'en déclare pas |
+| Inerte sans action | Le contexte n'existe que si le type a une action **exposée** (capacité et `save` disponibles), une révision lue, une scène et un script déclaré ; sinon aucun bloc, aucun script de module |
+| Borné | Configuration : objet JSON strict sans `NaN`, au plus 1 Mio (`MAX_MODULE_EDITOR_CONFIG_BYTES`, inchangé) ; scène : au plus 8 Mio |
+| Contrôlé par le module | Script : asset `.js` déclaré, servi par l'hôte ; configuration : `editor_config(document)` |
+| Validé par l'hôte | URLs (script, actions), type, chemin et jeton calculés par l'hôte ; le client générique vérifie que chaque URL est un chemin du même serveur ; exceptions de configuration isolées |
+
+Contrat JavaScript (côté navigateur, implémentation de
+`/module-resource.js`) :
+
+```js
+// Asset déclaré du module, importé par le client générique (import(), même origine).
+export function createResourceEditor(context) {
+  // context (gelé) : { script, resourceType, path, revision, actions, config, announce }
+  //   — le bloc JSON de la page nomme le type « type », le contexte JS le nomme « resourceType ».
+  return {                       // ou null : consultation seule, sans message
+    nodeMove,                    // facultatif : option du Graphic Core
+    onViewChange(state) {},      // facultatif : option du Graphic Core
+    attach(engine) {},           // facultatif : après création du moteur (calques, focus…)
+  };
+}
+```
+
+Cycle de vie : `module-resource.js` lit le contexte → importe le script →
+`createResourceEditor(context)` → `createGraphicEngine(container, scène,
+{ nodeMove, onViewChange })` → `attach(engine)` → gestes du script, qui envoie
+lui-même ses actions (formulaire encodé, URL et jeton du contexte) → après
+succès, navigation vers la page rechargée (nouvelle révision, nouveau moteur).
+Il n'y a pas de crochet de destruction : une action réussie recharge la page.
+
+Échec du script (introuvable, sans `createResourceEditor`, exception, option
+refusée par le moteur, `attach` en échec) : la scène est montée **en
+consultation seule** et l'indisponibilité est annoncée ; la ressource reste
+lisible (test JS, validation navigateur FD-ARCH-001). L'API du moteur utilisable
+par un script : [moteur graphique](../graphics/graphics-engine.md#public-api-for-clients).
+
+## Exemple minimal
+
+Le témoin `tests/flow_witness/` (non livré) montre tout le contrat sur un domaine
+« organigramme » : trois étapes étiquetées, un lien, une action, un calque.
+
+```python
+ModuleDescriptor(
+    definition=SpecializedToolDefinition(id="flow", …, resource_types=(flow_type,),
+                                         ui_entry=UiEntry("Flux")),
+    version="0.1.0",
+    api_version=MODULE_API_VERSION,
+    bindings=(
+        ResourceBinding(
+            "flow",
+            FlowCodec(),                        # octets ↔ FlowDocument
+            flow_scene,                         # FlowDocument → GraphicScene (runtime)
+            editor_script="flow-editor.js",     # calque monde : une poignée par étape
+            editor_config=flow_editor_config,   # {renameAction, steps}
+        ),
+    ),
+    asset_package="flow_witness",
+    assets=(ModuleAsset("flow-editor.js", "static/flow-editor.js"),),
+    actions=(ModuleAction("rename-step", "flow", ("step", "label"), rename_step),),
+)
+```
+
+Le paquet expose ce descripteur sous `FORGE_DESIGN_MODULE` et s'active par
+`forge-design --module <paquet>`. Le témoin et ForgeDesign-Circuit
+fonctionnent ensemble dans la même application (validation FD-ARCH-001).
+
 ## Namespace
 
 Tout l'espace Web d'un module est sous **`/modules/<id>/`** (`base_url`
@@ -206,6 +308,22 @@ Vocabulaire plateforme inchangé (FD-SPECIALIZED-001) : `create`, `open`,
 capacités propres à l'outil (kebab-case). L'activation calcule les capacités
 **disponibles**, c'est-à-dire déclarées moins celles d'une dépendance
 optionnelle indisponible.
+
+Usage réel par l'hôte (FD-ARCH-001) :
+
+| Capacité | Effet aujourd'hui |
+|---|---|
+| `open` | Lecture d'une ressource (`read_specialized_resource` refuse sans elle) |
+| `save` | Écriture (type modifiable requis) ; avec la capacité de l'action, condition d'exposition de toute action |
+| `create` | Écriture sans révision antérieure (création) |
+| `edit` | Capacité par défaut d'une `ModuleAction` : sans elle, l'action n'est ni exposée, ni routée, ni proposée au script d'édition, qui n'est pas chargé |
+| `validate`, `export`, `interactive-runtime` | Déclarables ; aucune fonction de l'hôte n'en dépend encore (la validation bloquante s'applique à toute écriture) |
+| Capacités d'outil (ex. `simulate`) | Disponibles ou non selon les dépendances optionnelles ; utilisables comme capacité d'une action |
+
+Une capacité absente n'expose donc ni route d'action, ni action dans le
+contexte, ni script d'édition (tests `test_capability_gate_and_read_only_modules`,
+`test_absent_capability_exposes_no_route_action_or_editor`). Le cœur ne propose
+aucun bouton générique d'édition.
 
 ## Optional dependencies
 
@@ -283,11 +401,21 @@ cycle de release du module) et l'**API hôte** (`api_version`, entier
 incrémenté seulement pour une rupture du contrat). La métadonnée Python
 `forge-design >= X, < Y` complète, au niveau de l'installation.
 
+Audit FD-ARCH-001 : depuis FD-MODULES-001, tous les ajouts sont **additifs et
+facultatifs** — `actions`, `editor_script`, `editor_config`, les options et
+méthodes du Graphic Core (`nodeMove`, `onViewChange`, `addOverlay`, `worldAt`),
+les exports `loads_strict_json` et `MAX_SPECIALIZED_*` ; `assets` et `UiEntry`
+existaient déjà. Un module V1 sans ces champs fonctionne à l'identique :
+**`MODULE_API_VERSION` reste 1**.
+
 ## Testing
 
-- Le cœur garde des **tests de contrat** avec un faux module (descripteur,
-  activation, diagnostics, lecture par l'hôte, frontières), sans aucun test
-  métier d'un domaine après migration.
+- Le cœur garde des **tests de contrat** avec des modules témoins (`witness`,
+  et depuis FD-ARCH-001 le second domaine `tests/flow_witness/` avec sa variante
+  au script défaillant) : descripteur, activation, diagnostics, lecture par
+  l'hôte, actions, édition, isolation de plusieurs modules, frontières
+  (`test_modules_contract.py`, `test_module_boundaries.py`), sans aucun test
+  métier d'un domaine réel.
 - Chaque module a sa propre suite : domaine, codec, projection, et
   compatibilité contre la **version minimale supportée** de Forge Design.
 - Développement : `pip install -e ../ForgeDesign-Circuit` dans
@@ -295,7 +423,7 @@ incrémenté seulement pour une rupture du contrat). La métadonnée Python
 - CI future du module : matrice minimale (version minimale et dernière version
   du cœur).
 
-## Migration Circuit
+## Historique : extraction de Circuit
 
 `forge_design/circuit/` (FD-CIRCUIT-002/003) quitte le cœur **avant** toute
 poursuite fonctionnelle : FD-CIRCUIT-004 n'est pas poursuivi dans le cœur.

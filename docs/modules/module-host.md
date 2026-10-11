@@ -103,7 +103,9 @@ rendu SVG côté serveur pour un module.
 
 ## Édition
 
-FD-GRAPHICS-EDIT-001 (premier client : ForgeDesign-Circuit, FDC-EDIT-001).
+FD-GRAPHICS-EDIT-001 (premier client : ForgeDesign-Circuit, FDC-EDIT-001 ;
+exemple normatif : le témoin `tests/flow_witness/`, voir le
+[contrat](module-architecture.md#édition)).
 Le cœur ne contient aucun éditeur métier ; il charge, de façon générique, le
 script d'édition déclaré par le module, et seulement là où il sert.
 
@@ -130,7 +132,8 @@ Côté navigateur, `/module-resource.js` (générique) lit ce contexte, vérifie
 que chaque URL est un chemin absolu du même serveur, importe le script par
 `import()` (CSP `script-src 'self'` inchangée) et appelle
 `createResourceEditor(context)` avec un contexte gelé
-(`resourceType`, `path`, `revision`, `actions`, `config`, `announce`). Le
+(`script`, `resourceType`, `path`, `revision`, `actions`, `config`, `announce` ;
+la clé `type` du bloc JSON devient `resourceType` dans le contexte JS). Le
 résultat peut fournir les options `nodeMove` et `onViewChange`
 (FD-GRAPHICS-EDIT-002) du moteur et `attach(engine)` ; dans `attach`, le script
 peut créer ses calques monde par `engine.addOverlay()`

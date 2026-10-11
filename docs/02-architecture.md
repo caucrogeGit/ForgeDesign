@@ -44,6 +44,13 @@ Forge Core ne dépend jamais de Forge Design.
 Le navigateur ne lit ni n'écrit directement les fichiers du projet.
 Toute opération passe par le backend Python.
 
+Forge Design porte deux responsabilités dans un même produit : les **outils
+propres aux projets Forge** (Inspector, Route, Entity, Debug, Template) et un
+**moteur générique** (hôte de ressources, hôte de modules, Graphic Core,
+actions) qui accueille des **modules spécialisés externes**. Leur frontière est
+normative : [Frontières du cœur et des modules](architecture/core-module-boundaries.md)
+(FD-ARCH-001).
+
 ## 2. Serveur Web local
 
 Le serveur Forge Design est local-first.
@@ -746,7 +753,8 @@ déclarées depuis FD-GRAPHICS-002, ont reçu leur style.
 
 ### Modules spécialisés externes — FD-MODULES-001
 
-Normatif : [Architecture des modules spécialisés](modules/module-architecture.md).
+Normatif : [Architecture des modules spécialisés](modules/module-architecture.md) ;
+matrice des frontières : [Frontières du cœur et des modules](architecture/core-module-boundaries.md).
 
 ```text
 configuration de lancement (liste explicite de paquets, jamais le projet ouvert)

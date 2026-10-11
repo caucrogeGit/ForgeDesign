@@ -21,6 +21,20 @@ documenter
 
 Cette roadmap privilégie une tranche verticale réelle avant les abstractions générales.
 
+## Pistes (depuis FD-ARCH-001)
+
+La phase pilote Circuit est close : elle a prouvé le moteur générique sur un
+module réel. La suite du produit se lit en **quatre pistes** séparées ;
+frontières normatives : [cœur et modules](architecture/core-module-boundaries.md).
+Les phases numérotées ci-dessous restent l'historique de construction.
+
+| Piste | Contenu | État | Suite recommandée |
+|---|---|---|---|
+| **A. Cœur Forge Design** | Application locale Forge MVC, sélection et contexte de projet, stockage `.forge-design/`, sécurité système de fichiers, hôte de ressources, contrat spécialisé, hôte des modules, actions bornées | Socle fait ; frontières auditées et gardées (FD-ARCH-001) | **Ticket principal : FD-RELEASE-001** — version de distribution du cœur et compatibilité déclarée des modules (un module ne peut pas encore exiger un cœur portant une capacité donnée : la distribution est figée à `0.1.0.dev0`) |
+| **B. Outils propres à Forge** | Project Inspector, Route Explorer, Entity Explorer, Debug Center, Template Viewer, Template Designer, preview réelle | Lecture et conception de vues faites ; Phase 5 (diagnostics Forge exécutés) et Phase 12 (intégration applicative) ouvertes | Reprendre la priorité produit après FD-RELEASE-001 : diagnostics Forge (Phase 5), puis intégration applicative (Phase 12) |
+| **C. Moteur graphique générique** | Graphic Core : scène, rendu, viewport, minicarte, niveaux de détail, sélection de nœuds, `nodeMove`, calques monde, `worldAt`, `onViewChange` | Éprouvé par trois clients du cœur et un module | Aucune capacité nouvelle sans besoin réel d'au moins un client ; la sélection d'arête n'est pas prévue |
+| **D. Modules externes** | Dépôts `ForgeDesign-<Domaine>` installés et activés explicitement | ForgeDesign-Circuit : module de validation (édition FDC-EDIT-001 à 007 dans son dépôt) | Second pilote recommandé : **Flowchart** (étapes étiquetées, arêtes orientées porteuses de sens, édition de texte et de structure, presque pas de routage géométrique) ; Circuit poursuit dans son dépôt, hors de la progression du cœur |
+
 ## Phase 0 — Fondation documentaire
 
 ### FD-FOUNDATION-001 — Documents fondateurs
@@ -285,7 +299,11 @@ spécialisé volontairement simple (FD-SPECIALIZED-002 : socle exécutable
 `forge_design.specialized`, éprouvé par un outil témoin limité aux tests) →
 registre et intégration seulement ensuite, si un besoin réel les justifie.
 
-## Phase 10 — Circuit
+## Phase 10 — Circuit (historique : phase pilote close)
+
+Circuit n'est plus une phase du produit : c'est un **module externe**
+(piste D, dépôt ForgeDesign-Circuit) qui a servi de pilote au moteur générique.
+Ce qui suit est l'historique de la phase pilote.
 
 Périmètre normatif : Circuit — besoins et périmètre (FD-CIRCUIT-001), désormais
 dans le module ForgeDesign-Circuit ([renvoi](circuit/README.md)). Circuit V1 est un éditeur de schémas électriques exacts ;
@@ -383,10 +401,15 @@ fait      FD-GRAPHICS-EDIT-002  calques monde des clients (addOverlay : racine d
                           onViewChange (échelle, origine, zone, niveau de détail) et worldAt ;
                           aucun vocabulaire de domaine ; premier client : création de
                           connexions Circuit (FDC-EDIT-004, module)
-suivant   (module) re-routage des connexions après déplacement, si les constats de
-          FDC-EDIT-001 le confirment (extrémités reprojetées, points intermédiaires figés)
-puis      autres tickets du module Circuit (édition, export, simulation), chaque
-          capacité générique d'édition étant extraite vers le cœur quand elle sert
+fait      (module) FDC-EDIT-002 à 007 : routes après déplacement, sorties orientées,
+                          connexions, dérivations fil → borne et fil → fil, évitement local
+                          des composants ; aucun changement du cœur après FD-GRAPHICS-EDIT-002
+fait      FD-ARCH-001     audit et consolidation des frontières : matrice normative, exports
+                          publics figés, direction des dépendances, second domaine témoin
+                          (flowchart-like) dans les tests, validation multi-modules avec
+                          Circuit ; MODULE_API_VERSION reste 1
+suivant   piste A (FD-RELEASE-001), puis piste B ; Circuit poursuit dans son dépôt ;
+          second module pilote recommandé : Flowchart
 ```
 
 ## Phase 11 — 3D
