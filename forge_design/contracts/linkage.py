@@ -10,7 +10,7 @@ from forge_design.contracts.reader import (
     read_view_contract,
     read_view_contracts,
 )
-from forge_design.forge.project_root import resolve_project_root
+from forge_design.forge.checked_root import check_forge_root
 from forge_design.forge.source import (
     SourceReadError,
     inspect_project_source,
@@ -175,10 +175,13 @@ def analyze_view_contract_links(
     exemple par la synthèse de Project Inspector), réutilisé tel quel pour ne
     pas rebalayer mvc/views ; sans lui, l'inventaire est lu ici.
     """
-    canonical = resolve_project_root(root)
+    # Racine résolue et reconnue une fois pour toute l'analyse (FD-PERF-001),
+    # transmise aux lecteurs ; chaque fichier reste ouvert de façon sécurisée.
+    checked = check_forge_root(root)
+    canonical = checked.root
     if templates is None:
-        templates = read_templates(canonical)
-    inventory = read_view_contracts(canonical)
+        templates = read_templates(canonical, checked=checked)
+    inventory = read_view_contracts(canonical, checked=checked)
     contract_issues = list(inventory.issues)
     complete = not inventory.truncated and not inventory.issues
     truncated = templates.truncated or inventory.truncated
@@ -186,7 +189,7 @@ def analyze_view_contract_links(
     observations: dict[str, ViewContractLinkStatus] = {}
     for info in inventory.contracts:
         try:
-            detail = read_view_contract(canonical, info.path)
+            detail = read_view_contract(canonical, info.path, checked=checked)
         except FileNotFoundError:
             contract_issues.append(
                 ViewContractIssue(

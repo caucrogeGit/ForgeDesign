@@ -5,10 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from stat import S_ISDIR, S_ISREG
 
+from forge_design.forge.checked_root import CheckedForgeRoot, checked_root
 from forge_design.forge.filesystem import open_directory
-from forge_design.forge.project_detection import detect_forge_project
-from forge_design.forge.project_root import resolve_project_root
-from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.forge.source import (
     read_project_source_details,
     source_parts,
@@ -51,11 +49,8 @@ class TemplateSource:
     text: str
 
 
-def _root(root: Path) -> Path:
-    canonical = resolve_project_root(root)
-    if not detect_forge_project(canonical).valid:
-        raise NotForgeProjectError("La racine n'est pas un projet Forge reconnu.")
-    return canonical
+def _root(root: Path, checked: CheckedForgeRoot | None = None) -> Path:
+    return checked_root(root, checked)
 
 
 def read_template_source(root: Path, template_path: str) -> TemplateSource:
@@ -67,13 +62,16 @@ def read_template_source(root: Path, template_path: str) -> TemplateSource:
     )
 
 
-def read_templates(root: Path) -> TemplatesResult:
+def read_templates(
+    root: Path, *, checked: CheckedForgeRoot | None = None
+) -> TemplatesResult:
     """Scanner des descripteurs ancrés ; aucune lecture du contenu des fichiers.
 
     À volume borné, parcours lexical déterministe. Au-delà du budget de noms,
     le sous-ensemble découvert dépend de l'énumération du filesystem.
+    ``checked`` : racine déjà vérifiée par l'opération appelante (FD-PERF-001).
     """
-    canonical = _root(root)
+    canonical = _root(root, checked)
     templates: list[TemplateInfo] = []
     issues: list[TemplateIssue] = []
     entries = 0

@@ -95,7 +95,7 @@ def test_synthetic_outside_views(
         name="x", template="mvc/controllers/a.py", context={}
     )
 
-    def synthetic(*args: object) -> ViewContractReadResult:
+    def synthetic(*args: object, **kwargs: object) -> ViewContractReadResult:
         return ViewContractReadResult("a.view.json", 1, 1, model, ())
 
     monkeypatch.setattr(linkage, "read_view_contract", synthetic)
@@ -222,9 +222,9 @@ def test_contract_disappears_unknown(
     contract(views, "a.view.json", "target")
     original = linkage.read_view_contract
 
-    def read(root: Path, path: str):
+    def read(root: Path, path: str, *, checked: Any = None):
         (views / path).unlink()
-        return original(root, path)
+        return original(root, path, checked=checked)
 
     monkeypatch.setattr(linkage, "read_view_contract", read)
     result = analyze_view_contract_links(root)
@@ -244,15 +244,17 @@ def test_upstream_truncation(
     if which == "templates":
         original = linkage.read_templates
 
-        def partial_templates(root: Path):
-            return replace(original(root), templates=(), truncated=True)
+        def partial_templates(root: Path, *, checked: Any = None):
+            return replace(
+                original(root, checked=checked), templates=(), truncated=True
+            )
 
         monkeypatch.setattr(linkage, "read_templates", partial_templates)
     else:
         original_contracts = linkage.read_view_contracts
 
-        def partial_contracts(root: Path):
-            return replace(original_contracts(root), truncated=True)
+        def partial_contracts(root: Path, *, checked: Any = None):
+            return replace(original_contracts(root, checked=checked), truncated=True)
 
         monkeypatch.setattr(linkage, "read_view_contracts", partial_contracts)
     result = analyze_view_contract_links(root)
@@ -352,7 +354,7 @@ def test_existing_template_inventory_is_reused(
     expected = analyze_view_contract_links(root)
     inventory = read_templates(root)
 
-    def rescan(*args: object) -> None:
+    def rescan(*args: object, **kwargs: object) -> None:
         raise AssertionError("mvc/views rebalayé")
 
     monkeypatch.setattr(linkage, "read_templates", rescan)

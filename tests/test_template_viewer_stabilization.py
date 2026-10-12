@@ -38,7 +38,8 @@ class Trace(Protocol):
 
 def test_public_contracts() -> None:
     for function, parameters in (
-        (templates.read_templates, ("root",)),
+        # FD-PERF-001 : racine déjà vérifiée, transmise par l'opération appelante.
+        (templates.read_templates, ("root", "checked")),
         (templates.read_template_source, ("root", "template_path")),
         (analyze_template_structure, ("source",)),
         (build_template_tree, ("structure",)),
@@ -47,6 +48,8 @@ def test_public_contracts() -> None:
         (resolve_template_references, ("root", "references")),
     ):
         assert tuple(inspect.signature(function).parameters) == parameters
+    checked = inspect.signature(templates.read_templates).parameters["checked"]
+    assert checked.kind is inspect.Parameter.KEYWORD_ONLY and checked.default is None
     for model in (
         templates.TemplateInfo,
         templates.TemplateIssue,

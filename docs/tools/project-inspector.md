@@ -76,8 +76,10 @@ La synthèse est recalculée à chaque affichage, sans cache ni persistance
 migrations, et ne lit que par les analyses existantes, avec leurs protections
 (descripteurs ancrés, liens non suivis, lectures bornées). Chaque analyse est
 lancée une seule fois par affichage ; l’inventaire de `mvc/views` lu pour les
-templates est réutilisé pour les contrats de vue. Après une ouverture ou une
-actualisation, l’inspection qui vient d’être faite est reprise telle quelle.
+templates est réutilisé pour les contrats de vue, dont l’analyse ne vérifie la
+racine Forge qu’une fois au lieu d’une fois par contrat (FD-PERF-001). Après une
+ouverture ou une actualisation, l’inspection qui vient d’être faite est reprise
+telle quelle.
 
 Les migrations ne sont qu’inventoriées : entrées directes de `mvc/migrations`,
 nom (`AAAAMMJJHHMMSS_nom.sql`, convention Forge) et taille pour repérer un

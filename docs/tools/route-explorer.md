@@ -112,7 +112,9 @@ seule ; template présent vers Template Viewer (`/templates/view?path=…`).
 
 Par affichage, l’inventaire des templates (Template Viewer) et l’analyse des
 liens contrats ↔ templates sont faits une fois, puis indexés par chemin : aucune
-relecture par route.
+relecture par route. L’analyse des contrats vérifie la racine Forge une seule fois
+et la transmet à ses lecteurs (FD-PERF-001) ; chaque fichier de contrat reste
+ouvert de façon confinée.
 
 ## Compatibilité et limites
 

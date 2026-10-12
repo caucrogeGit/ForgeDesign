@@ -8,10 +8,8 @@ from stat import S_ISDIR, S_ISREG
 from pydantic import ValidationError
 
 from forge_design.contracts.models import ViewContract
+from forge_design.forge.checked_root import CheckedForgeRoot, checked_root
 from forge_design.forge.filesystem import open_directory
-from forge_design.forge.project_detection import detect_forge_project
-from forge_design.forge.project_root import resolve_project_root
-from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.forge.source import (
     SourceLocation,
     SourceReadError,
@@ -67,11 +65,10 @@ def view_contract_source(reference: str) -> SourceLocation | None:
     return template_source(reference)
 
 
-def _root(root: Path) -> Path:
-    canonical = resolve_project_root(root)
-    if not detect_forge_project(canonical).valid:
-        raise NotForgeProjectError("La racine n'est pas un projet Forge reconnu.")
-    return canonical
+def _root(root: Path, checked: CheckedForgeRoot | None = None) -> Path:
+    # Sans contexte : résolution et détection, comme toujours. Avec un contexte
+    # déjà vérifié pour cette racine (FD-PERF-001) : garde stricte seulement.
+    return checked_root(root, checked)
 
 
 def _truncation(path: str | None = None) -> ViewContractIssue:
@@ -80,9 +77,14 @@ def _truncation(path: str | None = None) -> ViewContractIssue:
     )
 
 
-def read_view_contracts(root: Path) -> ViewContractsResult:
-    """Inventorier les fichiers réguliers seulement, sans lecture de contenu."""
-    canonical = _root(root)
+def read_view_contracts(
+    root: Path, *, checked: CheckedForgeRoot | None = None
+) -> ViewContractsResult:
+    """Inventorier les fichiers réguliers seulement, sans lecture de contenu.
+
+    ``checked`` : racine déjà vérifiée par l'opération appelante (FD-PERF-001).
+    """
+    canonical = _root(root, checked)
     contracts: list[ViewContractInfo] = []
     issues: list[ViewContractIssue] = []
     entries = 0
@@ -177,15 +179,19 @@ def read_view_contracts(root: Path) -> ViewContractsResult:
     )
 
 
-def read_view_contract(root: Path, contract_path: str) -> ViewContractReadResult:
+def read_view_contract(
+    root: Path, contract_path: str, *, checked: CheckedForgeRoot | None = None
+) -> ViewContractReadResult:
     """Lire un seul fichier ; refus lexical/projet et absence restent des exceptions.
 
     Métadonnées None si aucune lecture sûre n'a abouti. Aucun contrat partiel.
+    ``checked`` évite de revérifier la racine pour chaque contrat d'une même
+    analyse ; l'ouverture sécurisée du fichier reste faite à chaque lecture.
     """
     location = view_contract_source(contract_path)
     if location is None:
         raise SourceReadError("Chemin de contrat refusé.")
-    canonical = _root(root)
+    canonical = _root(root, checked)
     try:
         content = read_project_source_details(canonical, location.path)
     except SourceReadError:
