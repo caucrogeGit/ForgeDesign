@@ -68,10 +68,14 @@ une erreur locale.
 
 ## Masquage et confinement
 
-`redact_debug_text` masque les affectations explicites password/passwd/pwd/secret,
-token/access_token/refresh_token/api_key/apikey, authorization/cookie/set-cookie,
-sans distinction de casse, avec `=` ou `:` et valeurs éventuellement citées.
-Authorization avec : ou = (y compris Bearer) et les headers Cookie/Set-Cookie sont masqués jusqu’à la fin
+`redact_debug_text` masque les affectations dont le **dernier composant** de la
+clé est password/passwd/pwd/secret/token/api_key/apikey/secret_key/private_key
+(donc aussi `DB_PASSWORD`, `SERVICE_TOKEN`, `OPENAI_API_KEY`, `access_token`…),
+ainsi que authorization/cookie/set-cookie, sans distinction de casse ASCII, avec
+`=` ou `:` et valeurs éventuellement citées, et le mot de passe des URL
+`schéma://utilisateur:mot-de-passe@hôte` (FD-DEBUG-006, détaillé plus bas).
+Authorization, éventuellement préfixé (`Proxy-Authorization`, `HTTP_AUTHORIZATION`),
+avec : ou = (y compris Bearer) et les headers Cookie/Set-Cookie sont masqués jusqu’à la fin
 de ligne ; les valeurs citées inachevées sont également masquées jusqu’à la fin
 physique de ligne. Une query ordinaire masque les paramètres sensibles et conserve
 les autres ; la forme header peut masquer conservativement tout le reste.
@@ -377,7 +381,69 @@ Les sorties sont décodées en UTF-8 (octets invalides remplacés). Les séquenc
 ANSI (CSI, OSC bornée, échappements courts) sont retirées et les autres
 contrôles remplacés par `�`. Le masquage textuel de Debug Center
 (`redact_debug_text`) s’applique ensuite, car le diagnostic recopie les messages
-d’exception des pilotes de base de données. Ce masquage a les limites décrites
-plus haut. En particulier, un nom préfixé comme `DB_PASSWORD=` n’est pas
-reconnu. Le texte est rendu échappé par Jinja dans un `<pre>`, sans `| safe`.
+d’exception des pilotes de base de données. Depuis FD-DEBUG-006, il reconnaît
+aussi les clés suffixées (`DB_PASSWORD=`) et le mot de passe des URL de
+connexion (`mysql://roger:[masqué]@db.local/app`), avec les limites décrites
+plus bas. Le texte est rendu échappé par Jinja dans un `<pre>`, sans `| safe`.
 Le formulaire n’a aucun champ et fonctionne sans JavaScript (POST natif).
+
+## Masquage renforcé (FD-DEBUG-006)
+
+Le masqueur reste une fonction pure `str → str`, déterministe et idempotente,
+sans lecture de fichier, d’environnement ni de secret réel : il cherche des
+**formes**, jamais des valeurs connues. Le marqueur reste `[masqué]`. Il protège
+tous les textes du modèle public (id, message, hint, route, controller, template,
+SQL, correlation_id, request.query, noms de post_keys et headers), donc la liste,
+le détail, la recherche, les liens de détail et la synthèse de Project Inspector,
+ainsi que la sortie du diagnostic Forge. Les frames et `location` (fichier,
+fonction) restent hors masquage, comme avant.
+
+Trois passes, dans cet ordre ; chacune ne fait que remplacer par le marqueur,
+qui est ensuite traité comme une valeur atomique, si bien qu’aucune passe ne
+réexpose ce qu’une autre a masqué :
+
+1. **En-têtes** : `…authorization` (dernier composant : `Authorization`,
+   `Proxy-Authorization`, `HTTP_AUTHORIZATION`, `X.Authorization`, mais pas
+   `Authorization_Mode`) jusqu’à la fin de ligne ; `Cookie` et `Set-Cookie`
+   selon la politique historique.
+2. **Affectations** : la clé se termine par un composant sensible, précédé du
+   début du texte ou d’un caractère non alphanumérique (`_`, `-`, `.` compris).
+
+   | Masqué | Conservé |
+   |---|---|
+   | `DB_PASSWORD=`, `mysql-password=`, `app.secret=`, `--password=` | `password_policy=`, `DB_PASSWORD_EXTRA=` |
+   | `API_TOKEN=`, `GITHUB_TOKEN=`, `access_token=`, `?service_token=` | `token_count=`, `tokenizer=`, `mytoken=` |
+   | `SECRET_KEY=`, `JWT_SECRET=`, `client_secret=` | `secretary=` |
+   | `OPENAI_API_KEY=`, `X-Api-Key:`, `JWT_PRIVATE_KEY=`, `app.private.key=` | `api_keys_count=`, `PRIVATE_KEY_PATH=`, `monkey=`, `key=` |
+
+   Les mots-clés sont ASCII : `ſ`, `ı` ou le signe kelvin n’en tiennent pas lieu.
+3. **URL** : `schéma://utilisateur:mot-de-passe@hôte` devient
+   `schéma://utilisateur:[masqué]@hôte`. Schéma, utilisateur, hôte, port (IPv6
+   compris), chemin et query sont conservés ; toutes les URL d’une ligne sont
+   traitées ; un mot de passe encodé (`p%40ss`) est masqué sans décodage ; un
+   `@` non encodé est masqué jusqu’au dernier `@` de l’autorité. Sans mot de
+   passe (`user@host`, `user:@host`), rien n’est modifié. Le traitement est
+   **syntaxique**, sans décodage ni réparation d’URL : `u:pa%2Fss@h` est
+   masqué, mais `u:pa/ss@h` sort du contrat, puisque `/` termine l’autorité.
+
+Les sauts de ligne (LF, CRLF, CR), l’Unicode des valeurs et la politique des
+caractères de contrôle sont inchangés. La sortie grandit d’au plus la longueur du
+marqueur par valeur remplacée : la croissance est proportionnelle au nombre de
+secrets masqués, jamais incontrôlée.
+
+Chaque passe n’est tentée que si son indice littéral figure dans le texte
+(`authorization`/`cookie`, un fragment de mot-clé, `://`) ; le résultat est
+identique, vérifié par un test d’équivalence. Toutes les expressions sont linéaires :
+lookbehind de largeur fixe, aucun motif imbriqué non borné, un schéma d’URL ne
+démarre qu’en début de mot. Sur 256 Kio, 1 ms pour un texte ordinaire et 30 ms
+au pire pour un texte saturé de mots-clés.
+
+Un ID d’événement qui contient une forme nouvellement reconnue change d’ID
+public : un ancien lien `/debug/event?line=…&id=…` peut alors répondre 404, ce
+qui est conforme au contrat (le couple désigne une occurrence de la lecture
+courante). Un secret nouvellement masqué n’est plus retrouvable par la recherche.
+
+Limites conservées : secret isolé sans nom de clé, clé métier inconnue, valeur
+encodée arbitrairement (base64, chiffrée) sans contexte, valeur répartie sur
+plusieurs lignes, caractère réservé non encodé dans un mot de passe d’URL,
+frames et localisation. Ce n’est ni un détecteur de secrets ni un outil DLP.

@@ -108,10 +108,17 @@ def test_hostile_output_is_plain_text_without_ansi(tmp_path: Path) -> None:
 def test_sensitive_assignments_are_masked(tmp_path: Path) -> None:
     result = run(forge_project(tmp_path / "projet", "secret"))
     shown = result.stdout + result.stderr
-    for secret in ("hunter2", "k3y-777", "t0ken-999"):
+    for secret in ("hunter", "k3y-777", "abc999", "t0ken-99"):
         assert secret not in shown
-    assert result.stdout.strip() == "password=[masqué] api_key: [masqué] visible"
-    assert result.stderr.strip() == "Authorization: [masqué]"
+    assert result.stdout.splitlines() == [
+        "password=[masqué] api_key: [masqué] visible",
+        "DB_PASSWORD=[masqué] vers mysql://roger:[masqué]@db.local/app "
+        "API_TOKEN=[masqué]",
+    ]
+    assert result.stderr.splitlines() == [
+        "Authorization: [masqué]",
+        "HTTP_AUTHORIZATION=[masqué]",
+    ]
 
 
 def test_clean_output() -> None:

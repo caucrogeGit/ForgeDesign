@@ -31,7 +31,10 @@ elif mode == "hostile":
     print(HOSTILE, file=sys.stderr)
 elif mode == "secret":
     print("password=hunter2 api_key: k3y-777 visible")
+    print("DB_PASSWORD=hunter3 vers mysql://roger:hunter4@db.local/app", end=" ")
+    print("API_TOKEN=abc999")
     print("Authorization: Bearer t0ken-999", file=sys.stderr)
+    print("HTTP_AUTHORIZATION=Basic t0ken-998 token_count=3", file=sys.stderr)
 elif mode == "big":
     sys.stdout.write("o" * (1024 * 1024)); sys.stdout.flush()
     sys.stderr.write("e" * (1024 * 1024)); sys.stderr.flush()

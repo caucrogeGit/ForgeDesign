@@ -1650,6 +1650,9 @@ non vide dans la borne Web. Erreurs projet : 409 sur liste et détail ; absence 
 projet : liste 200, détail 409 ; occurrence absente après lecture : 404. La politique
 no-store des routes reste inchangée. La redaction traite également les headers avec
 = et les valeurs citées non refermées ; elle reste défensive et non exhaustive.
+Depuis FD-DEBUG-006, elle reconnaît aussi les clés dont le dernier composant est
+sensible (`DB_PASSWORD`, `SERVICE_TOKEN`) et le mot de passe des URL de connexion,
+sans changer de signature ni de marqueur.
 
 
 ## Template Viewer — inventaire et lecture brute
