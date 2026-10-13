@@ -25,11 +25,13 @@ from email.message import Message
 from http.client import HTTPException
 from os import PathLike
 from pathlib import Path
-from stat import S_ISREG
 from typing import IO, Protocol
 
-from forge_design.forge.filesystem import open_directory
 from forge_design.forge.project_detection import detect_forge_project
+from forge_design.forge.project_python import (
+    child_environment,
+    project_interpreter,
+)
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.real_preview.models import (
     RealPreviewConfig,
@@ -40,7 +42,6 @@ from forge_design.real_preview.models import (
 
 HOST = "127.0.0.1"
 _POSIX = os.name == "posix"
-_ENVIRONMENT_WHITELIST = ("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TMPDIR")
 _HEALTH_BODY_LIMIT = 1024
 _WAIT_STEP = 0.05
 _READER_JOIN_TIMEOUT = 2.0
@@ -159,24 +160,6 @@ _clock: Callable[[], float] = time.monotonic
 _sleep: Callable[[float], None] = time.sleep
 
 
-def _project_interpreter(root: Path) -> Path | None:
-    """<racine>/.venv/bin/python : dossiers sans lien, cible fichier exécutable.
-
-    Le chemin non résolu est retourné : l'interpréteur reconnaît son venv par
-    l'emplacement invoqué, pas par la cible du lien.
-    """
-    try:
-        with open_directory(str(root / ".venv" / "bin")):
-            pass
-        python = root / ".venv" / "bin" / "python"
-        target = python.resolve(strict=True)
-        if not S_ISREG(target.stat().st_mode) or not os.access(target, os.X_OK):
-            return None
-    except (OSError, RuntimeError):
-        return None
-    return python
-
-
 def _bootstrap_path() -> Path | None:
     path = Path(__file__).resolve().with_name("child_bootstrap.py")
     return path if path.is_file() else None
@@ -184,9 +167,7 @@ def _bootstrap_path() -> Path | None:
 
 def _child_environment(source: Mapping[str, str]) -> dict[str, str]:
     """Liste blanche construite positivement ; APP_ENV fixé."""
-    environment = {
-        name: source[name] for name in _ENVIRONMENT_WHITELIST if name in source
-    }
+    environment = child_environment(source)
     environment["APP_ENV"] = "dev"
     return environment
 
@@ -331,7 +312,7 @@ class RealPreviewController:
             self._root = root
         if not detect_forge_project(root).valid:
             return "Projet Forge non reconnu."
-        interpreter = _project_interpreter(root)
+        interpreter = project_interpreter(root)
         if interpreter is None:
             return "Interpréteur du projet introuvable (.venv/bin/python)."
         bootstrap = _bootstrap_path()

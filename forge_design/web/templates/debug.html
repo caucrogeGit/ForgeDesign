@@ -3,6 +3,34 @@
 {% block content %}
 <h1>Debug Center</h1>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% set diagnostic_states = {"succeeded": "Réussi (code 0)", "checks-failed": "Terminé avec le code 1 : au moins un contrôle en échec, ou erreur de la commande", "exit-code": "Terminé avec un autre code retour", "launch-failed": "Échec du lancement", "timed-out": "Diagnostic interrompu : délai dépassé"} %}
+<section class="forge-diagnostic" aria-labelledby="forge-diagnostic-title">
+<h2 id="forge-diagnostic-title">Diagnostic Forge</h2>
+<p>Lance la commande officielle <code>forge doctor</code> du projet, uniquement sur votre demande, et affiche son résultat sans l’interpréter ; les affectations sensibles reconnues (mot de passe, jeton, clé d’API…) sont masquées, sans garantie d’exhaustivité. Rien n’est enregistré : le résultat disparaît avec cette page.</p>
+<p class="message" data-diagnostic-warning>Le diagnostic Forge est exécuté avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé. Il exécute la configuration du projet et peut donc exécuter son code ou accéder aux services qui y sont configurés, notamment la base de données.</p>
+<p>Durée limitée à {{ diagnostic_timeout }} s ; sortie standard et sortie d’erreur limitées à {{ diagnostic_limit_kib }} Kio chacune.</p>
+{% if current_project %}<form method="post" action="/debug/forge-diagnostic"><button type="submit">Exécuter le diagnostic Forge</button></form>
+{% else %}<p>Aucun projet sélectionné : ouvrez un projet pour lancer le diagnostic.</p>{% endif %}
+{% if diagnostic_error %}<p class="message error" role="alert" data-diagnostic-error>{{ diagnostic_error }}</p>{% endif %}
+{% if diagnostic %}
+<div data-diagnostic-status="{{ diagnostic.status }}" role="status">
+<dl>
+<dt>État</dt><dd>{{ diagnostic_states[diagnostic.status] }}</dd>
+<dt>Code retour</dt><dd>{{ diagnostic.exit_code if diagnostic.exit_code is not none else '—' }}</dd>
+<dt>Durée</dt><dd>{{ '%.2f' | format(diagnostic.duration) }} s</dd>
+<dt>Interpréteur</dt><dd><code>{{ diagnostic.interpreter }}</code> du projet</dd>
+</dl>
+{% if diagnostic.message %}<p class="message error">{{ diagnostic.message }}</p>{% endif %}
+<h3>Sortie standard</h3>
+{% if diagnostic.stdout %}<pre class="source-code" data-diagnostic-stdout>{{ diagnostic.stdout }}</pre>{% else %}<p>(vide)</p>{% endif %}
+{% if diagnostic.stdout_truncated %}<p data-diagnostic-truncated="stdout">Sortie tronquée : {{ diagnostic.stdout_truncated }} octets ignorés au-delà de {{ diagnostic_limit_kib }} Kio.</p>{% endif %}
+<h3>Sortie d’erreur</h3>
+{% if diagnostic.stderr %}<pre class="source-code" data-diagnostic-stderr>{{ diagnostic.stderr }}</pre>{% else %}<p>(vide)</p>{% endif %}
+{% if diagnostic.stderr_truncated %}<p data-diagnostic-truncated="stderr">Sortie tronquée : {{ diagnostic.stderr_truncated }} octets ignorés au-delà de {{ diagnostic_limit_kib }} Kio.</p>{% endif %}
+</div>
+{% else %}<p data-diagnostic-status="not-run">État : non exécuté.</p>{% endif %}
+</section>
+<h2 id="journal-title">Journal des erreurs runtime</h2>
 <form method="get" action="/debug" class="route-filters" aria-label="Filtres des événements">
 <div><label for="debug-query">Recherche</label><input type="search" id="debug-query" name="q" maxlength="{{ query_limit }}" value="{{ filters.query or '' }}"></div>
 <div><label for="debug-level">Niveau</label><select id="debug-level" name="level">{% for value in levels %}<option value="{{ value }}"{% if filters.level == value %} selected{% endif %}>{{ 'Tous' if value == 'all' else value }}</option>{% endfor %}</select></div>

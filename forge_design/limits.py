@@ -55,6 +55,11 @@ MAX_MIGRATION_DIRECTORY_ENTRIES = 4096
 # section, le total et le lien vers l'outil détaillé complétant l'aperçu.
 MAX_HEALTH_VISIBLE_DIAGNOSTICS = 5
 
+# Diagnostic Forge exécuté à la demande (FD-RUNTIME-001) : durée et sorties
+# bornées pendant l'exécution, jamais après une capture illimitée.
+FORGE_DIAGNOSTIC_TIMEOUT_SECONDS = 10.0
+MAX_FORGE_DIAGNOSTIC_OUTPUT_BYTES = 256 * 1024
+
 # Imbrication design : racine incluse, profondeur racine zéro, marqueur inclus.
 MAX_DESIGN_NODES = 4096
 MAX_DESIGN_DEPTH = 128

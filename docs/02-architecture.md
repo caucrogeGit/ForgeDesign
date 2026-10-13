@@ -2408,7 +2408,9 @@ ni composition Web (le contrôleur n'est pas encore créé par
 - `controller.py` : `RealPreviewController.start(project_root)` réutilise
   `resolve_project_root`, `detect_forge_project` et `open_directory`. Il
   vérifie `.venv/bin/python`, alloue le port, construit l'environnement en
-  liste blanche, puis lance l'enfant (`shell=False`, nouveau groupe). Un seul
+  liste blanche (`forge/project_python.py`, partagé avec le diagnostic Forge
+  depuis FD-RUNTIME-001, plus `APP_ENV=dev`), puis lance l'enfant
+  (`shell=False`, nouveau groupe). Un seul
   thread lit le tube jusqu'à EOF dans un tampon borné, et `start` attend
   `/health` ou un échec. `status()` détecte une sortie spontanée ; `stop()`
   envoie `SIGTERM` puis `SIGKILL` au groupe.

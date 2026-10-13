@@ -20,7 +20,7 @@ from forge_design.modules import ModuleActivation
 from forge_design.modules.host import ModuleHost
 from forge_design.project_selector import ProjectSelector
 from forge_design.recent_projects import RecentProjects
-from forge_design.web.debug import show_debug
+from forge_design.web.debug import run_forge_diagnostic_action, show_debug
 from forge_design.web.debug_detail import show_debug_detail
 from forge_design.web.editor import editor_action, show_editor
 from forge_design.web.editor_preview import show_editor_preview
@@ -215,6 +215,9 @@ def create_application(
     def entities(request: Request) -> Response:
         return show_entities(request, context, registry)
 
+    def forge_diagnostic(request: Request) -> Response:
+        return run_forge_diagnostic_action(request, context, registry)
+
     def debug(request: Request) -> Response:
         return show_debug(request, context, registry)
 
@@ -300,6 +303,15 @@ def create_application(
     add("GET", "/entities", entities, public=True, no_store=True)
     add("GET", "/debug", debug, public=True, no_store=True)
     add("GET", "/debug/event", debug_detail, public=True, no_store=True)
+    # Diagnostic Forge exécuté sur action explicite, jamais au GET.
+    add(
+        "POST",
+        "/debug/forge-diagnostic",
+        forge_diagnostic,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
     add("GET", "/source", source, public=True, no_store=True)
     add("GET", "/templates", templates, public=True, no_store=True)
     add("GET", "/templates/view", template, public=True, no_store=True)

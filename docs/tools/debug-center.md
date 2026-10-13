@@ -268,3 +268,116 @@ nécessitant un projet (409). Un projet devenu invalide/disparu/non résoluble d
 409 sur les deux pages. Un couple absent après lecture valide donne 404. Erreurs
 GET contrôlées 200/400/404/409 : no-store. Les erreurs de programmation inattendues
 restent gérées par Forge, sans nouveau contrat 5xx spécifique au Debug Center.
+
+## Diagnostic Forge à la demande (FD-RUNTIME-001)
+
+La page `/debug` propose, au-dessus du journal, une section « Diagnostic Forge ».
+Elle lance la commande officielle `forge doctor` du projet ouvert, **uniquement**
+sur un clic explicite. Forge Design ne réimplémente aucun contrôle et
+n’interprète pas le texte produit. Le résultat se limite au code retour, à la
+durée, à la sortie standard et à la sortie d’erreur.
+
+### Action
+
+| Requête | Effet |
+|---|---|
+| `GET /debug` (avec ou sans projet, filtres compris) | Ne lance jamais rien ; état « non exécuté » |
+| `POST /debug/forge-diagnostic` | Lance le diagnostic une fois et rend la page avec le résultat (`no-store`) |
+| `GET /debug/forge-diagnostic` | 405 : aucune route GET |
+
+Le POST est une action locale (`is_local_action` : hôte `127.0.0.1`, `Origin`
+exacte, `Sec-Fetch-Site`), sinon 403. Il exige un formulaire encodé, sinon 415.
+Il n’accepte **aucun paramètre** (corps ou query non vides → 400) : ni commande,
+ni chemin, ni exécutable, ni environnement, ni délai. Sans projet ouvert, la
+réponse est 409 « Aucun projet sélectionné : diagnostic non lancé. ». Si la
+racine n’est plus un projet Forge valide (supprimée, déplacée, marqueurs
+absents), la réponse est 409 « Diagnostic non lancé : … ». Dans ces deux cas,
+aucun processus n’est créé.
+
+Le résultat appartient à la réponse du POST : il n’est ni stocké dans le
+contexte, ni dans `.forge-design/`, ni en session. Le GET suivant revient à
+« non exécuté ». Le journal des erreurs runtime reste une section distincte. Les
+cinq Tools sont inchangés : le diagnostic n’est pas un Tool.
+
+### Commande
+
+```text
+<racine>/.venv/bin/python -s -B -P -m forge doctor      cwd = racine Forge vérifiée
+```
+
+- **Interpréteur** : toujours `<racine>/.venv/bin/python`, déterminé par Forge
+  Design (`forge/project_python.py`, partagé avec la preview réelle). Les
+  dossiers `.venv` et `bin` ne doivent pas être des liens ; la cible doit être
+  un fichier exécutable. Il n’y a ni recherche dans `PATH`, ni repli sur
+  l’interpréteur de Forge Design, ni chemin reçu par HTTP. Absent ou
+  inutilisable : « Interpréteur du projet introuvable ou inutilisable
+  (.venv/bin/python) : diagnostic non lancé. ».
+- **`-s`** : sans le site-packages de l’utilisateur.
+- **`-B`** : aucun bytecode n’est écrit. Lancé sans cette option, le diagnostic
+  crée `__pycache__/config.cpython-*.pyc` dans le projet (constaté).
+- **`-P`** : `-m` n’insère pas le dossier courant en tête de `sys.path`. Sans
+  cette option, un `forge.py` présent à la racine du projet s’exécuterait à la
+  place du CLI officiel (constaté). Le diagnostic ajoute lui-même la racine au
+  chargement de `config.py` : les imports locaux de la configuration
+  fonctionnent comme en terminal.
+- `subprocess.Popen` avec une liste d’arguments, `shell=False`, nouvelle
+  session (`start_new_session=True`) et entrée standard fermée. Le code n’utilise
+  ni shell, ni concaténation, ni `os.system`, ni `eval`, ni `exec`.
+
+L’environnement est une liste blanche construite positivement : `PATH`, `HOME`,
+`LANG`, `LC_ALL`, `LC_CTYPE`, `TZ` et `TMPDIR`, si présentes. Aucune autre
+variable n’est transmise, en particulier ni `PYTHON*`, ni `VIRTUAL_ENV`, ni
+jeton, ni mot de passe. `APP_ENV` n’est pas fixé : le diagnostic suit son
+défaut (`dev`, donc `env/example` puis `env/dev`), comme en terminal.
+L’environnement n’est jamais affiché.
+
+### Ce que le diagnostic exécute (forge-mvc 1.0.0rc9)
+
+`forge doctor` lance seize contrôles et imprime une ligne `[OK]`, `[WARN]`,
+`[FAIL]` ou `[SKIP]` par contrôle. Il :
+
+- **exécute `config.py`** du projet, donc le code qu’il importe, et charge
+  `env/` ;
+- importe le module d’entités de Forge (`forge_mvc_entities`) pour valider
+  `mvc/entities` ;
+- **ouvre une connexion à la base configurée** via le backend installé. SQLite
+  ne crée pas de base absente : le contrôle rapporte un avertissement ;
+- cherche `npm` dans `PATH` ;
+- lit la structure, les templates, les migrations, les modules et les
+  certificats, et parcourt les sources `.py` en texte (indices MFA et RBAC)
+  sans les importer.
+
+Il n’importe ni `app.py` ni les contrôleurs, et ne démarre aucun serveur. Ce
+n’est pas un bac à sable : la séparation tient à la frontière de processus.
+L’avertissement de la page le dit avant le bouton.
+
+### Bornes et arrêt
+
+| Borne | Valeur | Effet |
+|---|---:|---|
+| `FORGE_DIAGNOSTIC_TIMEOUT_SECONDS` | 10 s | Au-delà : « Diagnostic interrompu : délai dépassé. » |
+| `MAX_FORGE_DIAGNOSTIC_OUTPUT_BYTES` | 256 Kio par flux | Le surplus est lu et jeté, puis compté et signalé |
+
+Les deux flux sont lus en continu par un sélecteur. Au-delà de la borne,
+l’excédent est jeté sans arrêter la lecture : un tube plein ne bloque jamais
+l’enfant. Dans tous les cas, y compris après une sortie normale, le **groupe
+de processus entier** reçoit `SIGKILL`, puis le processus est attendu. Aucun
+petit-enfant ne survit, même s’il garde les tubes ouverts.
+
+### Codes retour et affichage
+
+| Code | État affiché |
+|---|---|
+| 0 | Réussi (code 0) |
+| 1 | Terminé avec le code 1 : au moins un contrôle en échec, ou erreur de la commande |
+| autre | Terminé avec un autre code retour |
+| — | Échec du lancement, ou délai dépassé |
+
+Les sorties sont décodées en UTF-8 (octets invalides remplacés). Les séquences
+ANSI (CSI, OSC bornée, échappements courts) sont retirées et les autres
+contrôles remplacés par `�`. Le masquage textuel de Debug Center
+(`redact_debug_text`) s’applique ensuite, car le diagnostic recopie les messages
+d’exception des pilotes de base de données. Ce masquage a les limites décrites
+plus haut. En particulier, un nom préfixé comme `DB_PASSWORD=` n’est pas
+reconnu. Le texte est rendu échappé par Jinja dans un `<pre>`, sans `| safe`.
+Le formulaire n’a aucun champ et fonctionne sans JavaScript (POST natif).
