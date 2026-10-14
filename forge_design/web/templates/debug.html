@@ -9,7 +9,7 @@
 {{ caller() }}
 <p>Durée limitée à {{ diagnostic_timeout }} s ; sortie standard et sortie d’erreur limitées à {{ diagnostic_limit_kib }} Kio chacune.</p>
 {% if current_project %}<form method="post" action="{{ action }}"><button type="submit">{{ button }}</button></form>
-{% else %}<p>Aucun projet sélectionné : ouvrez un projet pour lancer le {{ noun }}.</p>{% endif %}
+{% else %}<p>Aucun projet sélectionné : ouvrez un projet pour lancer {{ noun }}.</p>{% endif %}
 {% if run_error %}<p class="message error" role="alert" data-diagnostic-error>{{ run_error }}</p>{% endif %}
 {% if run %}
 <div data-diagnostic-status="{{ run.status }}" role="status">
@@ -32,13 +32,18 @@
 {%- endmacro %}
 {% set diagnostic_states = {"succeeded": "Réussi (code 0)", "checks-failed": "Terminé avec le code 1 : au moins un contrôle en échec, ou erreur de la commande", "exit-code": "Terminé avec un autre code retour", "launch-failed": "Échec du lancement", "timed-out": "Diagnostic interrompu : délai dépassé"} %}
 {% set audit_states = {"succeeded": "Terminé avec le code 0 : aucun constat FAIL (des avertissements restent possibles)", "checks-failed": "Terminé avec le code 1 : au moins un constat FAIL, ou erreur de la commande", "exit-code": "Terminé avec un autre code retour", "launch-failed": "Échec du lancement", "timed-out": "Audit interrompu : délai dépassé"} %}
-{% call forge_command("diagnostic", "Diagnostic Forge", "/debug/forge-diagnostic", "Exécuter le diagnostic Forge", "diagnostic", diagnostic_states, diagnostic, diagnostic_error) %}
+{% call forge_command("diagnostic", "Diagnostic Forge", "/debug/forge-diagnostic", "Exécuter le diagnostic Forge", "le diagnostic", diagnostic_states, diagnostic, diagnostic_error) %}
 <p>Lance la commande officielle <code>forge doctor</code> du projet, uniquement sur votre demande, et affiche son résultat sans l’interpréter ; les affectations sensibles reconnues (mot de passe, jeton, clé d’API…) sont masquées, sans garantie d’exhaustivité. Rien n’est enregistré : le résultat disparaît avec cette page.</p>
 <p class="message" data-diagnostic-warning>Le diagnostic Forge est exécuté avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé. Il exécute la configuration du projet et peut donc exécuter son code ou accéder aux services qui y sont configurés, notamment la base de données.</p>
 {% endcall %}
-{% call forge_command("audit", "Audit du projet Forge", "/debug/forge-audit", "Exécuter l’audit Forge", "audit", audit_states, audit, audit_error) %}
+{% call forge_command("audit", "Audit du projet Forge", "/debug/forge-audit", "Exécuter l’audit Forge", "l’audit", audit_states, audit, audit_error) %}
 <p>Lance la commande officielle <code>forge project:audit</code> : analyse de la structure, de la configuration, des entités, des routes (syntaxe seulement), des templates, des modules, des migrations, de la documentation et de la présence de tests, sans les exécuter. Résultat affiché sans interprétation, affectations sensibles reconnues masquées, rien n’est enregistré.</p>
 <p class="message" data-diagnostic-warning>L’audit est exécuté avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé : le CLI Forge et les paquets installés dans <code>.venv</code> s’exécutent. Avec forge-mvc 1.0.0rc9, il lit les fichiers du projet, notamment <code>env/example</code> et <code>env/dev</code>, sans en afficher les valeurs ; il n’exécute ni <code>config.py</code>, ni l’application, ni les tests, et ne contacte aucune base de données.</p>
+{% endcall %}
+{% set check_states = {"succeeded": "Terminé avec le code 0 : aucun contrôle en échec (des avertissements restent possibles)", "checks-failed": "Terminé avec le code 1 : au moins un contrôle en échec, ou erreur de la commande", "exit-code": "Terminé avec un autre code retour : le code importé du projet a pu terminer le processus", "launch-failed": "Échec du lancement", "timed-out": "Vérification interrompue : délai dépassé"} %}
+{% call forge_command("check", "Vérification du projet Forge", "/debug/forge-project-check", "Exécuter la vérification Forge", "la vérification", check_states, check, check_error) %}
+<p>Lance la commande officielle <code>forge project:check</code> : vérification de la structure, de la configuration, des entités, des routes (par import réel), des templates, des modules et des migrations. Résultat affiché sans interprétation, affectations sensibles reconnues masquées, rien n’est enregistré.</p>
+<p class="message" data-diagnostic-warning>La vérification <code>forge project:check</code> est exécutée avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé. Elle importe réellement les routes du projet (<code>mvc/routes</code>) : ce code s’exécute, ainsi que les contrôleurs et modules qu’il importe (dans le squelette Forge : contrôleurs et registre <code>optins/</code>). Ce code peut lire ou écrire des fichiers, contacter des services ou lancer des processus avec les droits de votre compte ; <code>config.py</code> n’est pas chargé par la commande elle-même, mais peut l’être par le code importé. Forge Design n’exécute pas ce code dans son propre processus, limite la durée et arrête le groupe de processus qu’il a lancé, mais ce sous-processus n’est pas un bac à sable.</p>
 {% endcall %}
 <h2 id="journal-title">Journal des erreurs runtime</h2>
 <form method="get" action="/debug" class="route-filters" aria-label="Filtres des événements">

@@ -81,11 +81,12 @@ racine Forge qu’une fois au lieu d’une fois par contrat (FD-PERF-001). Aprè
 ouverture ou une actualisation, l’inspection qui vient d’être faite est reprise
 telle quelle.
 
-Le diagnostic officiel `forge doctor`, qui exécute la configuration du projet,
-et l’audit officiel `forge project:audit` n’entrent pas dans la synthèse : ils se
-lancent seulement à la demande depuis
+Les commandes officielles `forge doctor` (qui exécute la configuration),
+`forge project:audit` et `forge project:check` (qui importe les routes, donc du
+code applicatif) n’entrent pas dans la synthèse : elles se lancent seulement à
+la demande depuis
 [Debug Center](debug-center.md#diagnostic-forge-à-la-demande-fd-runtime-001)
-(FD-RUNTIME-001, FD-RUNTIME-002).
+(FD-RUNTIME-001 à 003).
 
 Les migrations ne sont qu’inventoriées : entrées directes de `mvc/migrations`,
 nom (`AAAAMMJJHHMMSS_nom.sql`, convention Forge) et taille pour repérer un

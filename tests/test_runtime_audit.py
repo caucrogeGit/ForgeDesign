@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from runtime_diagnostics_support import alive, forge_project
+from runtime_diagnostics_support import alive, forge_project, make_linked_venv
 from test_project_health import snapshot
 
 import forge_design
@@ -29,6 +29,7 @@ from forge_design.forge.runtime_diagnostics import (
     ForgeDiagnosticRun,
     run_forge_diagnostic,
     run_forge_project_audit,
+    run_forge_project_check,
 )
 
 M = "[masqué]"
@@ -79,7 +80,8 @@ def test_launcher_receives_exactly_the_audit_argv(tmp_path: Path) -> None:
 def test_closed_command_list_is_structural(tmp_path: Path) -> None:
     root = forge_project(tmp_path / "projet", "ok")
     commands = runtime_diagnostics._COMMANDS  # pyright: ignore[reportPrivateUsage]
-    assert set(commands) == {"doctor", "project:audit"}
+    # Contrat FD-RUNTIME-003 : ensemble exact des trois commandes autorisées.
+    assert set(commands) == {"doctor", "project:audit", "project:check"}
     with pytest.raises(TypeError):
         commands["run"] = commands["doctor"]  # type: ignore[index]
     launched: list[object] = []
@@ -89,7 +91,7 @@ def test_closed_command_list_is_structural(tmp_path: Path) -> None:
         raise AssertionError("jamais lancé")
 
     private = runtime_diagnostics._run_forge_command  # pyright: ignore[reportPrivateUsage]
-    for name in ("run", "db:apply", "doctor --fix", "project:check", ""):
+    for name in ("run", "db:apply", "doctor --fix", "project:check --fix", ""):
         with pytest.raises(ValueError, match="non autorisée"):
             private(
                 check_forge_root(root),
@@ -100,13 +102,17 @@ def test_closed_command_list_is_structural(tmp_path: Path) -> None:
                 limit=10,
             )
     assert launched == []
-    # Seules deux fonctions publiques lancent une commande, chacune la sienne.
+    # Seules trois fonctions publiques lancent une commande, chacune la sienne.
     public = sorted(
         name
         for name in vars(runtime_diagnostics)
         if name.startswith("run_") and callable(getattr(runtime_diagnostics, name))
     )
-    assert public == ["run_forge_diagnostic", "run_forge_project_audit"]
+    assert public == [
+        "run_forge_diagnostic",
+        "run_forge_project_audit",
+        "run_forge_project_check",
+    ]
     source = Path(runtime_diagnostics.__file__).read_text(encoding="utf-8")
     calls = [
         node
@@ -119,6 +125,7 @@ def test_closed_command_list_is_structural(tmp_path: Path) -> None:
     assert [n.value for n in names if isinstance(n, ast.Constant)] == [
         "doctor",
         "project:audit",
+        "project:check",
     ]
     # Le runner privé n'est importé nulle part ailleurs.
     package = Path(forge_design.__file__).parent
@@ -212,15 +219,7 @@ def test_concurrent_runs_share_no_state(tmp_path: Path) -> None:
 @pytest.fixture(scope="module")
 def linked_venv(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
     """Venv sans pip relié au forge-mvc installé ici, copié dans chaque projet."""
-    venv = tmp_path_factory.mktemp("venv") / ".venv"
-    subprocess.run(
-        [sys.executable, "-m", "venv", "--without-pip", str(venv)],
-        check=True,
-        timeout=60,
-    )
-    target = next(venv.glob("lib/python*/site-packages"))
-    (target / "forge_mvc.pth").write_text("\n".join(site.getsitepackages()) + "\n")
-    yield venv
+    yield make_linked_venv(tmp_path_factory.mktemp("venv") / ".venv")
 
 
 def real_project(root: Path, venv: Path | None, *, failing: bool = False) -> Path:
@@ -293,7 +292,9 @@ def test_real_project_audit_failure_and_masked_names(
     assert not (root / "CONFIG_EXECUTED").exists()
 
 
-@pytest.mark.parametrize("runner", [run_forge_project_audit, run_forge_diagnostic])
+@pytest.mark.parametrize(
+    "runner", [run_forge_project_audit, run_forge_diagnostic, run_forge_project_check]
+)
 def test_user_site_pth_is_never_executed(tmp_path: Path, runner: Any) -> None:
     """-s : dans un venv « --system-site-packages », un .pth du site utilisateur
     serait exécuté au démarrage ; il ne l'est jamais."""

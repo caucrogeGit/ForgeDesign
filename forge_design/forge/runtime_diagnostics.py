@@ -1,13 +1,14 @@
-"""Commandes officielles Forge exécutées à la demande (FD-RUNTIME-001, -002).
+"""Commandes officielles Forge exécutées à la demande (FD-RUNTIME-001 à -003).
 
-Forge Design ne réimplémente ni ``forge doctor`` ni ``forge project:audit`` : il
-les lance, sur action explicite de l'utilisateur, dans un sous-processus séparé
-du serveur, avec l'interpréteur du projet :
+Forge Design ne réimplémente ni ``forge doctor``, ni ``forge project:audit``, ni
+``forge project:check`` : il les lance, sur action explicite de l'utilisateur,
+dans un sous-processus séparé du serveur, avec l'interpréteur du projet :
 
     <racine>/.venv/bin/python -s -B -P -m forge doctor          (cwd = racine)
     <racine>/.venv/bin/python -s -B -P -m forge project:audit   (cwd = racine)
+    <racine>/.venv/bin/python -s -B -P -m forge project:check   (cwd = racine)
 
-Ces deux commandes forment une liste **fermée** : le runner privé ne reçoit
+Ces trois commandes forment une liste **fermée** : le runner privé ne reçoit
 qu'un nom parmi elles et construit l'argv depuis sa propre table ; aucune API ne
 lance une commande Forge arbitraire, aucun argument ne vient de HTTP.
 
@@ -20,11 +21,14 @@ lance une commande Forge arbitraire, aucun argument ne vient de HTTP.
   diagnostic ajoute lui-même la racine au chargement de ``config.py`` : les
   imports locaux du projet restent ceux d'un ``forge doctor`` lancé en terminal.
 
-``doctor`` exécute ``config.py`` du projet et peut se connecter à la base
-configurée ; ``project:audit`` (forge-mvc 1.0.0rc9) lit les fichiers du projet
-sans exécuter son code. Dans les deux cas, le CLI Forge et les paquets du
-``.venv`` s'exécutent : ce n'est pas un bac à sable, c'est une frontière de
-processus.
+Trois niveaux de confiance (forge-mvc 1.0.0rc9) : ``project:audit`` lit les
+fichiers du projet sans exécuter son code ; ``doctor`` exécute ``config.py`` et
+peut se connecter à la base configurée ; ``project:check`` importe réellement
+``mvc.routes``, donc exécute les routes, les contrôleurs et leurs imports
+transitifs, avec tous les effets que ce code peut produire (sans ``-B``, il
+écrirait aussi leurs ``__pycache__``). Dans tous les cas, le CLI Forge et les
+paquets du ``.venv`` s'exécutent : ce n'est pas un bac à sable, c'est une
+frontière de processus ; le runner arrête le groupe de processus qu'il a lancé.
 Aucun shell, aucun argument venu de HTTP, environnement en liste blanche, durée
 bornée (le groupe de processus entier est tué), sorties bornées pendant la
 lecture, séquences ANSI retirées, affectations sensibles masquées (le diagnostic
@@ -54,6 +58,7 @@ from forge_design.limits import (
 
 DIAGNOSTIC_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "doctor")
 AUDIT_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "project:audit")
+CHECK_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "project:check")
 INTERPRETER_LABEL = ".venv/bin/python"
 
 DiagnosticStatus = Literal[
@@ -71,21 +76,33 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _REPLACEMENT = chr(0xFFFD)
 
 
-ForgeCommandName = Literal["doctor", "project:audit"]
+ForgeCommandName = Literal["doctor", "project:audit", "project:check"]
 
 
 @dataclass(frozen=True)
 class _ForgeCommand:
     arguments: tuple[str, ...]
-    noun: str  # « diagnostic », « audit » : messages de lancement et de délai
-    noun_capitalized: str
+    # Phrases complètes, accordées (« vérification non lancée »).
+    not_launched: str
+    timed_out: str
 
 
-# Liste fermée : seules ces deux entrées peuvent atteindre le lanceur.
+# Liste fermée : seules ces trois entrées peuvent atteindre le lanceur.
 _COMMANDS: Final = MappingProxyType(
     {
-        "doctor": _ForgeCommand(DIAGNOSTIC_ARGUMENTS, "diagnostic", "Diagnostic"),
-        "project:audit": _ForgeCommand(AUDIT_ARGUMENTS, "audit", "Audit"),
+        "doctor": _ForgeCommand(
+            DIAGNOSTIC_ARGUMENTS,
+            "diagnostic non lancé",
+            "Diagnostic interrompu : délai dépassé.",
+        ),
+        "project:audit": _ForgeCommand(
+            AUDIT_ARGUMENTS, "audit non lancé", "Audit interrompu : délai dépassé."
+        ),
+        "project:check": _ForgeCommand(
+            CHECK_ARGUMENTS,
+            "vérification non lancée",
+            "Vérification interrompue : délai dépassé.",
+        ),
     }
 )
 
@@ -244,6 +261,29 @@ def run_forge_project_audit(
     )
 
 
+def run_forge_project_check(
+    checked: CheckedForgeRoot,
+    *,
+    launcher: Launcher | None = None,
+    environ: Mapping[str, str] | None = None,
+    timeout: float = FORGE_DIAGNOSTIC_TIMEOUT_SECONDS,
+    limit: int = MAX_FORGE_DIAGNOSTIC_OUTPUT_BYTES,
+) -> ForgeDiagnosticRun:
+    """Lancer ``forge project:check`` avec l'interpréteur du projet, une fois.
+
+    Mêmes garanties de processus (FD-RUNTIME-003), mais la commande importe
+    réellement les routes du projet : du code applicatif s'exécute.
+    """
+    return _run_forge_command(
+        checked,
+        "project:check",
+        launcher=launcher,
+        environ=environ,
+        timeout=timeout,
+        limit=limit,
+    )
+
+
 def _run_forge_command(
     checked: CheckedForgeRoot,
     name: ForgeCommandName,
@@ -268,7 +308,7 @@ def _run_forge_command(
             0.0,
             message=(
                 "Interpréteur du projet introuvable ou inutilisable "
-                f"({INTERPRETER_LABEL}) : {command.noun} non lancé."
+                f"({INTERPRETER_LABEL}) : {command.not_launched}."
             ),
         )
     argv = (str(interpreter), *command.arguments)
@@ -318,7 +358,7 @@ def _run_forge_command(
             True,
             streams.dropped["stdout"],
             streams.dropped["stderr"],
-            message=f"{command.noun_capitalized} interrompu : délai dépassé.",
+            message=command.timed_out,
         )
     return ForgeDiagnosticRun(
         _status(code),

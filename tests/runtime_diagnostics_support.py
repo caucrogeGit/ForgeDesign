@@ -7,6 +7,8 @@ le dossier courant du processus (donc la racine canonique transmise par cwd).
 """
 
 import os
+import site
+import subprocess
 import sys
 from pathlib import Path
 
@@ -84,3 +86,15 @@ def alive(pid: int) -> bool:
             return stat.read().split()[2] != "Z"
     except OSError:
         return False
+
+
+def make_linked_venv(venv: Path) -> Path:
+    """Venv sans pip relié au forge-mvc installé ici (vrai CLI Forge)."""
+    subprocess.run(
+        [sys.executable, "-m", "venv", "--without-pip", str(venv)],
+        check=True,
+        timeout=60,
+    )
+    target = next(venv.glob("lib/python*/site-packages"))
+    (target / "forge_mvc.pth").write_text("\n".join(site.getsitepackages()) + "\n")
+    return venv

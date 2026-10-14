@@ -458,6 +458,82 @@ Le texte (`[OK]`, `[WARN]`, `[FAIL]`, `[INFO]`, résumé) n’est jamais interpr
 `forge project:check`, qui importe réellement les routes du projet, n’est pas
 proposé.
 
+## Vérification Forge à la demande (FD-RUNTIME-003)
+
+Sous l’audit, la section « Vérification du projet Forge » lance la commande
+officielle `forge project:check` sur clic explicite (« Exécuter la vérification
+Forge »). Contrairement à l’audit, **cette commande exécute du code du projet** :
+l’avertissement est affiché avant le bouton, et le clic vaut action volontaire
+(pas de confirmation JavaScript : la page fonctionne sans script).
+
+### Trois niveaux de confiance
+
+| Commande | Code projet exécuté | Services externes possibles | Niveau |
+|---|---|---|---|
+| `project:audit` | Non constaté | Non constaté | Analyse officielle essentiellement statique |
+| `doctor` | `config.py` et ses imports | Base configurée possible | Diagnostic avec configuration exécutée |
+| `project:check` | Routes, contrôleurs et imports transitifs | Tout effet produit par ce code est possible | Exécution applicative explicite |
+
+Constats sur forge-mvc 1.0.0rc9 (lecture du code, audit hooks Python, sentinelles) :
+`project:check` vérifie structure, configuration (`dotenv_values`, valeurs jamais
+affichées), entités, templates, modules et migrations comme l’audit, mais pour
+les routes il insère la racine en tête de `sys.path` et **importe réellement**
+`mvc.routes`. Sur le squelette Forge, cela exécute `mvc/routes/__init__.py`,
+`mvc/controllers/home_controller.py`, `optins/__init__.py` et
+`optins/registry.py`. Un contrôleur que les routes n’importent pas n’est pas
+exécuté ; `config.py` n’est pas chargé par la commande (le cœur ne l’importe
+que pour créer l’application), mais le serait si le code importé l’importait.
+La commande elle-même n’écrit rien (sans `-B`, les imports écriraient des
+`__pycache__` dans `mvc/routes`, `mvc/controllers` et `optins`), ne lance aucun
+processus et ne contacte aucun service : tout effet vient du code importé.
+
+Lecture seule : Forge Design n’écrit aucun fichier. `project:check` peut exécuter
+du code importé du projet ; ce code conserve les droits de l’utilisateur et peut
+donc produire ses propres effets de bord (fichier écrit, processus lancé, service
+contacté). Ce n’est pas une violation de la lecture seule de Forge Design : la
+commande est explicitement demandée, et la page le dit avant le clic.
+
+### Commande, frontière et arrêt
+
+```text
+<racine>/.venv/bin/python -s -B -P -m forge project:check      cwd = racine Forge vérifiée
+```
+
+Troisième et dernière entrée de la liste fermée du runner privé (`doctor`,
+`project:audit`, `project:check`) ; API publique `run_forge_project_check`.
+Même environnement en liste blanche, sans `APP_ENV` ; mêmes bornes (10 s,
+256 Kio par flux), même nettoyage et même masquage : les secrets imprimés par le
+code importé (`DB_PASSWORD=…`, `SERVICE_TOKEN=…`, URL de connexion) sont masqués.
+
+Le runner arrête **le groupe de processus qu’il a lancé**, après une sortie
+normale comme au délai : un enfant lancé par le code importé ne survit pas. Un
+processus que le code projet détacherait volontairement dans une nouvelle
+session sort de ce groupe (limite testée) : d’où la formulation exacte de
+l’avertissement.
+
+Comportements du code importé à connaître :
+
+- `sys.exit(n)` dans les routes termine la commande avec ce code, **sans
+  rapport** (`SystemExit` échappe aux contrôles de Forge) : « Terminé avec un
+  autre code retour : le code importé du projet a pu terminer le processus » ;
+- un thread non démon garde le processus vivant : la vérification est
+  interrompue au délai, et le rapport, écrit dans une sortie standard tamponnée
+  jamais vidée, est perdu (la sortie d’erreur, vidée par ligne, reste visible) ;
+- tout ce que ce code imprime précède le rapport dans la sortie.
+
+| Code | État affiché |
+|---|---|
+| 0 | Terminé avec le code 0 : aucun contrôle en échec (des avertissements restent possibles) |
+| 1 | Terminé avec le code 1 : au moins un contrôle en échec, ou erreur de la commande |
+| autre | Terminé avec un autre code retour : le code importé du projet a pu terminer le processus |
+| — | Échec du lancement, ou « Vérification interrompue : délai dépassé » |
+
+`POST /debug/forge-project-check` (même gardes 403/415/400/409, `no-store`,
+aucun paramètre ; `GET` : 405). Résultat non persisté, aucun « dernier check ».
+Aucune des trois commandes n’en déclenche une autre, et aucune n’est intégrée à
+Project Inspector : une commande qui exécute du code ne doit jamais être
+déclenchée indirectement par le cockpit.
+
 ## Masquage renforcé (FD-DEBUG-006)
 
 Le masqueur reste une fonction pure `str → str`, déterministe et idempotente,

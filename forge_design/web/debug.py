@@ -19,6 +19,7 @@ from forge_design.forge.runtime_diagnostics import (
     ForgeDiagnosticRun,
     run_forge_diagnostic,
     run_forge_project_audit,
+    run_forge_project_check,
 )
 from forge_design.limits import (
     FORGE_DIAGNOSTIC_TIMEOUT_SECONDS,
@@ -68,6 +69,8 @@ def _render_debug(
     diagnostic_error: str | None = None,
     audit: ForgeDiagnosticRun | None = None,
     audit_error: str | None = None,
+    check: ForgeDiagnosticRun | None = None,
+    check_error: str | None = None,
 ) -> Response:
     result = None
     if context.root is not None and error is None:
@@ -97,6 +100,8 @@ def _render_debug(
             "diagnostic_error": diagnostic_error,
             "audit": audit,
             "audit_error": audit_error,
+            "check": check,
+            "check_error": check_error,
             "diagnostic_limit_kib": MAX_FORGE_DIAGNOSTIC_OUTPUT_BYTES // 1024,
             "diagnostic_timeout": int(FORGE_DIAGNOSTIC_TIMEOUT_SECONDS),
         },
@@ -133,11 +138,37 @@ def run_forge_audit_action(
     )
 
 
+def run_forge_check_action(
+    request: Request,
+    context: CurrentProjectContext,
+    registry: ToolRegistry,
+    *,
+    runner: Runner | None = None,
+) -> Response:
+    """POST explicite : exécuter une fois ``forge project:check`` (FD-RUNTIME-003).
+
+    Cette commande importe les routes du projet : du code applicatif s'exécute
+    dans le sous-processus, ce que la page annonce avant le bouton.
+    """
+    return _forge_command_action(
+        request, context, registry, "check", runner or run_forge_project_check
+    )
+
+
+Section = Literal["diagnostic", "audit", "check"]
+# Phrases accordées : « diagnostic non lancé », « vérification non lancée ».
+_NOT_LAUNCHED: dict[Section, tuple[str, str]] = {
+    "diagnostic": ("diagnostic non lancé", "Diagnostic non lancé"),
+    "audit": ("audit non lancé", "Audit non lancé"),
+    "check": ("vérification non lancée", "Vérification non lancée"),
+}
+
+
 def _forge_command_action(
     request: Request,
     context: CurrentProjectContext,
     registry: ToolRegistry,
-    section: Literal["diagnostic", "audit"],
+    section: Section,
     runner: Runner,
 ) -> Response:
     """Gardes communes, puis une exécution ; résultat dans la seule section visée.
@@ -147,7 +178,7 @@ def _forge_command_action(
     Rendu direct, sans persistance ni redirection.
     """
     filters = DebugFilter()
-    noun = "diagnostic" if section == "diagnostic" else "audit"
+    not_launched, not_launched_capitalized = _NOT_LAUNCHED[section]
 
     def rendered(
         status: int = 200,
@@ -163,8 +194,12 @@ def _forge_command_action(
                 diagnostic_error=error,
                 status=status,
             )
+        if section == "audit":
+            return _render_debug(
+                context, registry, filters, audit=run, audit_error=error, status=status
+            )
         return _render_debug(
-            context, registry, filters, audit=run, audit_error=error, status=status
+            context, registry, filters, check=run, check_error=error, status=status
         )
 
     if not is_local_action(request):
@@ -175,9 +210,9 @@ def _forge_command_action(
     if request.params or getattr(request, "body", None):
         return rendered(400, "Ce formulaire n’accepte aucun paramètre.")
     if context.root is None:
-        return rendered(409, f"Aucun projet sélectionné : {noun} non lancé.")
+        return rendered(409, f"Aucun projet sélectionné : {not_launched}.")
     try:
         checked = check_forge_root(context.root)
     except _PROJECT_ERRORS as exc:
-        return rendered(409, f"{noun.capitalize()} non lancé : {exc}")
+        return rendered(409, f"{not_launched_capitalized} : {exc}")
     return rendered(run=runner(checked))

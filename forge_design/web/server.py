@@ -22,6 +22,7 @@ from forge_design.project_selector import ProjectSelector
 from forge_design.recent_projects import RecentProjects
 from forge_design.web.debug import (
     run_forge_audit_action,
+    run_forge_check_action,
     run_forge_diagnostic_action,
     show_debug,
 )
@@ -225,6 +226,9 @@ def create_application(
     def forge_audit(request: Request) -> Response:
         return run_forge_audit_action(request, context, registry)
 
+    def forge_project_check(request: Request) -> Response:
+        return run_forge_check_action(request, context, registry)
+
     def debug(request: Request) -> Response:
         return show_debug(request, context, registry)
 
@@ -323,6 +327,14 @@ def create_application(
         "POST",
         "/debug/forge-audit",
         forge_audit,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
+    add(
+        "POST",
+        "/debug/forge-project-check",
+        forge_project_check,
         public=True,
         csrf=False,
         no_store=True,
