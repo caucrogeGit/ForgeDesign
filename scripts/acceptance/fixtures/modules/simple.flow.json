@@ -1,0 +1,82 @@
+{
+  "format_version": "0.1",
+  "nodes": [
+    {
+      "id": "debut",
+      "kind": "start",
+      "label": "Début",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "verifier",
+      "kind": "step",
+      "label": "Vérifier la valeur",
+      "x": 0,
+      "y": 100
+    },
+    {
+      "id": "valide",
+      "kind": "decision",
+      "label": "Valeur valide ?",
+      "x": 0,
+      "y": 200
+    },
+    {
+      "id": "continuer",
+      "kind": "step",
+      "label": "Continuer",
+      "x": -160,
+      "y": 320
+    },
+    {
+      "id": "signaler",
+      "kind": "step",
+      "label": "Signaler l'erreur",
+      "x": 160,
+      "y": 320
+    },
+    {
+      "id": "fin",
+      "kind": "end",
+      "label": "Fin",
+      "x": 0,
+      "y": 440
+    }
+  ],
+  "edges": [
+    {
+      "id": "t1",
+      "source": "debut",
+      "target": "verifier"
+    },
+    {
+      "id": "t2",
+      "source": "verifier",
+      "target": "valide"
+    },
+    {
+      "id": "t3",
+      "source": "valide",
+      "target": "continuer",
+      "label": "Oui"
+    },
+    {
+      "id": "t4",
+      "source": "valide",
+      "target": "signaler",
+      "label": "Non"
+    },
+    {
+      "id": "t5",
+      "source": "continuer",
+      "target": "fin",
+      "label": "suite"
+    },
+    {
+      "id": "t6",
+      "source": "signaler",
+      "target": "fin"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+raise AssertionError("config executed")

@@ -1,0 +1,3 @@
+# Fixtures volontairement hostiles ou incomplètes (FD-ACCEPTANCE-001) :
+# jamais reformatées ni analysées, leur contenu exact fait partie du test.
+exclude = ["*"]

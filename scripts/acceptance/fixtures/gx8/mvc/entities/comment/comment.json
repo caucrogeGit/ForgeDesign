@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "name": "Comment", "table": "comment", "fields": [{"name": "title", "type": "string", "max_length": 255, "required": true}], "options": {"timestamps": false, "soft_delete": false}}
