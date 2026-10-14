@@ -53,7 +53,7 @@ def test_command_cwd_and_environment_are_fixed(tmp_path: Path) -> None:
         "SERVICE_TOKEN": "secret",
     }
     seen = json.loads(check(root, environ=environ).stdout)
-    assert CHECK_ARGUMENTS == ("-s", "-B", "-P", "-m", "forge", "project:check")
+    assert CHECK_ARGUMENTS == ("-s", "-B", "-P", "-u", "-m", "forge", "project:check")
     assert seen["argv"] == list(CHECK_ARGUMENTS)
     assert seen["cwd"] == str(root)
     assert set(seen["env"]) - {"PWD"} <= set(CHILD_ENVIRONMENT_WHITELIST)
@@ -236,10 +236,12 @@ def test_non_daemon_thread_keeps_process_alive_until_timeout(
     )
     root = sentinel_project(tmp_path / "projet", linked_venv, tail)
     result = check(root, timeout=3.0)
-    # Le thread du projet empêche la sortie : délai. Le rapport, écrit dans un
-    # stdout tamponné jamais vidé, est perdu ; stderr (vidé par ligne) reste.
+    # Le thread du projet empêche la sortie : délai. Avec -u (FD-RUNTIME-004),
+    # le rapport déjà écrit est dans le tube et reste conservé (perdu avant).
     assert result.status == "timed-out" and result.exit_code is None
-    assert "Forge project:check" not in result.stdout
+    assert "Forge project:check — 1.0.0rc9" in result.stdout
+    assert "Tout est conforme." in result.stdout
+    assert f"DB_PASSWORD={M} SERVICE_TOKEN={M}" in result.stdout
     assert f"mysql://roger:{M}@db.local/app" in result.stderr
 
 

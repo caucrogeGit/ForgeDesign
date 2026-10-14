@@ -50,7 +50,7 @@ def test_command_cwd_and_environment_are_fixed(tmp_path: Path) -> None:
     assert result.status == "succeeded" and result.exit_code == 0
     seen = json.loads(result.stdout)
     # Interpréteur du projet, arguments exacts : -s -B -P -m forge doctor.
-    assert DIAGNOSTIC_ARGUMENTS == ("-s", "-B", "-P", "-m", "forge", "doctor")
+    assert DIAGNOSTIC_ARGUMENTS == ("-s", "-B", "-P", "-u", "-m", "forge", "doctor")
     assert seen["argv"] == list(DIAGNOSTIC_ARGUMENTS)
     assert seen["cwd"] == str(root)
     # PWD est posé par /bin/sh, lanceur du faux interpréteur, pas par Forge Design.

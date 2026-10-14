@@ -1,7 +1,10 @@
 """Projets Forge dont ``.venv/bin/python`` est un faux interpréteur (FD-RUNTIME-001).
 
 Le faux interpréteur est un vrai exécutable : le runner le lance par son vrai
-chemin (Popen, nouvelle session, tubes), sans patcher subprocess. Son
+chemin (Popen, nouvelle session, tubes), sans patcher subprocess. Comme un vrai
+interpréteur, il applique au Python qu'il lance les options placées avant ``-m``
+(``-s -B -P -u``) : retirer ``-u`` change réellement la mise en tampon
+(FD-RUNTIME-004). Le faux CLI reçoit l'argv complet. Son
 comportement est choisi par le fichier ``fake-doctor-mode`` à la racine, lu dans
 le dossier courant du processus (donc la racine canonique transmise par cwd).
 """
@@ -42,6 +45,23 @@ elif mode == "big":
     sys.stderr.write("e" * (1024 * 1024)); sys.stderr.flush()
 elif mode == "sleep":
     time.sleep(30)
+elif mode == "partial":
+    # Sortie produite puis blocage (FD-RUNTIME-004), sans flush explicite.
+    print("AVANT TIMEOUT")
+    print("DB_PASSWORD=VerySecret123 avant blocage")
+    print("SANS-LF", end="")
+    print("ERREUR AVANT TIMEOUT", file=sys.stderr)
+    print("ERR-SANS-LF", end="", file=sys.stderr)
+    time.sleep(30)
+elif mode == "partial-big":
+    sys.stdout.write("o" * (1024 * 1024))
+    sys.stderr.write("e" * 1000)
+    time.sleep(30)
+elif mode == "partial-child":
+    child = subprocess.Popen(["sh", "-c", "echo ENFANT AVANT TIMEOUT; exec sleep 60"])
+    open("fake-child-pid", "w").write(str(child.pid))
+    print("PARENT AVANT TIMEOUT")
+    time.sleep(30)
 elif mode in ("child", "orphan"):
     child = subprocess.Popen(["sleep", "60"])
     open("fake-child-pid", "w").write(str(child.pid))
@@ -57,7 +77,13 @@ def fake_interpreter(root: Path, mode: str) -> Path:
     doctor = root.parent / f"{root.name}-fake-doctor.py"
     doctor.write_text(f"HOSTILE = {HOSTILE!r}\n" + FAKE_DOCTOR, encoding="utf-8")
     python = bin_dir / "python"
-    python.write_text(f'#!/bin/sh\nexec {sys.executable} -S {doctor} "$@"\n')
+    # Options Python (avant -m) appliquées au vrai Python ; argv complet au CLI.
+    python.write_text(
+        "#!/bin/sh\n"
+        'opts=""\n'
+        'for a in "$@"; do [ "$a" = "-m" ] && break; opts="$opts $a"; done\n'
+        f'exec {sys.executable} -S $opts {doctor} "$@"\n'
+    )
     python.chmod(0o755)
     (root / "fake-doctor-mode").write_text(mode)
     return python

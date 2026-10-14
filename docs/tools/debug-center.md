@@ -306,7 +306,7 @@ cinq Tools sont inchangés : le diagnostic n’est pas un Tool.
 ### Commande
 
 ```text
-<racine>/.venv/bin/python -s -B -P -m forge doctor      cwd = racine Forge vérifiée
+<racine>/.venv/bin/python -s -B -P -u -m forge doctor      cwd = racine Forge vérifiée
 ```
 
 - **Interpréteur** : toujours `<racine>/.venv/bin/python`, déterminé par Forge
@@ -411,7 +411,7 @@ non lancé. ». Rien n’est persisté.
 ### Commande et runner
 
 ```text
-<racine>/.venv/bin/python -s -B -P -m forge project:audit      cwd = racine Forge vérifiée
+<racine>/.venv/bin/python -s -B -P -u -m forge project:audit      cwd = racine Forge vérifiée
 ```
 
 Même interpréteur, mêmes options, même liste blanche d’environnement que le
@@ -496,7 +496,7 @@ commande est explicitement demandée, et la page le dit avant le clic.
 ### Commande, frontière et arrêt
 
 ```text
-<racine>/.venv/bin/python -s -B -P -m forge project:check      cwd = racine Forge vérifiée
+<racine>/.venv/bin/python -s -B -P -u -m forge project:check      cwd = racine Forge vérifiée
 ```
 
 Troisième et dernière entrée de la liste fermée du runner privé (`doctor`,
@@ -517,8 +517,8 @@ Comportements du code importé à connaître :
   rapport** (`SystemExit` échappe aux contrôles de Forge) : « Terminé avec un
   autre code retour : le code importé du projet a pu terminer le processus » ;
 - un thread non démon garde le processus vivant : la vérification est
-  interrompue au délai, et le rapport, écrit dans une sortie standard tamponnée
-  jamais vidée, est perdu (la sortie d’erreur, vidée par ligne, reste visible) ;
+  interrompue au délai ; grâce à `-u` (FD-RUNTIME-004), le rapport et tout ce
+  qui a déjà été imprimé restent visibles (ils étaient perdus auparavant) ;
 - tout ce que ce code imprime précède le rapport dans la sortie.
 
 | Code | État affiché |
@@ -533,6 +533,38 @@ aucun paramètre ; `GET` : 405). Résultat non persisté, aucun « dernier check
 Aucune des trois commandes n’en déclenche une autre, et aucune n’est intégrée à
 Project Inspector : une commande qui exécute du code ne doit jamais être
 déclenchée indirectement par le cockpit.
+
+## Sorties conservées avant un délai dépassé (FD-RUNTIME-004)
+
+Les trois commandes sont lancées avec `-u`, placé **avant** `-m` (après, ce
+serait un argument de Forge et non de Python) :
+
+```text
+<racine>/.venv/bin/python -s -B -P -u -m forge doctor | project:audit | project:check
+```
+
+Les sorties du processus Python principal sont ainsi non tamponnées : ce qu’il a
+déjà écrit sur stdout ou stderr, y compris un fragment sans saut de ligne, est
+dans le tube, lu en continu par le runner, et **reste disponible** si la commande
+est ensuite interrompue au délai. Sans `-u`, un stdout tamponné jamais vidé était
+perdu, et stderr (vidé par ligne) perdait sa dernière ligne incomplète.
+
+Le pipeline ne change pas : octets lus → UTF-8 avec remplacement →
+`clean_output` → masquage FD-DEBUG-006 → Jinja. Une valeur sensible émise avant
+le délai est donc masquée comme les autres. Le runner, le délai (10 s), les
+bornes (256 Kio par flux, surplus compté), l’arrêt du groupe, l’environnement
+(`PYTHONUNBUFFERED` n’est ni utilisé ni transmis) et les messages sont
+inchangés ; en exécution normale, les sorties des trois commandes sont
+identiques à l’octet près avec et sans `-u`, au même coût.
+
+Ce n’est **pas** du streaming : la page affiche toujours le résultat final d’un
+POST synchrone, sans rafraîchissement ni polling. `-u` ne vaut que pour le
+Python principal : un sous-processus lancé par le code du projet (par exemple
+`python enfant.py`) garde sa propre mise en tampon, de même qu’une bibliothèque
+native ; ce qu’il a écrit dans le tube avant l’arrêt du groupe est conservé. Un
+processus détaché par le projet dans une nouvelle session reste hors de la
+garantie d’arrêt (FD-RUNTIME-003). L’ordre entre stdout et stderr n’est pas
+garanti (deux tubes) ; l’ordre au sein d’un flux est celui reçu.
 
 ## Masquage renforcé (FD-DEBUG-006)
 

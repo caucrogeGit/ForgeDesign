@@ -4,9 +4,9 @@ Forge Design ne réimplémente ni ``forge doctor``, ni ``forge project:audit``, 
 ``forge project:check`` : il les lance, sur action explicite de l'utilisateur,
 dans un sous-processus séparé du serveur, avec l'interpréteur du projet :
 
-    <racine>/.venv/bin/python -s -B -P -m forge doctor          (cwd = racine)
-    <racine>/.venv/bin/python -s -B -P -m forge project:audit   (cwd = racine)
-    <racine>/.venv/bin/python -s -B -P -m forge project:check   (cwd = racine)
+    <racine>/.venv/bin/python -s -B -P -u -m forge doctor          (cwd = racine)
+    <racine>/.venv/bin/python -s -B -P -u -m forge project:audit   (cwd = racine)
+    <racine>/.venv/bin/python -s -B -P -u -m forge project:check   (cwd = racine)
 
 Ces trois commandes forment une liste **fermée** : le runner privé ne reçoit
 qu'un nom parmi elles et construit l'argv depuis sa propre table ; aucune API ne
@@ -20,6 +20,11 @@ lance une commande Forge arbitraire, aucun argument ne vient de HTTP.
   lui, un ``forge.py`` du projet s'exécuterait à la place du CLI officiel. Le
   diagnostic ajoute lui-même la racine au chargement de ``config.py`` : les
   imports locaux du projet restent ceux d'un ``forge doctor`` lancé en terminal.
+- ``-u`` (FD-RUNTIME-004) : sorties du Python principal non tamponnées, avant
+  ``-m`` (après, ce serait un argument de Forge) ; ce qu'il a déjà écrit est dans
+  le tube et reste conservé si la commande est interrompue au délai (sans lui, un
+  stdout tamponné jamais vidé était perdu). Ni streaming, ni effet sur les
+  processus enfants lancés par le projet.
 
 Trois niveaux de confiance (forge-mvc 1.0.0rc9) : ``project:audit`` lit les
 fichiers du projet sans exécuter son code ; ``doctor`` exécute ``config.py`` et
@@ -56,9 +61,9 @@ from forge_design.limits import (
     MAX_FORGE_DIAGNOSTIC_OUTPUT_BYTES,
 )
 
-DIAGNOSTIC_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "doctor")
-AUDIT_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "project:audit")
-CHECK_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "project:check")
+DIAGNOSTIC_ARGUMENTS = ("-s", "-B", "-P", "-u", "-m", "forge", "doctor")
+AUDIT_ARGUMENTS = ("-s", "-B", "-P", "-u", "-m", "forge", "project:audit")
+CHECK_ARGUMENTS = ("-s", "-B", "-P", "-u", "-m", "forge", "project:check")
 INTERPRETER_LABEL = ".venv/bin/python"
 
 DiagnosticStatus = Literal[

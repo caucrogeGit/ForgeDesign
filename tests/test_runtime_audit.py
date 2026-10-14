@@ -52,7 +52,7 @@ def test_command_cwd_and_environment_are_fixed(tmp_path: Path) -> None:
     }
     result = audit(root, environ=environ)
     seen = json.loads(result.stdout)
-    assert AUDIT_ARGUMENTS == ("-s", "-B", "-P", "-m", "forge", "project:audit")
+    assert AUDIT_ARGUMENTS == ("-s", "-B", "-P", "-u", "-m", "forge", "project:audit")
     assert seen["argv"] == list(AUDIT_ARGUMENTS)
     assert seen["cwd"] == str(root)
     # Aucun APP_ENV : l'audit ne le lit pas, Forge Design ne le force pas.
