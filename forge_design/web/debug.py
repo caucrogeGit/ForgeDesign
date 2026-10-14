@@ -1,6 +1,7 @@
 """Page Debug Center, sans activation ni cache de projet."""
 
 from collections.abc import Callable
+from typing import Literal
 
 from core.http.request import Request
 from core.http.response import Response
@@ -17,6 +18,7 @@ from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.forge.runtime_diagnostics import (
     ForgeDiagnosticRun,
     run_forge_diagnostic,
+    run_forge_project_audit,
 )
 from forge_design.limits import (
     FORGE_DIAGNOSTIC_TIMEOUT_SECONDS,
@@ -64,6 +66,8 @@ def _render_debug(
     status: int = 200,
     diagnostic: ForgeDiagnosticRun | None = None,
     diagnostic_error: str | None = None,
+    audit: ForgeDiagnosticRun | None = None,
+    audit_error: str | None = None,
 ) -> Response:
     result = None
     if context.root is not None and error is None:
@@ -91,6 +95,8 @@ def _render_debug(
             else None,
             "diagnostic": diagnostic,
             "diagnostic_error": diagnostic_error,
+            "audit": audit,
+            "audit_error": audit_error,
             "diagnostic_limit_kib": MAX_FORGE_DIAGNOSTIC_OUTPUT_BYTES // 1024,
             "diagnostic_timeout": int(FORGE_DIAGNOSTIC_TIMEOUT_SECONDS),
         },
@@ -98,38 +104,80 @@ def _render_debug(
     )
 
 
+Runner = Callable[[CheckedForgeRoot], ForgeDiagnosticRun]
+
+
 def run_forge_diagnostic_action(
     request: Request,
     context: CurrentProjectContext,
     registry: ToolRegistry,
     *,
-    runner: Callable[[CheckedForgeRoot], ForgeDiagnosticRun] | None = None,
+    runner: Runner | None = None,
 ) -> Response:
-    """POST explicite : exécuter une fois le diagnostic officiel du projet courant.
+    """POST explicite : exécuter une fois ``forge doctor`` sur le projet courant."""
+    return _forge_command_action(
+        request, context, registry, "diagnostic", runner or run_forge_diagnostic
+    )
+
+
+def run_forge_audit_action(
+    request: Request,
+    context: CurrentProjectContext,
+    registry: ToolRegistry,
+    *,
+    runner: Runner | None = None,
+) -> Response:
+    """POST explicite : exécuter une fois ``forge project:audit`` (FD-RUNTIME-002)."""
+    return _forge_command_action(
+        request, context, registry, "audit", runner or run_forge_project_audit
+    )
+
+
+def _forge_command_action(
+    request: Request,
+    context: CurrentProjectContext,
+    registry: ToolRegistry,
+    section: Literal["diagnostic", "audit"],
+    runner: Runner,
+) -> Response:
+    """Gardes communes, puis une exécution ; résultat dans la seule section visée.
 
     Aucun champ, aucun paramètre : la commande, l'interpréteur, le dossier et
     l'environnement sont fixés par Forge Design ; la racine vient du contexte.
     Rendu direct, sans persistance ni redirection.
     """
     filters = DebugFilter()
+    noun = "diagnostic" if section == "diagnostic" else "audit"
 
-    def refused(message: str, status: int) -> Response:
+    def rendered(
+        status: int = 200,
+        error: str | None = None,
+        run: ForgeDiagnosticRun | None = None,
+    ) -> Response:
+        if section == "diagnostic":
+            return _render_debug(
+                context,
+                registry,
+                filters,
+                diagnostic=run,
+                diagnostic_error=error,
+                status=status,
+            )
         return _render_debug(
-            context, registry, filters, diagnostic_error=message, status=status
+            context, registry, filters, audit=run, audit_error=error, status=status
         )
 
     if not is_local_action(request):
-        return refused("Origine de la requête non autorisée.", 403)
+        return rendered(403, "Origine de la requête non autorisée.")
     content_type = request.header("Content-Type", "").split(";", 1)[0]
     if content_type != "application/x-www-form-urlencoded":
-        return refused("Format de formulaire non pris en charge.", 415)
+        return rendered(415, "Format de formulaire non pris en charge.")
     if request.params or getattr(request, "body", None):
-        return refused("Ce formulaire n’accepte aucun paramètre.", 400)
+        return rendered(400, "Ce formulaire n’accepte aucun paramètre.")
     if context.root is None:
-        return refused("Aucun projet sélectionné : diagnostic non lancé.", 409)
+        return rendered(409, f"Aucun projet sélectionné : {noun} non lancé.")
     try:
         checked = check_forge_root(context.root)
     except _PROJECT_ERRORS as exc:
-        return refused(f"Diagnostic non lancé : {exc}", 409)
-    run = (runner or run_forge_diagnostic)(checked)
-    return _render_debug(context, registry, filters, diagnostic=run)
+        return rendered(409, f"{noun.capitalize()} non lancé : {exc}")
+    return rendered(run=runner(checked))

@@ -1,12 +1,18 @@
-"""Diagnostic officiel Forge exécuté à la demande (FD-RUNTIME-001).
+"""Commandes officielles Forge exécutées à la demande (FD-RUNTIME-001, -002).
 
-Forge Design ne réimplémente pas ``forge doctor`` : il le lance, sur action
-explicite de l'utilisateur, dans un sous-processus séparé du serveur, avec
-l'interpréteur du projet :
+Forge Design ne réimplémente ni ``forge doctor`` ni ``forge project:audit`` : il
+les lance, sur action explicite de l'utilisateur, dans un sous-processus séparé
+du serveur, avec l'interpréteur du projet :
 
-    <racine>/.venv/bin/python -s -B -P -m forge doctor      (cwd = racine)
+    <racine>/.venv/bin/python -s -B -P -m forge doctor          (cwd = racine)
+    <racine>/.venv/bin/python -s -B -P -m forge project:audit   (cwd = racine)
 
-- ``-s`` : sans le site-packages de l'utilisateur ;
+Ces deux commandes forment une liste **fermée** : le runner privé ne reçoit
+qu'un nom parmi elles et construit l'argv depuis sa propre table ; aucune API ne
+lance une commande Forge arbitraire, aucun argument ne vient de HTTP.
+
+- ``-s`` : sans le site-packages de l'utilisateur (dont les ``.pth`` seraient
+  exécutés au démarrage d'un venv créé avec ``--system-site-packages``) ;
 - ``-B`` : aucun bytecode écrit (lancé tel quel, le diagnostic crée
   ``__pycache__/config.*.pyc`` dans le projet) ;
 - ``-P`` : la racine n'est pas insérée en tête de ``sys.path`` par ``-m`` ; sans
@@ -14,8 +20,11 @@ l'interpréteur du projet :
   diagnostic ajoute lui-même la racine au chargement de ``config.py`` : les
   imports locaux du projet restent ceux d'un ``forge doctor`` lancé en terminal.
 
-Le diagnostic exécute ``config.py`` du projet et peut se connecter à la base
-configurée : ce n'est pas un bac à sable, c'est une frontière de processus.
+``doctor`` exécute ``config.py`` du projet et peut se connecter à la base
+configurée ; ``project:audit`` (forge-mvc 1.0.0rc9) lit les fichiers du projet
+sans exécuter son code. Dans les deux cas, le CLI Forge et les paquets du
+``.venv`` s'exécutent : ce n'est pas un bac à sable, c'est une frontière de
+processus.
 Aucun shell, aucun argument venu de HTTP, environnement en liste blanche, durée
 bornée (le groupe de processus entier est tué), sorties bornées pendant la
 lecture, séquences ANSI retirées, affectations sensibles masquées (le diagnostic
@@ -32,7 +41,8 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Literal, Protocol
+from types import MappingProxyType
+from typing import IO, Final, Literal, Protocol
 
 from forge_design.forge.checked_root import CheckedForgeRoot
 from forge_design.forge.debug_redaction import redact_debug_text
@@ -43,6 +53,7 @@ from forge_design.limits import (
 )
 
 DIAGNOSTIC_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "doctor")
+AUDIT_ARGUMENTS = ("-s", "-B", "-P", "-m", "forge", "project:audit")
 INTERPRETER_LABEL = ".venv/bin/python"
 
 DiagnosticStatus = Literal[
@@ -58,6 +69,25 @@ _ANSI = re.compile(
 # Autres contrôles C0 et DEL, sauf tabulation et fins de ligne.
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _REPLACEMENT = chr(0xFFFD)
+
+
+ForgeCommandName = Literal["doctor", "project:audit"]
+
+
+@dataclass(frozen=True)
+class _ForgeCommand:
+    arguments: tuple[str, ...]
+    noun: str  # « diagnostic », « audit » : messages de lancement et de délai
+    noun_capitalized: str
+
+
+# Liste fermée : seules ces deux entrées peuvent atteindre le lanceur.
+_COMMANDS: Final = MappingProxyType(
+    {
+        "doctor": _ForgeCommand(DIAGNOSTIC_ARGUMENTS, "diagnostic", "Diagnostic"),
+        "project:audit": _ForgeCommand(AUDIT_ARGUMENTS, "audit", "Audit"),
+    }
+)
 
 
 class DiagnosticProcess(Protocol):
@@ -182,6 +212,51 @@ def run_forge_diagnostic(
     ``checked`` : racine Forge vérifiée par l'appelant (contexte courant).
     ``launcher`` et ``environ`` ne sont injectables que depuis Python (tests).
     """
+    return _run_forge_command(
+        checked,
+        "doctor",
+        launcher=launcher,
+        environ=environ,
+        timeout=timeout,
+        limit=limit,
+    )
+
+
+def run_forge_project_audit(
+    checked: CheckedForgeRoot,
+    *,
+    launcher: Launcher | None = None,
+    environ: Mapping[str, str] | None = None,
+    timeout: float = FORGE_DIAGNOSTIC_TIMEOUT_SECONDS,
+    limit: int = MAX_FORGE_DIAGNOSTIC_OUTPUT_BYTES,
+) -> ForgeDiagnosticRun:
+    """Lancer ``forge project:audit`` avec l'interpréteur du projet, une fois.
+
+    Mêmes garanties que :func:`run_forge_diagnostic` (FD-RUNTIME-002).
+    """
+    return _run_forge_command(
+        checked,
+        "project:audit",
+        launcher=launcher,
+        environ=environ,
+        timeout=timeout,
+        limit=limit,
+    )
+
+
+def _run_forge_command(
+    checked: CheckedForgeRoot,
+    name: ForgeCommandName,
+    *,
+    launcher: Launcher | None,
+    environ: Mapping[str, str] | None,
+    timeout: float,
+    limit: int,
+) -> ForgeDiagnosticRun:
+    """Runner privé commun ; l'argv vient uniquement de la table ``_COMMANDS``."""
+    command = _COMMANDS.get(name)
+    if command is None:
+        raise ValueError(f"Commande Forge non autorisée : {name!r}.")
     root = checked.root
     interpreter = project_interpreter(root)
     if interpreter is None:
@@ -193,10 +268,10 @@ def run_forge_diagnostic(
             0.0,
             message=(
                 "Interpréteur du projet introuvable ou inutilisable "
-                f"({INTERPRETER_LABEL}) : diagnostic non lancé."
+                f"({INTERPRETER_LABEL}) : {command.noun} non lancé."
             ),
         )
-    argv = (str(interpreter), *DIAGNOSTIC_ARGUMENTS)
+    argv = (str(interpreter), *command.arguments)
     env = child_environment(os.environ if environ is None else environ)
     started = time.monotonic()
     try:
@@ -243,7 +318,7 @@ def run_forge_diagnostic(
             True,
             streams.dropped["stdout"],
             streams.dropped["stderr"],
-            message="Diagnostic interrompu : délai dépassé.",
+            message=f"{command.noun_capitalized} interrompu : délai dépassé.",
         )
     return ForgeDiagnosticRun(
         _status(code),

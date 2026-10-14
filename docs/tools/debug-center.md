@@ -387,6 +387,77 @@ connexion (`mysql://roger:[masqué]@db.local/app`), avec les limites décrites
 plus bas. Le texte est rendu échappé par Jinja dans un `<pre>`, sans `| safe`.
 Le formulaire n’a aucun champ et fonctionne sans JavaScript (POST natif).
 
+## Audit Forge à la demande (FD-RUNTIME-002)
+
+Sous le diagnostic, la section « Audit du projet Forge » lance la commande
+officielle `forge project:audit`, elle aussi **uniquement** sur un clic explicite
+(« Exécuter l’audit Forge »). Les deux commandes restent séparées : chacune a son
+formulaire, son POST, son résultat et son message d’erreur, et aucune ne lance
+l’autre ni n’affiche le résultat de l’autre. L’ordre de la page est : Diagnostic
+Forge, Audit du projet Forge, Journal des erreurs runtime.
+
+| Requête | Effet |
+|---|---|
+| `GET /debug` | Ne lance rien ; les deux sections sont « non exécutées » |
+| `POST /debug/forge-audit` | Lance l’audit une fois ; résultat dans la seule section Audit |
+| `GET /debug/forge-audit` | 405 |
+
+Les gardes sont celles du diagnostic (403, 415, 400 pour tout champ ou paramètre,
+409 sans projet ou hors projet Forge, sans aucun processus). Les messages sont
+« Aucun projet sélectionné : audit non lancé. », « Audit non lancé : … » et
+« Interpréteur du projet introuvable ou inutilisable (.venv/bin/python) : audit
+non lancé. ». Rien n’est persisté.
+
+### Commande et runner
+
+```text
+<racine>/.venv/bin/python -s -B -P -m forge project:audit      cwd = racine Forge vérifiée
+```
+
+Même interpréteur, mêmes options, même liste blanche d’environnement que le
+diagnostic. `APP_ENV` n’est pas fixé : l’audit ne le lit pas. Les deux commandes
+partagent un runner privé, `_run_forge_command`, qui reçoit un **nom** parmi une
+liste fermée (`doctor`, `project:audit`, table immuable) et construit l’argv
+depuis cette table ; tout autre nom lève une erreur avant lancement. L’API
+publique se limite à `run_forge_diagnostic` et `run_forge_project_audit` ; il
+n’existe aucune fonction « exécuter une commande Forge quelconque ». Le résultat
+est le même `ForgeDiagnosticRun` ; délai (10 s), bornes (256 Kio par flux),
+arrêt du groupe, nettoyage ANSI et masquage (FD-DEBUG-006) sont communs.
+
+`-s` a un effet concret : dans un venv créé avec `--system-site-packages`, un
+`.pth` du site utilisateur serait exécuté au démarrage ; il ne l’est pas.
+
+### Ce que fait l’audit (forge-mvc 1.0.0rc9)
+
+Vérifié par lecture du code et par audit hooks Python sur un projet réel :
+
+- **lit** la structure, `env/example` puis `env/dev` (`dotenv_values`, pour
+  vérifier quatre clés : seuls les **noms** des clés vides sont imprimés, jamais
+  les valeurs ; `os.environ` reste inchangé), `relations.json` et les JSON
+  d’entités, `mvc/routes/__init__.py` (analysé par `ast.parse`, jamais importé),
+  les templates, `forge_modules.json`, les noms et tailles des migrations, le
+  README et la liste de `tests/` ;
+- **n’exécute** ni `config.py`, ni `app.py`, ni les contrôleurs, ni les tests :
+  aucun code du projet n’est exécuté ;
+- **ne contacte** aucune base, aucun réseau, ne lance aucun sous-processus et
+  n’écrit aucun fichier.
+
+Le CLI Forge et les paquets du `.venv` (forge-mvc, python-dotenv) s’exécutent :
+ces garanties valent pour forge-mvc 1.0.0rc9, et l’avertissement de la page le
+dit. Forge suit les liens symboliques du projet. Les noms de fichiers et de
+dossiers du projet apparaissent dans la sortie : ils passent par le masquage.
+
+| Code | État affiché |
+|---|---|
+| 0 | Terminé avec le code 0 : aucun constat FAIL (des avertissements restent possibles) |
+| 1 | Terminé avec le code 1 : au moins un constat FAIL, ou erreur de la commande |
+| autre | Terminé avec un autre code retour |
+| — | Échec du lancement, ou « Audit interrompu : délai dépassé » |
+
+Le texte (`[OK]`, `[WARN]`, `[FAIL]`, `[INFO]`, résumé) n’est jamais interprété.
+`forge project:check`, qui importe réellement les routes du projet, n’est pas
+proposé.
+
 ## Masquage renforcé (FD-DEBUG-006)
 
 Le masqueur reste une fonction pure `str → str`, déterministe et idempotente,

@@ -82,9 +82,10 @@ ouverture ou une actualisation, l’inspection qui vient d’être faite est rep
 telle quelle.
 
 Le diagnostic officiel `forge doctor`, qui exécute la configuration du projet,
-n’entre pas dans la synthèse : il se lance seulement à la demande depuis
+et l’audit officiel `forge project:audit` n’entrent pas dans la synthèse : ils se
+lancent seulement à la demande depuis
 [Debug Center](debug-center.md#diagnostic-forge-à-la-demande-fd-runtime-001)
-(FD-RUNTIME-001).
+(FD-RUNTIME-001, FD-RUNTIME-002).
 
 Les migrations ne sont qu’inventoriées : entrées directes de `mvc/migrations`,
 nom (`AAAAMMJJHHMMSS_nom.sql`, convention Forge) et taille pour repérer un
