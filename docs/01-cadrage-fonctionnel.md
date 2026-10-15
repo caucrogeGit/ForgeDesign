@@ -261,7 +261,7 @@ Principes :
 
 - lancement local ;
 - ouverture dans un navigateur ;
-- écoute sur `127.0.0.1` / `localhost` par défaut ;
+- écoute sur `127.0.0.1` uniquement, port `8765` par défaut (`http://127.0.0.1:8765/`) ; Forge Design refuse les autres valeurs de `Host`, y compris `localhost`, conformément à sa garde locale ;
 - aucun accès direct du navigateur au système de fichiers ;
 - accès projet uniquement via les services backend ;
 - aucune exposition réseau implicite ;

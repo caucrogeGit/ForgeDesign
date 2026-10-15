@@ -63,18 +63,7 @@ exposition réseau = non
 accès filesystem depuis navigateur = non
 ```
 
-Une commande future pourra lancer le serveur et ouvrir automatiquement le navigateur.
-
-Exemple cible, non contractuel tant que la CLI correspondante n'est pas implémentée :
-
-```text
-forge-design
-→ démarre le backend local
-→ affiche l'URL locale
-→ ouvre éventuellement le navigateur
-```
-
-Une option telle que `--no-browser` pourra être étudiée dans un ticket CLI dédié.
+La commande `forge-design` (FD-CLI-002) démarre le backend local, affiche la version et l'URL `http://127.0.0.1:8765/`, puis ouvre le navigateur par défaut ; `--no-browser` ne l'ouvre pas ; `--module PAQUET` active un module externe installé ([hôte des modules](modules/module-host.md)).
 
 Une écoute sur `0.0.0.0`, une connexion distante ou une exposition publique ne font pas partie du comportement par défaut.
 Elles nécessitent une conception de sécurité dédiée.

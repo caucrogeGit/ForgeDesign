@@ -44,7 +44,7 @@ forge-design
 ```
 
 Le navigateur par défaut ouvre `http://127.0.0.1:8765/` après ouverture du socket.
-Forge Design écoute uniquement sur cette adresse locale.
+Forge Design écoute uniquement sur cette adresse locale et refuse les autres valeurs de `Host`, y compris `localhost` : utiliser `http://127.0.0.1:8765/`.
 La commande reste active jusqu'à `Ctrl+C`, qui ferme le serveur proprement.
 Pour démarrer sans ouvrir le navigateur :
 
@@ -101,7 +101,7 @@ Le navigateur n'accède jamais directement au système de fichiers du projet For
 
 Seul le backend Python de Forge Design peut lire ou modifier un projet, en passant par les contrôles de sécurité et les services prévus.
 
-Par défaut, le serveur Forge Design écoute uniquement sur l'interface loopback (`127.0.0.1` / `localhost`).
+Par défaut, le serveur Forge Design écoute uniquement sur l'interface loopback (`127.0.0.1`).
 
 Les Tools ne vont pas chercher des dépendances globales.
 L'application leur fournit explicitement les services dont ils ont besoin.
