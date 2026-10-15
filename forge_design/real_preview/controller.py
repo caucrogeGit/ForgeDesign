@@ -322,7 +322,16 @@ class RealPreviewController:
             port = _allocate_port()
         except OSError:
             return "Aucun port loopback disponible."
-        command = [str(interpreter), "-I", "-u", str(bootstrap), "--port", str(port)]
+        # -B : Forge Design n'écrit aucun bytecode dans le projet (FD-REALPREVIEW-007).
+        command = [
+            str(interpreter),
+            "-I",
+            "-B",
+            "-u",
+            str(bootstrap),
+            "--port",
+            str(port),
+        ]
         return root, command, port
 
     def start(self, project_root: str | PathLike[str]) -> RealPreviewStatus:

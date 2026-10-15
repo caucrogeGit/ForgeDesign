@@ -6,6 +6,7 @@ les site-packages de Forge Design) : aucun venv complet n'est créé par test.
 Aucun projet réel ni env/dev utilisateur n'est jamais lu.
 """
 
+import hashlib
 import importlib.metadata
 import os
 import shutil
@@ -68,6 +69,45 @@ def make_project(
         (root / "env" / "dev").write_text(env_dev)
     make_venv(root)
     return root
+
+
+# ── Instantané de projet (FD-REALPREVIEW-007) ───────────────────────────────
+
+Entry = tuple[str, int, int, str]
+
+
+def tree_snapshot(root: Path) -> dict[str, Entry]:
+    """Chemin relatif → (type, taille, mtime_ns, empreinte), sans rien exclure.
+
+    .venv, __pycache__ et *.pyc compris ; dossiers avec leur mtime (un
+    __pycache__ créé puis supprimé laisse la trace de son dossier parent) ;
+    liens non suivis, empreinte = cible.
+    """
+    result: dict[str, Entry] = {".": ("d", 0, root.lstat().st_mtime_ns, "")}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        base = Path(dirpath)
+        for name in (*dirnames, *sorted(filenames)):
+            path = base / name
+            stat = path.lstat()
+            if path.is_symlink():
+                entry = ("l", 0, stat.st_mtime_ns, os.readlink(path))
+            elif path.is_dir():
+                entry = ("d", 0, stat.st_mtime_ns, "")
+            else:
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                entry = ("f", stat.st_size, stat.st_mtime_ns, digest)
+            result[str(path.relative_to(root))] = entry
+    return result
+
+
+def tree_changes(before: dict[str, Entry], after: dict[str, Entry]) -> list[str]:
+    """Ajouts (+), suppressions (-) et modifications (~), triés."""
+    return sorted(
+        [f"+ {k}" for k in after.keys() - before.keys()]
+        + [f"- {k}" for k in before.keys() - after.keys()]
+        + [f"~ {k}" for k in before.keys() & after.keys() if before[k] != after[k]]
+    )
 
 
 def _alive(pid: int) -> bool:

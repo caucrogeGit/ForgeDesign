@@ -2,7 +2,7 @@
 
 Exécuté uniquement dans le processus enfant, par l'interpréteur du projet :
 
-    <projet>/.venv/bin/python -I -u child_bootstrap.py --port <port>
+    <projet>/.venv/bin/python -I -B -u child_bootstrap.py --port <port>
 
 avec cwd = racine canonique du projet. Bibliothèque standard seulement : ce
 fichier n'importe jamais forge_design, qui n'est pas installé chez le projet.

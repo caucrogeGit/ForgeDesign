@@ -410,8 +410,16 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     assert.match(frame ?? "", /^http:\/\/127\.0\.0\.1:\d+\/contacts$/);
     assert.notEqual(new URL(frame).port, new URL(base).port);
     metrics.preview_frame = frame;
+    // src présent ne suffit pas : la page du projet est réellement servie par le proxy.
+    const served = await fetch(frame, { redirect: "manual" });
+    const page200 = await served.text();
+    assert.equal(served.status, 200, "GET de l'URL de l'iframe");
+    assert.match(served.headers.get("content-type") ?? "", /^text\/html/);
+    assert.match(page200, /<html/i);
+    metrics.preview_frame_get = { status: served.status, bytes: page200.length };
     await clickAt('form[action="/editor/real-preview/stop"] button', "Arrêter la preview réelle");
     assert.equal(await page.eval(`document.querySelector(".real-preview-state")?.dataset.state`), "stopped");
+    await assert.rejects(fetch(frame), "proxy fermé après l'arrêt");
     // Démarrée puis changement de projet : arrêtée.
     await clickAt('form[action="/editor/real-preview/start"] button', "Redémarrer");
     await openProject(P("A"));

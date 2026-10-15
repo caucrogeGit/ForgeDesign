@@ -2383,7 +2383,7 @@ La phase SAFEWRITE ajoutera le contrôle réel des écritures et conflits.
 Forge Design ──contrôle explicite──▶ RealPreviewController (composition)
                                          │ processus enfant, shell=False
                                          ▼
-   <projet>/.venv/bin/python -I -u child_bootstrap.py --port <port éphémère>
+   <projet>/.venv/bin/python -I -B -u child_bootstrap.py --port <port éphémère>
        import app → create_wsgi_app(application) → bind 127.0.0.1:<port>
                                          ▲
 iframe éditeur ──▶ proxy GET/HEAD Forge Design (origine loopback dédiée, Host strict)

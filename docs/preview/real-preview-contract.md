@@ -242,7 +242,7 @@ RealPreviewController (détenu par la composition)
      │
      │ processus enfant, shell=False, nouveau groupe de processus
      ▼
-<projet>/.venv/bin/python -I -u <child_bootstrap.py de Forge Design> --port <port>
+<projet>/.venv/bin/python -I -B -u <child_bootstrap.py de Forge Design> --port <port>
      │  1. garde d'audit socket.bind (loopback seulement)
      │  2. import app  →  config.py, env/example, env/dev, build_application()
      │  3. create_wsgi_app(app.application)
@@ -344,7 +344,7 @@ FD-REALPREVIEW-001, **n'est plus acceptable**.
 ### Commande retenue
 
 ```python
-[f"{root}/.venv/bin/python", "-I", "-u", CHILD_BOOTSTRAP, "--port", str(port)]
+[f"{root}/.venv/bin/python", "-I", "-B", "-u", CHILD_BOOTSTRAP, "--port", str(port)]
 # cwd = racine canonique, shell=False, start_new_session=True
 ```
 
@@ -352,7 +352,10 @@ FD-REALPREVIEW-001, **n'est plus acceptable**.
 `forge_design/real_preview/child_bootstrap.py` installé avec Forge Design,
 résolu par Forge Design. `-I` (mode isolé) ignore les variables `PYTHON*`,
 le site utilisateur et n'ajoute ni le cwd ni le dossier du script à
-`sys.path` ; `-u` remplace `PYTHONUNBUFFERED`, ignoré sous `-I`.
+`sys.path` ; `-B` empêche Python d'écrire du bytecode (`__pycache__/*.pyc`)
+dans le projet (FD-REALPREVIEW-007) ; `-u` remplace `PYTHONUNBUFFERED`,
+ignoré sous `-I`. `-B` est exprimé dans l'argv, comme pour les commandes de
+Debug Center : `PYTHONDONTWRITEBYTECODE` serait d'ailleurs ignoré sous `-I`.
 
 `forge run` n'est pas retenu (reloader, script shell), ni `python app.py`
 (bind dérivé de `env/dev`).
@@ -793,6 +796,26 @@ La restriction `GET`/`HEAD` du proxy réduit les modifications déclenchées
 depuis l'iframe, mais ne les empêche pas : un handler `GET`, `bootstrap.py` ou
 le démarrage lui-même peuvent écrire.
 
+### Bytecode — FD-REALPREVIEW-007
+
+Forge Design n'écrit plus de bytecode Python dans le projet par le simple
+fait de démarrer la preview : l'interpréteur est lancé avec `-B` (correction
+d'ACC-003, relevé par FD-ACCEPTANCE-001 : `__pycache__` créés à la racine,
+dans `mvc/controllers`, `mvc/routes` et `optins`). Le code applicatif exécuté
+reste libre de produire ses propres effets de bord : `-B` ne rend pas la
+preview lecture seule.
+
+- **Caches préexistants** : conservés, jamais nettoyés ni modifiés par Forge
+  Design ; un `.pyc` à jour peut être lu, un `.pyc` périmé n'est pas réécrit.
+- **Preuve** : instantané complet du projet (`__pycache__` et `.venv`
+  compris ; noms, tailles, empreintes, `mtime_ns`) identique pendant
+  `running` et après l'arrêt, le redémarrage, le changement de projet, la
+  fermeture du projet et la fermeture du serveur ; un témoin sans `-B` prouve
+  que la sonde voit le défaut.
+- **Coût** : nul à froid ; sur des démarrages répétés, l'ancien lancement
+  gagnait environ 12 ms en relisant les `.pyc` qu'il avait lui-même écrits
+  dans le projet.
+
 ## Threat model
 
 Une séparation de processus améliore l'isolation de Forge Design, mais **n'est
@@ -846,7 +869,7 @@ n'existe : « sandbox sécurisé », « isolé totalement », « sans risque ».
 |---|---|
 | Paquet | `forge_design/real_preview/` (pas `web/`, `preview/` ni `forge/`) |
 | Contrats | `RealPreviewState` (énumération des 5 états), `RealPreviewConfig` (racine, interpréteur, délais, borne de logs), `RealPreviewStatus` (état, port, raison, code de sortie, logs), `RealPreviewController` (`start`, `stop`, `status`), `RealPreviewError` |
-| Commande | `[<racine>/.venv/bin/python, "-I", "-u", <child_bootstrap.py>, "--port", <port>]`, cwd racine canonique, `shell=False`, `start_new_session=True` ; `python app.py` abandonné (FD-REALPREVIEW-001A) |
+| Commande | `[<racine>/.venv/bin/python, "-I", "-B", "-u", <child_bootstrap.py>, "--port", <port>]`, cwd racine canonique, `shell=False`, `start_new_session=True` ; `python app.py` abandonné (FD-REALPREVIEW-001A) ; `-B` ajouté par FD-REALPREVIEW-007 |
 | Bootstrap | `forge_design/real_preview/child_bootstrap.py`, stdlib seule : garde d'audit `socket.bind`, contrôle de compatibilité, `import app`, `create_wsgi_app(app.application)`, garde `Host`, bind `127.0.0.1:<port>` |
 | Confinement | Garantie pré-bind par construction ; sonde `/health` = readiness post-bind |
 | Interpréteur | `.venv/bin/python` du projet, sinon indisponible ; ni `PATH` ni `sys.executable` |

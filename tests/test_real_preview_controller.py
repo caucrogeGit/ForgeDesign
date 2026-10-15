@@ -165,15 +165,19 @@ def test_start_command_and_running(harness: Harness, project: Path) -> None:
     assert status == RealPreviewStatus(
         "running", project, harness.process.pid, 40001, None, None, status.logs
     )
-    command, cwd, _ = harness.spawned[0]
+    command, cwd, env = harness.spawned[0]
+    # -I, puis -B (aucun bytecode écrit, FD-REALPREVIEW-007), puis -u, avant le
+    # bootstrap ; la politique est explicite dans l'argv, pas dans l'environnement.
     assert command == [
         str(project / ".venv" / "bin" / "python"),
         "-I",
+        "-B",
         "-u",
         str(BOOTSTRAP),
         "--port",
         "40001",
     ]
+    assert "PYTHONDONTWRITEBYTECODE" not in env
     assert cwd == project
     assert harness.probes == 3
     assert harness.signals == []

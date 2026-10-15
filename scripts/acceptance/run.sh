@@ -196,6 +196,8 @@ stage_measures() {
 
 stage_shutdown() {
   log "Arrêt par Ctrl+C avec preview réelle active"
+  # A-preview comparé avant/après : arrêt des processus ET aucune écriture.
+  probe snapshot "$PROJECTS/A-preview" "$RESULTS/snap-before-shutdown-A-preview.json" >/dev/null
   server_start /tmp
   curl -s -o /dev/null -X POST -H "Origin: http://127.0.0.1:$PORT" \
     -H "Sec-Fetch-Site: same-origin" --data-urlencode "path=$PROJECTS/A-preview" \
@@ -209,6 +211,11 @@ stage_shutdown() {
   server_stop INT
   sleep 1
   probe strays "$PROJECTS" >>"$RESULTS/shutdown.txt" || true; tail -n 1 "$RESULTS/shutdown.txt"
+  probe snapshot "$PROJECTS/A-preview" "$RESULTS/snap-after-shutdown-A-preview.json" >/dev/null
+  probe diff "$RESULTS/snap-before-shutdown-A-preview.json" \
+    "$RESULTS/snap-after-shutdown-A-preview.json" >"$RESULTS/diff-shutdown-A-preview.json" \
+    && echo "  A-preview : conforme" | tee -a "$RESULTS/shutdown.txt" \
+    || echo "  A-preview : ÉCART $(cat "$RESULTS/diff-shutdown-A-preview.json")" | tee -a "$RESULTS/shutdown.txt"
 }
 
 for stage in $STAGES; do

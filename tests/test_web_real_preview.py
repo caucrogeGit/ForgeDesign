@@ -25,7 +25,12 @@ from urllib.parse import urlencode, urlsplit
 import pytest
 from core.security.csp import build_csp_header
 from real_preview_support import make_project as make_forge_project
-from real_preview_support import processes_mentioning, wait_until_dead
+from real_preview_support import (
+    processes_mentioning,
+    tree_changes,
+    tree_snapshot,
+    wait_until_dead,
+)
 from test_web_editor import DESIGN, make_root
 
 import forge_design.current_project as current_project
@@ -1080,6 +1085,7 @@ def real_start(server: web.ForgeDesignServer) -> Reply:
 
 def test_real_end_to_end(tmp_path: Path, no_survivors: None) -> None:
     root = real_project(tmp_path / "a")
+    before = tree_snapshot(root)
     with serving() as server:
         assert open_project(server, root)[0] == 200
         assert "Route : <code>/</code>" in real_editor(server)[1]
@@ -1120,10 +1126,13 @@ def test_real_end_to_end(tmp_path: Path, no_survivors: None) -> None:
             proxy_get(src)
         assert processes_mentioning(str(root)) == []
         assert iframe(real_editor(server)[1]) is None
+    # Aucun bytecode ni autre écriture de Forge Design (FD-REALPREVIEW-007).
+    assert tree_changes(before, tree_snapshot(root)) == []
 
 
 def test_real_switch_project_stops_previous(tmp_path: Path, no_survivors: None) -> None:
     first, second = real_project(tmp_path / "a"), real_project(tmp_path / "b")
+    before = {root: tree_snapshot(root) for root in (first, second)}
     with serving() as server:
         open_project(server, first)
         real_start(server)
@@ -1132,20 +1141,25 @@ def test_real_switch_project_stops_previous(tmp_path: Path, no_survivors: None) 
         assert wait_until_dead(processes_mentioning(str(first))) == []
         assert proxy_threads() == []
         assert str(second) in http(server, "GET", "/")[1]
+    for root, snapshot in before.items():
+        assert tree_changes(snapshot, tree_snapshot(root)) == []
 
 
 def test_real_close_project(tmp_path: Path, no_survivors: None) -> None:
     root = real_project(tmp_path / "a")
+    before = tree_snapshot(root)
     with serving() as server:
         open_project(server, root)
         real_start(server)
         assert http(server, "POST", "/project/close")[0] == 200
         assert wait_until_dead(processes_mentioning(str(root))) == []
         assert proxy_threads() == []
+    assert tree_changes(before, tree_snapshot(root)) == []
 
 
 def test_real_server_shutdown_while_running(tmp_path: Path, no_survivors: None) -> None:
     root = real_project(tmp_path / "a")
+    before = tree_snapshot(root)
     with serving() as server:
         open_project(server, root)
         real_start(server)
@@ -1156,6 +1170,8 @@ def test_real_server_shutdown_while_running(tmp_path: Path, no_survivors: None) 
     # Sortie du bloc : serveur fermé, runtime fermé (proxy puis runner).
     with pytest.raises(OSError):
         proxy_get(src)
+    assert wait_until_dead(processes_mentioning(str(root))) == []
+    assert tree_changes(before, tree_snapshot(root)) == []
 
 
 def _returning(
