@@ -1,6 +1,7 @@
 """Éditeur Web réel : HTTP, lecture, editor/*, write_design, sans état serveur."""
 
 import json
+import re
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from http.client import HTTPConnection
@@ -139,8 +140,23 @@ def get(server: WSGIServer, **params: str) -> tuple[int, str, dict[str, str]]:
     return request(server, "/editor?" + urlencode(params), method="GET")
 
 
+def displayed_revision(server: WSGIServer, design: str = DESIGN) -> str:
+    """Révision portée par les formulaires de la page, lue comme un navigateur."""
+    _, html, _ = get(server, design=design)
+    tokens = set(
+        re.findall(r'<input type="hidden" name="revision" value="([^"]*)"', html)
+    )
+    assert len(tokens) == 1, tokens
+    return tokens.pop()
+
+
 def action(server: WSGIServer, **fields: str) -> tuple[int, str, dict[str, str]]:
-    return request(server, "/editor/action", {"design": DESIGN, **fields})
+    """POST d'action depuis une vue fraîche : la révision affichée est jointe."""
+    design = fields.get("design", DESIGN)
+    revision = (
+        {} if "revision" in fields else {"revision": displayed_revision(server, design)}
+    )
+    return request(server, "/editor/action", {"design": DESIGN, **revision, **fields})
 
 
 def location(headers: dict[str, str]) -> dict[str, list[str]]:
@@ -371,7 +387,10 @@ def test_post_without_project_409(tmp_path: Path) -> None:
 )
 def test_malformed_actions_400(app: WSGIServer, root: Path, fields: Any) -> None:
     before = snapshot(root)
-    assert request(app, "/editor/action", {"design": DESIGN, **fields})[0] == 400
+    # Révision valide : le 400 tient au défaut visé, jamais à la révision.
+    revision = displayed_revision(app)
+    payload = {"design": DESIGN, "revision": revision, **fields}
+    assert request(app, "/editor/action", payload)[0] == 400
     assert snapshot(root) == before
 
 
@@ -522,8 +541,13 @@ def test_conflict_409(
         write(root, data)
         return result
 
+    # Révision affichée lue avant la substitution : la garde Web est satisfaite,
+    # l'écriture externe survient pendant la requête (garde de write_design).
+    revision = displayed_revision(app)
     monkeypatch.setattr(web_editor, "read_design", read_then_external_edit)
-    status, html, _ = action(app, action="append", parent="0", block_type="text")
+    status, html, _ = action(
+        app, revision=revision, action="append", parent="0", block_type="text"
+    )
     assert status == 409 and "modifié depuis sa lecture" in html
     assert on_disk(root)["view"] == "external/edit"
 
@@ -840,8 +864,13 @@ def test_tailwind_conflict_409(
         write(root, data)
         return result
 
+    # Révision affichée lue avant la substitution : la garde Web est satisfaite,
+    # l'écriture externe survient pendant la requête (garde de write_design).
+    revision = displayed_revision(app)
     monkeypatch.setattr(web_editor, "read_design", read_then_external_edit)
-    status, html, _ = action(app, action="tailwind_add", path="0", class_token="flex")
+    status, html, _ = action(
+        app, revision=revision, action="tailwind_add", path="0", class_token="flex"
+    )
     assert status == 409 and "modifié depuis sa lecture" in html
     assert on_disk(root)["view"] == "external/edit"
 

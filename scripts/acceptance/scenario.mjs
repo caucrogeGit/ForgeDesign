@@ -4,6 +4,7 @@
 // console, violations CSP, requêtes hors 127.0.0.1, fuite d'une valeur sensible,
 // accessibilité minimale. Les projets viennent de build_projects.py.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -353,31 +354,45 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     assert.equal(readFileSync(design, "utf8"), stamp);
   });
 
-  await step("éditeur B-write : vue périmée (deux onglets) — l'action ne doit jamais viser un autre bloc", async () => {
+  await step("éditeur B-write : vue périmée (deux onglets) refusée en 409, aucun bloc touché, rechargement", async () => {
     const design = join(P("B-write"), "mvc/views", DESIGN);
     const kids = () => JSON.parse(readFileSync(design, "utf8")).root.children.map((c) => c.type);
+    const sha = () => createHash("sha256").update(readFileSync(design)).digest("hex");
     await openProject(P("B-write"));
     // Trois blocs à la racine : section, table, section.
     await go(`/editor?design=${encodeURIComponent(DESIGN)}`);
     await page.eval(`(document.querySelector("#block-type").value = "section", true)`);
     await submit(`document.querySelector("#block-type").form.requestSubmit()`, "ajout d'une section");
     assert.deepEqual(kids(), ["section", "table", "section"]);
-    // Onglet 2 : vue de la « table » au chemin 1 (formulaire de suppression affiché).
+    // Onglet A : la « table » (chemin 1) est affichée avec son formulaire de suppression.
     await go(`/editor?design=${encodeURIComponent(DESIGN)}&node=1`);
     assert.match(await page.eval(`document.querySelector('form input[name=action][value=remove]')?.form.innerText ?? ""`), /Supprimer/);
-    // Onglet 1, entre-temps : suppression du bloc 0 (requête indépendante).
+    // Onglet B : sa propre vue (bloc 0), son propre formulaire, sa propre révision.
+    const pageB = await (await fetch(`${base}/editor?design=${encodeURIComponent(DESIGN)}&node=0`)).text();
+    const formB = [...pageB.matchAll(/<form action="\/editor\/action".*?<\/form>/gs)].map((m) => m[0]).find((f) => f.includes('value="remove"'));
+    const fieldsB = Object.fromEntries([...formB.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)"/g)].map((m) => [m[1], m[2].replaceAll("&#34;", '"').replaceAll("&amp;", "&")]));
     const removed = await fetch(`${base}/editor/action`, {
       method: "POST",
       redirect: "manual",
       headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: base, "Sec-Fetch-Site": "same-origin" },
-      body: new URLSearchParams({ action: "remove", design: DESIGN, preview: "desktop", path: "0" }),
+      body: new URLSearchParams(fieldsB),
     });
     assert.equal(removed.status, 303);
     assert.deepEqual(kids(), ["table", "section"]);
-    // Onglet 2 agit sur sa vue périmée : il croit supprimer la « table ».
+    const s1 = sha();
+    // Onglet A soumet sa vue périmée : refus, aucun bloc touché.
     await submit(`document.querySelector('form input[name=action][value=remove]').form.requestSubmit()`, "suppression depuis la vue périmée");
-    metrics.editor_stale_result = { blocks: kids(), notice: (await text()).match(/(enregistr|conflit|modifi)[^\n]{0,120}/i)?.[0] ?? null };
-    assert.ok(kids().includes("section"), `bloc non visé supprimé : il reste ${kids()}`);
+    const body = await text();
+    assert.match(body, /Le design a été modifié depuis l’affichage de cette page\. Rechargez l’éditeur avant de recommencer\./);
+    assert.equal(sha(), s1, "design identique octet pour octet à S1");
+    assert.deepEqual(kids(), ["table", "section"]);
+    metrics.editor_stale_result = { blocks: kids(), message: body.match(/Le design a été modifié[^\n]*/)?.[0] };
+    // Rechargement par le lien, puis action valide.
+    await clickAt('.message.error a[href^="/editor?design="]', "Recharger l’éditeur");
+    await page.eval(`(document.querySelector("#block-type").value = "section", true)`);
+    await submit(`document.querySelector("#block-type").form.requestSubmit()`, "action après rechargement");
+    assert.match(await text(), /Modification enregistrée/);
+    assert.deepEqual(kids(), ["table", "section", "section"]);
   });
 
   // ── 9. Preview réelle (A-preview uniquement) ───────────────────────────────

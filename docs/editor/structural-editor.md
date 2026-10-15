@@ -392,18 +392,69 @@ refusés côté serveur** (409), indépendamment du bouton.
 | Cas | Statut |
 |---|---|
 | succès, ou no-op (`notice=noop`, **aucun appel** à `write_design`) | 303 |
-| paramètre, chemin, champ, JSON ou forme d'action invalide | 400 |
+| paramètre, chemin, champ, JSON ou forme d'action invalide ; `revision` absente, vide ou mal formée | 400 |
 | origine non locale (`is_local_action`) | 403 |
 | Content-Type autre que `application/x-www-form-urlencoded` | 415 |
 | Design introuvable | 404 |
-| sans projet, Design non éditable, contrat indisponible, conflit de révision | 409 |
+| sans projet, Design non éditable, contrat indisponible, conflit de révision, **vue périmée** (FD-EDITOR-007) | 409 |
 | refus de l'éditeur (`editor.*`) ou `InvalidDesignForWriteError` | 422 |
 | `DesignWriteError` : sauvegarde **incertaine**, à relire | 500 |
 
-Une requête porte **exactement** les champs de son action : un champ manquant,
+Une requête porte **exactement** les champs de son action, plus `revision` : un champ manquant,
 en trop (deux propriétés), dupliqué ou de plus de 64 Kio donne 400. Toutes
 les pages sont `Cache-Control: no-store`. Toutes les valeurs du projet sont
 échappées par Jinja, sans `|safe`.
+
+### Révision du design affiché — FD-EDITOR-007
+
+Une action est adressée par `NodePath`, qui n'est pas une identité stable :
+après une suppression ou une insertion, le même chemin désigne un autre bloc.
+Chaque page de l'éditeur transporte donc la révision du design **affiché**, et
+toute action soumise depuis une vue périmée est refusée (ACC-004).
+
+```text
+GET /editor            read_design → design D1, jeton T1 dans les 11 formulaires d'action
+POST /editor/action    revision=T1 → read_design → jeton courant T2
+                       T1 ≠ T2 → 409, aucune mutation, aucune écriture
+                       T1 = T2 → action → write_design(expected_revision) inchangé
+```
+
+- **Jeton** : `revision_token(("design", <chemin>), révision)` du module neutre
+  `forge_design/revision_tokens.py`, le même calcul que les actions de modules
+  (FD-EDIT-001, octets inchangés). C'est un condensat SHA-256 de 64 hexadécimaux
+  de la révision **complète** (contenu, taille, mtime, périphérique, inode,
+  ctime) : opaque, le navigateur ne voit ni date, ni inode, ni périphérique.
+  Un remplacement par des octets identiques (nouvel inode) est un changement.
+- **Formulaires** : champ caché `revision` dans les 11 formulaires du gabarit
+  qui postent vers `/editor/action`, pour 10 actions (`tailwind_add` en a deux :
+  saisie libre et suggestions). À l'affichage, deux d'entre eux sont répétés par
+  des boucles (un `tailwind_remove` par classe, un formulaire de suggestions par
+  catégorie) ; chaque formulaire rendu porte le jeton (test). Le formulaire GET
+  d'ouverture et ceux de la preview réelle n'en portent pas.
+- **Ordre** : forme du jeton (400 si absent, vide ou pas 64 hexadécimaux
+  minuscules), lecture du design, comparaison à temps constant
+  (`hmac.compare_digest`), puis seulement validation de l'action, contrat,
+  mutation et no-op. Une vue périmée reçoit 409 même si l'action serait devenue
+  sans effet ou valide sur le document courant ; un jeton bien formé mais
+  inconnu (altéré) reçoit aussi 409.
+- **Réponse 409** : la page est rendue sur le design **courant**, sélection à
+  la racine (jamais le chemin soumis, qui peut viser un autre bloc), avec le
+  message « Le design a été modifié depuis l’affichage de cette page. Rechargez
+  l’éditeur avant de recommencer. » et un lien « Recharger l’éditeur ». Aucun
+  303, aucune redirection, `no-store`. Le jeton attendu n'est jamais divulgué.
+- **Double garde** : la garde Web protège l'intention de l'utilisateur (la vue
+  affichée) ; la révision attendue de `write_design`, inchangée, protège la
+  publication pendant la requête (« Le Design a été modifié depuis sa lecture »).
+- **Concurrence** : le serveur traite une requête à la fois ; deux POST portant
+  la même révision passent l'un après l'autre et le second reçoit 409. Dans un
+  même processus multi-thread (hors serveur), `write_design` compare puis
+  publie sans verrou : deux appels simultanés peuvent tous deux publier (mêmes
+  octets) ou l'un recevoir 500 « Sauvegarde incertaine », jamais un design
+  mélangé. Fenêtre préexistante, hors de ce ticket.
+
+C'est un contrôle optimiste : ni verrou, ni session d'édition, ni identifiant de
+bloc, ni rebase automatique ; aucun état serveur ; le format `.design.json`,
+`DesignFile` et `NodePath` sont inchangés.
 
 ### Hors périmètre
 

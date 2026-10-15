@@ -387,6 +387,9 @@ def test_module_contract_depends_only_on_the_specialized_contract() -> None:
         "forge_design.modules",
         "forge_design.forge.project_root",
         "forge_design.forge.project_version",
+        # FD-EDITOR-007 : calcul commun du jeton de révision (stdlib seule),
+        # extrait de modules.actions sans changement d'octets.
+        "forge_design.revision_tokens",
     }
     # FD-RELEASE-001 : version du cœur (source autoritaire) et spécificateurs
     # PEP 440 de la dépendance déclarée packaging, pour requires_forge_design.

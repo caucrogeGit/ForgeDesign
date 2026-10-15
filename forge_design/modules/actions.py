@@ -13,8 +13,6 @@ fini, booléen) sont faites par le cœur à la demande du handler ; ``null`` n'a
 pas de représentation et les valeurs imbriquées n'existent pas.
 """
 
-import hashlib
-import json
 import math
 import re
 from collections.abc import Callable, Iterator, Mapping
@@ -22,6 +20,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, get_args
 
+from forge_design.revision_tokens import is_revision_token as _is_revision_token
+from forge_design.revision_tokens import revision_token as _revision_token
 from forge_design.specialized import PlatformCapability, SpecializedResourceRevision
 from forge_design.specialized.models import is_kebab_case
 
@@ -43,7 +43,6 @@ RESERVED_ACTION_FIELDS = frozenset({"type", "path", "revision", "_method"})
 _FIELD = re.compile(r"[a-z][a-z0-9_-]*")
 _INTEGER = re.compile(r"-?(?:0|[1-9][0-9]*)")
 _NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
-_TOKEN = re.compile(r"[0-9a-f]{64}")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -77,7 +76,7 @@ def is_action_field(value: object) -> bool:
 
 
 def is_revision_token(value: object) -> bool:
-    return isinstance(value, str) and _TOKEN.fullmatch(value) is not None
+    return _is_revision_token(value)
 
 
 def check_action_text(value: str) -> None:
@@ -227,18 +226,7 @@ def revision_token(
     Condensat de la révision complète (contenu, taille, dates, identité du
     fichier) liée au module, au type et au chemin : le navigateur ne voit ni
     périphérique ni inode et ne reconstruit jamais une révision. Le serveur
-    recalcule le jeton de la révision courante et compare.
+    recalcule le jeton de la révision courante et compare. Calcul commun :
+    ``forge_design.revision_tokens`` (octets inchangés depuis FD-EDIT-001).
     """
-    fields = [
-        module_id,
-        type_id,
-        path,
-        revision.size,
-        revision.modified_ns,
-        revision.digest,
-        revision.device,
-        revision.inode,
-        revision.changed_ns,
-    ]
-    encoded = json.dumps(fields, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return _revision_token((module_id, type_id, path), revision)

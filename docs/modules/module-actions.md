@@ -108,7 +108,7 @@ Le corps contient l'enveloppe et les champs de l'action :
 |---|---|
 | `type` | type de ressource ; doit être celui de l'action |
 | `path` | chemin relatif de la ressource (au plus la longueur des sources) |
-| `revision` | jeton de révision (64 hexadécimaux minuscules) |
+| `revision` | jeton de révision (64 hexadécimaux minuscules ; calcul commun `forge_design/revision_tokens.py` depuis FD-EDITOR-007, octets inchangés) |
 | autres | exactement `fields`, ni plus ni moins |
 
 Le module lit des valeurs typées par `ModuleActionPayload` (lecture seule) :

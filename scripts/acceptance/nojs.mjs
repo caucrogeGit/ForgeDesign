@@ -125,7 +125,9 @@ const noLeak = async (where) => {
 };
 
 const steps = [];
+const only = process.env.ONLY ? new RegExp(process.env.ONLY) : null;
 const step = async (name, fn) => {
+  if (only && !only.test(name)) return;
   try {
     await fn();
     steps.push({ name, status: "OK" });
@@ -218,6 +220,51 @@ await step("sans JS : modules (navigation, métadonnées et message des ressourc
     assert.ok(await hasText("valide"), url);
     assert.ok(await hasText("La visualisation graphique nécessite JavaScript."), url);
   }
+});
+
+await step("sans JS : éditeur, vue périmée, racine et rechargement", async () => {
+  await open(P("B-write"));
+  await go("/editor?design=contacts%2Flist.design.json&node=1");
+  const file = join(P("B-write"), "mvc/views/contacts/list.design.json");
+  const data = JSON.parse(readFileSync(file, "utf8"));
+  data.root.children.unshift({ type: "section", children: [] });
+  writeFileSync(file, JSON.stringify(data) + "\n");
+  const current = readFileSync(file);
+  await click('form:has(input[name="action"][value="remove"]) button');
+  assert.deepEqual(readFileSync(file), current);
+  assert.ok(await hasText("Le design a été modifié depuis l’affichage"));
+  assert.ok(await count('input[name="path"][value=""]'));
+  await click('a[href="/editor?design=contacts%2Flist.design.json"]');
+  assert.equal(await count('[role="alert"]'), 0);
+  await click('form:has(input[name="action"][value="append"]) button');
+  assert.ok(await hasText("Modification enregistrée."));
+});
+
+// Onglet B simulé côté Node : sa propre page, son propre formulaire, sa révision.
+const postDisplayedForm = async (url, action, edit = {}) => {
+  const html = await (await fetch(`${base}${url}`)).text();
+  const form = [...html.matchAll(/<form action="\/editor\/action".*?<\/form>/gs)].map((m) => m[0]).find((f) => f.includes(`value="${action}"`));
+  const fields = Object.fromEntries([...form.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)"/g)].map((m) => [m[1], m[2]]));
+  return fetch(`${base}/editor/action`, {
+    method: "POST",
+    redirect: "manual",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: base, "Sec-Fetch-Site": "same-origin" },
+    body: new URLSearchParams({ ...fields, ...edit }),
+  });
+};
+
+await step("sans JS : éditeur, vue périmée refusée par formulaire natif, aucun bloc touché", async () => {
+  const designUrl = "/editor?design=contacts%2Flist.design.json";
+  const file = join(projects, "B-write/mvc/views/contacts/list.design.json");
+  await open(P("B-write"));
+  assert.equal((await postDisplayedForm(designUrl, "append", { block_type: "section" })).status, 303);
+  await go(`${designUrl}&node=1`);  // vue A : « table » au chemin 1
+  assert.equal((await postDisplayedForm(`${designUrl}&node=0`, "remove")).status, 303);  // onglet B
+  const s1 = readFileSync(file);
+  await click('form input[name="action"][value="remove"] ~ button, form:has(input[value="remove"]) button');
+  assert.ok(await hasText("Le design a été modifié depuis l’affichage de cette page."));
+  assert.ok(await hasText("Recharger l’éditeur"));
+  assert.ok(Buffer.compare(readFileSync(file), s1) === 0, "design identique à S1");
 });
 
 await step("sans JS : aucune requête hors 127.0.0.1", async () => {

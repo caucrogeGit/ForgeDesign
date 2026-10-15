@@ -5,6 +5,7 @@ action réussie est sauvegardée aussitôt par write_design avec la révision lu
 puis redirigée (POST/Redirect/GET). Aucune règle d'édition n'est codée ici.
 """
 
+import hmac
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
@@ -62,6 +63,7 @@ from forge_design.limits import (
     MAX_SOURCE_PATH_LENGTH,
 )
 from forge_design.preview import PREVIEW_VIEWPORTS, PreviewViewportMode
+from forge_design.revision_tokens import is_revision_token, revision_token
 from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
 from forge_design.web.tailwind_classes import (
@@ -100,6 +102,13 @@ _ACTION_FIELDS: Mapping[str, frozenset[str]] = {
     "tailwind_remove": frozenset({"action", "design", "path", "class_token"}),
 }
 _CONTRACT_ACTIONS = frozenset({"binding", "visibility", "columns"})
+# Révision du design affiché (FD-EDITOR-007) : jeton opaque porté par chaque
+# formulaire d'action, comparé au jeton courant avant toute interprétation.
+_REVISION_SCOPE = "design"
+STALE_DESIGN_MESSAGE = (
+    "Le design a été modifié depuis l’affichage de cette page. "
+    "Rechargez l’éditeur avant de recommencer."
+)
 DEFAULT_PREVIEW_MODE: PreviewViewportMode = "desktop"
 PREVIEW_MODE_LABELS: tuple[tuple[PreviewViewportMode, str], ...] = (
     ("desktop", "Desktop"),
@@ -302,6 +311,13 @@ def _find(rows: tuple[EditorNodeView, ...], path: NodePath) -> EditorNodeView | 
     return next((row for row in rows if row.path == path), None)
 
 
+def design_revision_token(design_path: str, read: DesignReadResult) -> str | None:
+    """Jeton opaque de la révision complète lue ; None si le design est absent."""
+    if read.revision is None:
+        return None
+    return revision_token((_REVISION_SCOPE, design_path), read.revision)
+
+
 def _render(
     context: CurrentProjectContext,
     *,
@@ -314,6 +330,7 @@ def _render(
     preview: PreviewViewportMode = DEFAULT_PREVIEW_MODE,
     status: int = 200,
     real_preview: RealPreviewPanel | None = None,
+    reload_url: str | None = None,
 ) -> Response:
     real_view: RealPreviewPanelView | None = None
     page: dict[str, object] = {
@@ -333,9 +350,13 @@ def _render(
         "selected": None,
         "contract_state": None,
         "real_preview": None,
+        "revision": "",
+        "reload_url": reload_url,
     }
     if read is not None:
         page["read_issues"] = tuple(issue.message for issue in read.issues)
+        if design_path is not None:
+            page["revision"] = design_revision_token(design_path, read) or ""
     design = read.design if read is not None else None
     if design is not None and context.root is not None:
         rows, truncated = _project_tree(design)
@@ -698,17 +719,37 @@ def editor_action(request: Request, context: CurrentProjectContext) -> Response:
     try:
         check_editor_post(request, context)
         fields = editor_form_fields(request)
+        if not is_revision_token(fields.get("revision")):
+            raise EditorHttpError(
+                400, "Révision du design absente ou invalide : rechargez l’éditeur."
+            )
+        design_path = fields.get("design")
+        if design_path is None:
+            raise EditorHttpError(400, "Une seule action complète est attendue.")
+        read = load_design(context, design_path)
+        # Vue périmée : refusée avant toute interprétation (validité, contrat,
+        # action, no-op). La sélection revient à la racine : le chemin soumis
+        # peut désormais désigner un autre bloc.
+        current = design_revision_token(design_path, read)
+        if current is None or not hmac.compare_digest(current, fields["revision"]):
+            return _render(
+                context,
+                design_path=design_path,
+                read=read,
+                error=STALE_DESIGN_MESSAGE,
+                preview=preview,
+                status=409,
+                reload_url=editor_url(design_path, (), None, preview),
+            )
         action = fields.get("action", "")
         expected = _ACTION_FIELDS.get(action)
-        # "preview" est le seul champ facultatif : il ne porte que le mode d'aperçu.
-        if expected is None or frozenset(fields) - {"preview"} != expected:
+        # Seul le mode d'aperçu est facultatif ; la révision est obligatoire.
+        if expected is None or frozenset(fields) - {"preview", "revision"} != expected:
             raise EditorHttpError(400, "Une seule action complète est attendue.")
         try:
             preview = parse_preview_mode(fields.get("preview"))
         except ValueError as error:
             raise EditorHttpError(400, str(error)) from None
-        design_path = fields["design"]
-        read = load_design(context, design_path)
         design = read.design
         if design is None:
             raise EditorHttpError(
