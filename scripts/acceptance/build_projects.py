@@ -12,6 +12,8 @@ Projets :
              contrat, design, migration, journal vide) : parcours lecture seule
   A-preview  copie de A réservée à la preview réelle (exécute le projet)
   A-bare     squelette nu : ni entité ni journal (états optionnels)
+  A-no-bootstrap  copie statique de A sans bootstrap.py ni .venv : projet Forge
+             valide pour forge-mvc 1.0.0rc9 (FD-FORGE-004), jamais exécuté
   B          gx8 enrichi : projet réaliste et volontairement problématique
              (routes et application lèvent si exécutées, noms hostiles)
   B-write    copie de B, seule cible des écritures (éditeur, modules)
@@ -229,6 +231,15 @@ def project_a(root: Path, venv: Path) -> Path:
     add_contacts(root)
     (root / "storage/logs/errors.dev.jsonl").write_text("")
     copy_venv(venv, root)
+    return root
+
+
+def project_a_no_bootstrap(root: Path, venv: Path) -> Path:
+    """A sans bootstrap.py (optionnel pour forge-mvc 1.0.0rc9, ADR-093) ni .venv."""
+    from_skeleton(root, venv)
+    add_contacts(root)
+    (root / "storage/logs/errors.dev.jsonl").write_text("")
+    (root / "bootstrap.py").unlink()
     return root
 
 
@@ -493,6 +504,7 @@ def main() -> None:
     a = project_a(projects / "A", venv)
     shutil.copytree(a, projects / "A-preview", symlinks=True)
     from_skeleton(projects / "A-bare", venv)
+    project_a_no_bootstrap(projects / "A-no-bootstrap", venv)
     b = project_b(projects / "B", venv)
     project_b_write(projects / "B-write", b)
     c = project_c(projects / "C", venv)

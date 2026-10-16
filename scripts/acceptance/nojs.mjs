@@ -154,6 +154,13 @@ await step("sans JS : Project Inspector (formulaire, synthèse, sections)", asyn
   assert.ok(await hasText("Synthèse du projet A"));
 });
 
+await step("sans JS : A-no-bootstrap reconnu sans bootstrap.py, Structure et Routes OK (0.2.1)", async () => {
+  await open(P("A-no-bootstrap"));
+  assert.equal(await count('[data-health-section="structure"][data-status="ok"]'), 1);
+  assert.equal(await count('[data-health-section="routes"][data-status="ok"]'), 1);
+  assert.ok(await hasText("Élément optionnel absent."));
+});
+
 await step("sans JS : Route Explorer (tableau, chaînes, filtre, repli graphique serveur)", async () => {
   await open(P("B"));
   await go("/routes");

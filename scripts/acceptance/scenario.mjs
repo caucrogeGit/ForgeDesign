@@ -175,6 +175,33 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     });
   }
 
+  // ── 3 bis. Correctifs 0.2.1 (FD-RELEASE-003) ─────────────────────────────────
+  const healthStatus = (key) =>
+    page.eval(`document.querySelector('[data-health-section="${key}"]')?.dataset.status ?? null`);
+  await step("ACC-002 : squelette A à registre d'opt-ins vide → Routes OK", async () => {
+    await openProject(P("A"));
+    assert.equal(await healthStatus("routes"), "ok");
+    assert.doesNotMatch(await text(), /déclaration non interprétée/);
+  });
+  await step("FD-FORGE-004 : A-no-bootstrap reconnu, Structure OK, analyses statiques disponibles", async () => {
+    await openProject(P("A-no-bootstrap"));
+    const body = await text();
+    assert.match(body, /Synthèse du projet A-no-bootstrap/);
+    assert.doesNotMatch(body, /bootstrap\.py : absent\./);
+    assert.equal(await healthStatus("structure"), "ok");
+    const info = await page.eval(`[...document.querySelectorAll('[data-health-section="structure"] li[data-severity="info"]')].map((li) => li.textContent.replace(/\\s+/g, " "))`);
+    assert.ok(info.some((line) => line.includes("Élément optionnel absent.") && line.includes("bootstrap.py")), info.join(" | "));
+    metrics.health_A_no_bootstrap = await page.eval(`[...document.querySelectorAll(".health-section h3")].map((h) => h.textContent.replace(/\\s+/g, " "))`);
+    for (const key of ["routes", "entities", "templates", "diagnostics"]) {
+      assert.notEqual(await healthStatus(key), "indisponible", key);
+      assert.notEqual(await healthStatus(key), null, key);
+    }
+    for (const url of ["/routes", "/entities", "/templates", "/debug"]) {
+      await go(url);
+      assert.doesNotMatch(await text(), /Analyse indisponible|Projet Forge non reconnu/, url);
+    }
+  });
+
   await step("actualiser puis fermer le projet ; GET n'exécute aucune commande", async () => {
     await openProject(P("A"));
     await clickAt('form[action="/project/refresh"] button', "Actualiser");
