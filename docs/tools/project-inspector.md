@@ -8,8 +8,16 @@ modifie jamais les fichiers du projet.
 ## Ouvrir un projet
 
 Saisir le chemin d’un dossier local, ou ouvrir un projet récent depuis
-l’accueil. Le projet n’est sélectionné que s’il est reconnu : trois fichiers
-d’entrée (`app.py`, `bootstrap.py`, `config.py`), `mvc/` et `mvc/routes/`.
+l’accueil. Le projet n’est sélectionné que s’il est reconnu : `app.py`,
+`config.py`, `mvc/` et `mvc/routes/` sont obligatoires.
+
+`bootstrap.py` est **optionnel**, comme pour forge-mvc 1.0.0rc9, qui ne le
+charge que s’il existe (`load_bootstrap`, ADR-093). Un projet créé avant ce
+câblage est donc reconnu. Absent, `bootstrap.py` n’est signalé que comme
+information dans la section Structure. Présent, il doit être un fichier
+ordinaire : un lien symbolique ou un autre type rend le projet non reconnu, comme
+pour les éléments obligatoires (FD-FORGE-004).
+
 Les autres dossiers MVC sont optionnels. « Actualiser » réinspecte le projet
 courant ; un projet devenu invalide ou inaccessible est alors fermé.
 
@@ -46,8 +54,9 @@ Les sévérités sont celles des analyses existantes : routes, entités et
 structure gardent leurs erreurs et avertissements. Sans sévérité existante, une
 anomalie de template, de contrat ou de migration vaut « attention » ; un contrat
 invalide est compté comme invalide sans devenir bloquant. Un élément optionnel
-absent (dossier MVC, `mvc/entities`, `mvc/views`, `mvc/migrations`) n’est
-qu’une information. Les erreurs ERROR ou CRITICAL du journal runtime sont des
+absent (`bootstrap.py`, dossier MVC, `mvc/entities`, `mvc/views`,
+`mvc/migrations`) n’est qu’une information ; un `bootstrap.py` présent mais
+invalide est une erreur. Les erreurs ERROR ou CRITICAL du journal runtime sont des
 erreurs passées de l’application : elles demandent un examen (« attention »)
 mais ne mettent jamais le projet « en erreur ». La mise en garde permanente de
 Route Explorer (lecture statique, liste possiblement partielle) est une

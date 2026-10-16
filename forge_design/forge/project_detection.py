@@ -24,11 +24,16 @@ StructureState = Literal["present", "absent", "invalid"]
 
 @dataclass(frozen=True)
 class StructureEntry:
-    """État observé d'un élément du squelette, sans interprétation des messages."""
+    """État observé d'un élément du squelette, sans interprétation des messages.
+
+    ``strict`` qualifie un élément optionnel : son absence est acceptée sans
+    message, mais présent et invalide (lien, type), il rend le projet non reconnu.
+    """
 
     label: str
     required: bool
     state: StructureState
+    strict: bool = False
 
 
 @dataclass(frozen=True)
@@ -65,8 +70,11 @@ def detect_forge_project(root: str | PathLike[str]) -> ForgeProjectDiagnostic:
     """Reconnaître le squelette Forge actuel sans importer ni lire ses fichiers.
 
     La racine passe toujours par resolve_project_root ; ses exceptions restent
-    publiques. Les trois fichiers d'entrée, mvc/ et mvc/routes/ sont nécessaires.
-    Les autres dossiers MVC sont optionnels. Les liens de signature sont refusés,
+    publiques. app.py, config.py, mvc/ et mvc/routes/ sont nécessaires.
+    bootstrap.py est optionnel, comme pour forge-mvc 1.0.0rc9 (load_bootstrap,
+    ADR-093) : absent, il n'est pas signalé ; présent, il doit être un fichier
+    ordinaire. Les dossiers MVC optionnels absents ou invalides ne sont que des
+    avertissements. Les liens de signature sont refusés,
     même internes ; un mvc invalide n'est jamais parcouru. Aucun parcours récursif.
     Comme la résolution de racine, cette inspection ponctuelle suppose que le
     filesystem ne change pas pendant l'appel (pas de garantie contre les courses).
@@ -77,15 +85,20 @@ def detect_forge_project(root: str | PathLike[str]) -> ForgeProjectDiagnostic:
     warnings: list[str] = []
     entries: list[StructureEntry] = []
 
-    def check(label: str, *, directory: bool, required: bool) -> bool:
+    def check(
+        label: str, *, directory: bool, required: bool, strict: bool = False
+    ) -> bool:
         state, problem = _check(canonical / label, label, directory=directory)
-        entries.append(StructureEntry(label, required, state))
-        if state != "present":
-            (errors if required else warnings).append(problem)
+        entries.append(StructureEntry(label, required, state, strict))
+        if (state != "present" and required) or (state == "invalid" and strict):
+            errors.append(problem)
+        elif state != "present" and not strict:
+            warnings.append(problem)
         return state == "present"
 
-    for name in ("app.py", "bootstrap.py", "config.py"):
-        check(name, directory=False, required=True)
+    check("app.py", directory=False, required=True)
+    check("bootstrap.py", directory=False, required=False, strict=True)
+    check("config.py", directory=False, required=True)
     if check("mvc", directory=True, required=True):
         check("mvc/routes", directory=True, required=True)
         for name in OPTIONAL_MVC_DIRECTORIES:

@@ -1174,3 +1174,20 @@ def test_web_source_rejections_end_to_end(
     assert status == 400 and headers["Cache-Control"] == "no-store"
     assert "Traceback" not in html and "NEVER EXPOSE" not in html
     assert outside.read_text() == "NEVER EXPOSE"
+
+
+def test_project_without_bootstrap_is_opened(server: WSGIServer, project: Path) -> None:
+    """FD-FORGE-004 : bootstrap.py optionnel, affiché comme information seulement."""
+    (project / "bootstrap.py").unlink()
+    status, html, _ = request(server, str(project))
+    assert status == 200 and "Projet Forge reconnu" in html
+    assert "bootstrap.py : absent." not in html
+    _, page, _ = request(server, method="GET")
+    assert 'data-health-section="structure" data-status="ok"' in page
+    assert (
+        '<li data-severity="info">Information : Élément optionnel absent. '
+        "<code>bootstrap.py</code></li>"
+    ) in page
+    assert "<dt>Éléments requis trouvés</dt><dd>4 / 4</dd>" in page
+    home = request(server, method="GET", target="/")[1]
+    assert f"Projet : {project.resolve()}" in home

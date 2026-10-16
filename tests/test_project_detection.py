@@ -4,10 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from forge_design.forge.project_detection import detect_forge_project
+from forge_design.forge.project_detection import StructureEntry, detect_forge_project
 from forge_design.forge.project_root import ProjectRootNotFoundError
 
-REQUIRED_FILES = ("app.py", "bootstrap.py", "config.py")
+REQUIRED_FILES = ("app.py", "config.py")
+# Optionnel pour forge-mvc 1.0.0rc9 (load_bootstrap, ADR-093) : FD-FORGE-004.
+BOOTSTRAP = "bootstrap.py"
 OPTIONAL = (
     "controllers",
     "entities",
@@ -21,7 +23,7 @@ OPTIONAL = (
 
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
-    for name in REQUIRED_FILES:
+    for name in (*REQUIRED_FILES, BOOTSTRAP):
         (tmp_path / name).touch()
     (tmp_path / "mvc/routes").mkdir(parents=True)
     return tmp_path
@@ -37,7 +39,11 @@ def test_minimal(project: Path) -> None:
 
 @pytest.mark.parametrize("name", (*REQUIRED_FILES, "mvc/routes", "mvc"))
 @pytest.mark.parametrize("wrong_type", (False, True))
-def test_required(project: Path, name: str, wrong_type: bool) -> None:
+@pytest.mark.parametrize("bootstrap", (True, False))
+def test_required(project: Path, name: str, wrong_type: bool, bootstrap: bool) -> None:
+    """Les quatre marqueurs restent obligatoires, avec ou sans bootstrap.py."""
+    if not bootstrap:
+        (project / BOOTSTRAP).unlink()
     target = project / name
     if name == "mvc":
         (target / "routes").rmdir()
@@ -149,10 +155,7 @@ def test_unreadable_signature(project: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 def test_structured_entries_match_the_messages(project: Path) -> None:
     """FD-PROJECT-006 : état structuré de chaque élément, messages inchangés."""
-    from forge_design.forge.project_detection import (
-        OPTIONAL_MVC_DIRECTORIES,
-        StructureEntry,
-    )
+    from forge_design.forge.project_detection import OPTIONAL_MVC_DIRECTORIES
 
     assert OPTIONAL_MVC_DIRECTORIES == OPTIONAL
     (project / "mvc/views").mkdir()
@@ -161,7 +164,7 @@ def test_structured_entries_match_the_messages(project: Path) -> None:
     result = detect_forge_project(project)
     assert result.entries == (
         StructureEntry("app.py", True, "present"),
-        StructureEntry("bootstrap.py", True, "present"),
+        StructureEntry("bootstrap.py", False, "present", strict=True),
         StructureEntry("config.py", True, "present"),
         StructureEntry("mvc", True, "present"),
         StructureEntry("mvc/routes", True, "present"),
@@ -200,3 +203,136 @@ def test_entries_stop_when_mvc_is_invalid(project: Path) -> None:
     entries = detect_forge_project(project).entries
     assert [(entry.label, entry.state) for entry in entries][-1] == ("mvc", "absent")
     assert len(entries) == 4
+
+
+# FD-FORGE-004 : bootstrap.py est optionnel (forge-mvc 1.0.0rc9, load_bootstrap,
+# ADR-093) ; app.py, config.py, mvc/ et mvc/routes/ restent obligatoires.
+
+
+def test_project_without_bootstrap_is_recognized(project: Path) -> None:
+    (project / BOOTSTRAP).unlink()
+    result = detect_forge_project(project)
+    assert result.valid
+    assert result.errors == ()
+    # Aucun message pour cette absence : ni erreur, ni avertissement.
+    assert result.warnings == tuple(f"mvc/{name} : absent." for name in OPTIONAL)
+    assert "bootstrap.py : absent." not in (*result.errors, *result.warnings)
+    assert result.entries[1] == StructureEntry(BOOTSTRAP, False, "absent", strict=True)
+    assert [entry.label for entry in result.entries if entry.required] == [
+        "app.py",
+        "config.py",
+        "mvc",
+        "mvc/routes",
+    ]
+
+
+def test_present_bootstrap_is_shown_as_optional(project: Path) -> None:
+    result = detect_forge_project(project)
+    assert result.valid and result.errors == ()
+    assert result.entries[1] == StructureEntry(BOOTSTRAP, False, "present", strict=True)
+    assert result == detect_forge_project(project)
+
+
+@pytest.mark.parametrize(
+    ("kind", "message"),
+    (
+        ("directory", "bootstrap.py : type incorrect, fichier ordinaire attendu."),
+        ("fifo", "bootstrap.py : type incorrect, fichier ordinaire attendu."),
+        ("outside", "bootstrap.py : lien symbolique non accepté."),
+        ("missing", "bootstrap.py : lien symbolique non accepté."),
+        ("self", "bootstrap.py : lien symbolique non accepté."),
+        ("inside", "bootstrap.py : lien symbolique non accepté."),
+    ),
+)
+def test_invalid_bootstrap_is_still_refused(
+    project: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+    kind: str,
+    message: str,
+) -> None:
+    """Optionnel quand il manque, jamais un faux fichier ordinaire quand il existe."""
+    import os
+
+    target = project / BOOTSTRAP
+    target.unlink()
+    if kind == "directory":
+        target.mkdir()
+    elif kind == "fifo":
+        os.mkfifo(target)
+    else:
+        outside = tmp_path_factory.mktemp("outside") / "bootstrap.py"
+        outside.touch()
+        destinations = {
+            "outside": outside,
+            "missing": project / "missing.py",
+            "self": target,
+            "inside": project / "config.py",
+        }
+        target.symlink_to(destinations[kind])
+    result = detect_forge_project(project)
+    assert not result.valid
+    assert result.errors == (message,)
+    assert result.entries[1] == StructureEntry(BOOTSTRAP, False, "invalid", strict=True)
+
+
+def test_unverifiable_bootstrap_is_refused(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = Path.lstat
+
+    def denied(path: Path) -> object:
+        if path == project / BOOTSTRAP:
+            raise PermissionError
+        return original(path)
+
+    monkeypatch.setattr(Path, "lstat", denied)
+    result = detect_forge_project(project)
+    assert not result.valid
+    assert result.errors == ("bootstrap.py : impossible de vérifier le type.",)
+
+
+@pytest.mark.parametrize("bootstrap", (True, False))
+def test_same_stat_calls_without_content_access(
+    project: Path, monkeypatch: pytest.MonkeyPatch, bootstrap: bool
+) -> None:
+    """Aucun parcours ni lecture ajoutés : un lstat par élément, présent ou non."""
+    if not bootstrap:
+        (project / BOOTSTRAP).unlink()
+    original = Path.lstat
+    calls: list[Path] = []
+
+    def counted(path: Path) -> object:
+        calls.append(path)
+        return original(path)
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("Content access or traversal forbidden")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "lstat", counted)
+        patch.setattr(Path, "open", forbidden)
+        patch.setattr(Path, "iterdir", forbidden)
+        patch.setattr(Path, "rglob", forbidden)
+        result = detect_forge_project(project)
+    assert result.valid
+    checked = [path for path in calls if path.is_relative_to(project.resolve())]
+    assert len(checked) == len(result.entries) == 12
+    assert project.resolve() / BOOTSTRAP in checked
+
+
+def test_real_forge_skeleton_without_bootstrap(tmp_path: Path) -> None:
+    """Squelette réellement installé (forge-mvc 1.0.0rc9), avec puis sans bootstrap."""
+    import shutil
+    from importlib.util import find_spec
+
+    spec = find_spec("skeleton")
+    assert spec is not None and spec.submodule_search_locations
+    source = Path(next(iter(spec.submodule_search_locations))) / "data"
+    assert (source / BOOTSTRAP).is_file()
+    copy = tmp_path / "squelette"
+    shutil.copytree(source, copy, symlinks=True)
+    assert detect_forge_project(copy).valid
+    (copy / BOOTSTRAP).unlink()
+    result = detect_forge_project(copy)
+    assert result.valid and result.errors == ()
+    assert result.entries[1] == StructureEntry(BOOTSTRAP, False, "absent", strict=True)

@@ -260,6 +260,15 @@ def _structure(entries: tuple[StructureEntry, ...]) -> HealthSection:
             diagnostics.append(
                 HealthDiagnostic("error", f"Élément requis {text}.", entry.label)
             )
+        elif entry.state == "invalid" and entry.strict:
+            # Optionnel mais présent invalide : le projet n'est pas reconnu.
+            diagnostics.append(
+                HealthDiagnostic(
+                    "error",
+                    "Élément optionnel invalide (lien ou type) : projet non reconnu.",
+                    entry.label,
+                )
+            )
         elif entry.state == "invalid":
             diagnostics.append(
                 HealthDiagnostic(

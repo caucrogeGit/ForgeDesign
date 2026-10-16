@@ -37,7 +37,7 @@ CONTACT_ENTITY = {
 
 
 def minimal(root: Path) -> Path:
-    """Squelette requis seulement : trois fichiers d'entrée, mvc/ et mvc/routes/."""
+    """Squelette minimal : app.py, config.py, mvc/routes/, bootstrap.py optionnel."""
     root.mkdir(parents=True)
     for name in ("app.py", "bootstrap.py", "config.py"):
         (root / name).write_text("raise AssertionError('never execute')")
@@ -154,7 +154,11 @@ def test_healthy_project_is_ok_in_every_section(tmp_path: Path) -> None:
     assert facts["forge"]["Compatibilité Forge Design"] == (
         "non évaluée (aucune règle de version définie)"
     )
-    assert facts["structure"]["Éléments requis trouvés"] == "5 / 5"
+    # bootstrap.py est optionnel (FD-FORGE-004) : 4 éléments requis.
+    assert facts["structure"]["Éléments requis trouvés"] == "4 / 4"
+    assert facts["structure"]["Éléments optionnels trouvés"].startswith(
+        "bootstrap.py, "
+    )
     assert (
         facts["routes"]["Routes"] == "1" and facts["routes"]["Méthodes HTTP"] == "GET"
     )
@@ -184,7 +188,8 @@ def test_minimal_project(tmp_path: Path) -> None:
     structure = value.section("structure")
     assert structure.status == "ok"
     assert {item.severity for item in structure.diagnostics} == {"info"}
-    assert dict(structure.facts)["Éléments optionnels trouvés"] == "aucun"
+    # bootstrap.py est présent mais optionnel (FD-FORGE-004).
+    assert dict(structure.facts)["Éléments optionnels trouvés"] == "bootstrap.py"
     assert dict(structure.facts)["Anomalies"] == "0"
     for key in ("entities", "templates", "migrations", "diagnostics", "contracts"):
         assert found[key] == "ok", key
@@ -567,3 +572,56 @@ def test_summary_is_recomputed_not_cached(tmp_path: Path) -> None:
     assert summarize_project_health(root, registry).status == "ok"
     (root / "mvc/migrations/oops.sql").write_text("x")
     assert summarize_project_health(root, registry).status == "attention"
+
+
+# --- FD-FORGE-004 : bootstrap.py optionnel --------------------------------------------
+
+
+def test_healthy_project_without_bootstrap_stays_ok(tmp_path: Path) -> None:
+    root = healthy(tmp_path / "projet")
+    (root / "bootstrap.py").unlink()
+    value = summary(root)
+    assert value.status == "ok"
+    assert set(statuses(value).values()) == {"ok"}
+    structure = value.section("structure")
+    facts = dict(structure.facts)
+    assert facts["Éléments requis trouvés"] == "4 / 4"
+    assert "bootstrap.py" not in facts["Éléments optionnels trouvés"]
+    assert facts["Anomalies"] == "0"
+    # Une simple information, jamais Attention ni Erreur.
+    assert [
+        (item.severity, item.message)
+        for item in structure.diagnostics
+        if item.subject == "bootstrap.py"
+    ] == [("info", "Élément optionnel absent.")]
+    assert value.section("forge").diagnostics == ()
+
+
+def test_bootstrap_absence_changes_no_status(tmp_path: Path) -> None:
+    with_bootstrap = summary(minimal(tmp_path / "avec"))
+    without = minimal(tmp_path / "sans")
+    (without / "bootstrap.py").unlink()
+    value = summary(without)
+    assert statuses(value) == statuses(with_bootstrap)
+    assert value.status == with_bootstrap.status
+
+
+@pytest.mark.parametrize("kind", ("directory", "symlink"))
+def test_invalid_bootstrap_is_a_structure_error(tmp_path: Path, kind: str) -> None:
+    root = healthy(tmp_path / "projet")
+    (root / "bootstrap.py").unlink()
+    if kind == "directory":
+        (root / "bootstrap.py").mkdir()
+    else:
+        (root / "bootstrap.py").symlink_to(root / "config.py")
+    value = summary(root)
+    assert value.status == "erreur"
+    structure = value.section("structure")
+    assert structure.status == "erreur"
+    assert [
+        (item.severity, item.message)
+        for item in structure.diagnostics
+        if item.subject == "bootstrap.py"
+    ] == [("error", "Élément optionnel invalide (lien ou type) : projet non reconnu.")]
+    assert dict(structure.facts)["Éléments requis trouvés"] == "4 / 4"
+    assert statuses(value)["routes"] == "indisponible"
