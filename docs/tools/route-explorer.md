@@ -128,7 +128,18 @@ C’est une compatibilité structurelle vérifiée, pas une matrice de versions.
   et appelés explicitement sont suivis ; un import seul ne suffit pas.
 - Les routes conditionnelles ou dynamiques peuvent manquer. Les alias de
   branchements, imports relatifs et sous-paquets ne sont pas résolus.
-  `register_optins(router)` reste non résolu et signalé.
+  `register_optins(router)` est reconnu uniquement pour le registre vide
+  conventionnel : `BACKEND = None`, `ENABLED_OPTINS = {}` et fonction sans
+  effet (`return None`), selon la structure typée du squelette Forge 1.0.0rc9.
+  L'import direct, la création du routeur et l'appel inconditionnel unique
+  doivent être non ambigus et dans l'ordre. Le registre est lu sans import,
+  avec une taille bornée et sans suivre les liens symboliques.
+  Un registre actif, personnalisé, illisible, absent malgré une référence,
+  ou un branchement manquant/incorrect reste signalé. Les projets historiques
+  sans registre ni référence aux opt-ins gardent leur diagnostic antérieur.
+  La reconnaissance syntaxique ne garantit ni l'installation des paquets,
+  ni leur identité à l'exécution ; la limite générale de lecture statique reste
+  affichée. Voir [FD-ACC-002](../rapports/FD-ACC-002-RAPPORT.md).
 - Les imports de contrôleurs directs peuvent avoir un alias. Les sous-paquets
   comme `mvc.controllers.pivot.*` ne sont pas suivis. Les références syntaxiques
   ne prouvent pas l’identité runtime des symboles ; les portées et réaffectations

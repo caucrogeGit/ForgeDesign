@@ -12,6 +12,7 @@ from typing import Literal
 
 from jinja2 import nodes
 
+from forge_design.forge.optin_routes import empty_optin_call
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import NotForgeProjectError
@@ -750,11 +751,14 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
         raise NotForgeProjectError("La racine n'est pas un projet Forge reconnu.")
     directory = canonical / "mvc/routes"
     tree = _tree(_read_source(directory / "__init__.py"))
+    empty_call, optin_warning = empty_optin_call(canonical, tree)
     imports: dict[str, str] = {}
     branches: list[tuple[str, str]] = []
     direct: list[ast.stmt] = []
     # Uniquement les instructions inconditionnelles de la racine, dans leur ordre.
     for statement in tree.body:
+        if statement is empty_call:
+            continue
         if isinstance(statement, ast.ImportFrom):
             module = statement.module or ""
             if statement.level == 0 and re.fullmatch(
@@ -781,6 +785,8 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
     cache: dict[str, ast.Module | None] = {}
     result = _parse(ast.Module(body=direct, type_ignores=[]), canonical, cache=cache)
     routes, warnings = list(result.routes), list(result.warnings)
+    if optin_warning is not None:
+        warnings.append(optin_warning)
     for module, function in branches[:MAX_ROUTE_BRANCHES]:
         filename = f"{module}.py"
         try:
