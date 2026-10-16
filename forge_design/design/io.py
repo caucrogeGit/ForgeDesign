@@ -4,13 +4,15 @@ import hashlib
 import json
 import os
 import secrets
-from contextlib import ExitStack
+from collections.abc import Generator
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from stat import S_ISREG
 
 from pydantic import ValidationError
 
+from forge_design.design.locking import LockUnavailable, design_lock
 from forge_design.design.models import DesignFile, DesignNodeType
 from forge_design.design.nesting import validate_design_nesting
 from forge_design.forge.filesystem import open_directory
@@ -70,6 +72,10 @@ class DesignWriteResult:
 
 class DesignWriteError(RuntimeError):
     """Sauvegarde impossible ; après publication, l'état disque doit être relu."""
+
+
+class DesignLockError(DesignWriteError):
+    """Mutation refusée avant action : coordination indisponible ou occupée."""
 
 
 class DesignWriteConflictError(DesignWriteError):
@@ -285,7 +291,43 @@ def _secure_write_available() -> bool:
     )
 
 
+@contextmanager
+def design_mutation(root: Path, design_path: str) -> Generator[None, None, None]:
+    """Contexte interne commun au Web et au writer public, sans changer son API."""
+    if design_source(design_path) is None:
+        raise SourceReadError("Chemin de design refusé.")
+    canonical = _root(root)
+    try:
+        with design_lock(canonical, design_path):
+            yield
+    except LockUnavailable as error:
+        raise DesignLockError(str(error)) from error
+
+
 def write_design(
+    root: Path,
+    design_path: str,
+    design: DesignFile,
+    *,
+    expected_revision: DesignRevision | None,
+) -> DesignWriteResult:
+    # Conserver les refus avant toute I/O du contrat public historique.
+    if design_source(design_path) is None:
+        raise SourceReadError("Chemin de design refusé.")
+    _payload(design, design_path)
+    canonical = _root(root)
+    if not _secure_write_available():
+        raise DesignLockError("Écriture POSIX sécurisée indisponible.")
+    try:
+        with design_mutation(canonical, design_path):
+            return _write_design_locked(
+                canonical, design_path, design, expected_revision=expected_revision
+            )
+    except OSError as error:
+        raise DesignWriteError("Sauvegarde incertaine ; relire le design.") from error
+
+
+def _write_design_locked(
     root: Path,
     design_path: str,
     design: DesignFile,
@@ -300,6 +342,7 @@ def write_design(
     if not _secure_write_available():
         raise DesignWriteError("Écriture POSIX sécurisée indisponible.")
     parts = source_parts(location.path)
+    published = False
     try:
         with ExitStack() as stack:
             directory = stack.enter_context(open_directory(str(canonical)))
@@ -346,15 +389,19 @@ def write_design(
                         dst_dir_fd=directory,
                         follow_symlinks=False,
                     )
+                    published = True
                     os.unlink(temporary, dir_fd=directory)
                 else:
                     os.replace(
                         temporary, name, src_dir_fd=directory, dst_dir_fd=directory
                     )
+                published = True
                 os.fsync(directory)
                 revision, _ = _current(directory, name)
                 if revision.digest != hashlib.sha256(data).hexdigest():
-                    raise DesignWriteConflictError("Design modifié après publication.")
+                    raise DesignWriteError(
+                        "Design modifié après publication : sauvegarde incertaine."
+                    )
                 return DesignWriteResult(
                     design_path,
                     expected_revision is None,
@@ -370,6 +417,10 @@ def write_design(
     except DesignWriteError:
         raise
     except FileExistsError as error:
+        if published:
+            raise DesignWriteError(
+                "Sauvegarde incertaine après publication."
+            ) from error
         raise DesignWriteConflictError("Cible ou temporaire déjà présent.") from error
     except (OSError, SourceReadError) as error:
         raise DesignWriteError(

@@ -89,7 +89,12 @@ def test_round_trip_and_sentinels(
     assert reread.design == changed and reread.revision == updated.revision
     assert [snapshot(path) for path in sentinels] == before
     assert not list(views.glob(".forge-design-write-*"))
-    assert not (root / ".forge-design").exists()
+    metadata = root / ".forge-design"
+    assert {p.name for p in metadata.iterdir()} == {"locks"}
+    locks = list((metadata / "locks").iterdir())
+    assert len(locks) == 1 and locks[0].name.startswith("design-")
+    assert locks[0].suffix == ".lock" and locks[0].read_bytes() == b""
+    assert not (metadata / "history.jsonl").exists()
     with pytest.raises(FrozenInstanceError):
         result.created = False  # type: ignore[misc]
 

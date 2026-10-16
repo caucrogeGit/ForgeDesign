@@ -356,24 +356,11 @@ def wsgi_post(app: Any, port: int, fields: dict[str, str]) -> str:
 def test_in_process_concurrency_never_corrupts_the_design(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Vérifié, pas supposé : deux appels WSGI dans le même processus lisent la
-    même révision et franchissent ensemble la garde Web. write_design compare
-    puis publie sans verrou : le plus souvent l'un reçoit 409, parfois les deux
-    publient ou l'un reçoit 500 « Sauvegarde incertaine » (fenêtre préexistante,
-    hors périmètre). Invariant garanti : un
-    design valide portant une seule mutation, jamais un état mélangé."""
+    """Deux appels WSGI concurrents : une publication, un conflit métier."""
     root = make_root(tmp_path)
     with serving(root, tmp_path) as server:
         revision = displayed_revision(server)
         barrier = threading.Barrier(2, timeout=10)
-        original = web_editor.read_design
-
-        def synchronised(project: Path, path: str) -> Any:
-            result = original(project, path)
-            barrier.wait()  # les deux lectures sont faites avant toute écriture
-            return result
-
-        monkeypatch.setattr(web_editor, "read_design", synchronised)
         app = server.get_app()
         fields = {
             "design": DESIGN,
@@ -386,7 +373,7 @@ def test_in_process_concurrency_never_corrupts_the_design(
         threads = [
             threading.Thread(
                 target=lambda: results.append(
-                    wsgi_post(app, server.server_port, fields)
+                    (barrier.wait(), wsgi_post(app, server.server_port, fields))[1]
                 )
             )
             for _ in range(2)
@@ -396,9 +383,7 @@ def test_in_process_concurrency_never_corrupts_the_design(
         for thread in threads:
             thread.join(20)
     codes = sorted(code.split()[0] for code in results)
-    # 409 : conflit détecté ; 303 : double publication des mêmes octets ;
-    # 500 : « Sauvegarde incertaine » (write_design ne peut garantir l'état).
-    assert codes[0] == "303" and codes[1] in {"303", "409", "500"}, codes
+    assert codes == ["303", "409"], codes
     assert kinds(root) == ["section", "table", "section"]  # une seule mutation
 
 

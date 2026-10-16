@@ -65,7 +65,7 @@ trap 'server_stop TERM' EXIT
 # Écritures attendues et documentées, par projet ; tout le reste est inattendu.
 allowed() {
   case $1 in
-    B-write) echo ".forge-design .forge-design/history.jsonl mvc/circuit/demo.circuit.json \
+    B-write) echo ".forge-design .forge-design/locks .forge-design/locks/design-fd3f841edd23559ec492bfeac366d3e784d18a0cb70549aed8d6940740fceecd.lock .forge-design/history.jsonl mvc/circuit/demo.circuit.json \
 mvc/flowchart/simple.flow.json mvc/views/contacts/list.design.json \
 storage/logs/errors.dev.jsonl" ;;
     C-check) echo "CONTROLLER_IMPORTED" ;;

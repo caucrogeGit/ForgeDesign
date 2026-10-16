@@ -411,8 +411,9 @@ Deux modes de sauvegarde :
 
 Il n'existe aucune option force. Les autres échecs d'écriture sont transformés en
 DesignWriteError. Aucun dossier parent n'est créé ; aucun backup ou historique.
-Aucun template, contrat, fichier de configuration XDG ou autre fichier projet
-n'est modifié. Seuls la cible design et son temporaire interne sont manipulés.
+Aucun template, contrat ou fichier de configuration XDG n'est modifié.
+FD-EDITOR-008 ajoute uniquement les métadonnées de coordination décrites ci-dessous,
+en plus de la cible et de son temporaire interne.
 
 Le temporaire `.forge-design-write-<aléatoire>` est créé dans le dossier cible par
 O_CREAT|O_EXCL|O_NOFOLLOW, manipulé par dirfd et synchronisé avec fsync. Les écritures
@@ -434,13 +435,49 @@ Mode de création 0o666 soumis à l'umask ; update préserve les bits &0o777. AC
 xattrs, propriétaire particulier et liens physiques ne sont pas préservés : le
 remplacement crée un nouvel inode et laisse les autres hard links sur l'ancien.
 
-Il n'y a pas de verrou interprocessus ni de transaction filesystem complète. Une
-fenêtre de race résiduelle existe entre le dernier contrôle et replace : un autre
-processus peut alors modifier/remplacer la cible. Même limite entre contrôle et
-publication du nom temporaire face à un acteur pouvant écrire dans le même dossier.
-Les descripteurs empêchent le suivi des liens, mais un dossier ouvert peut être
-renommé ; il n'existe pas d'instantané global de l'arborescence. Ces limites ne
-permettent pas de promettre un compare-and-swap face à un adversaire concurrent.
+### Coordination des mutations — FD-EDITOR-008
+
+Le Web et l'API publique `write_design` participent au même verrou Linux `flock`.
+Le contexte interne couvre la lecture décisionnelle Web, la comparaison du jeton,
+l'action et la publication. L'API publique conserve sa signature et vérifie
+`expected_revision` sous le verrou, même si son client a lu avant acquisition.
+Chaque acquisition indépendante ouvre un descripteur ; seul le même contexte,
+thread et processus propriétaire peut le réutiliser pour appeler le writer.
+
+Le verrou porte sur `.forge-design/locks/design-<sha256-du-chemin-relatif>.lock`,
+jamais sur l'inode remplaçable du design. Les fichiers vides restent présents
+après libération. Ne pas les supprimer ni les remplacer pendant une utilisation.
+Les répertoires sont ouverts sans suivre les liens ; les propriétaires,
+permissions, fichiers réguliers, liens physiques et identités sont contrôlés.
+Le répertoire `locks` est privé (0700), les fichiers sont privés (0600),
+soumis à l'umask ; aucune permission préexistante n'est réparée silencieusement.
+
+La garantie concerne Linux, un seul hôte, ext4 et tmpfs, et les écrivains qui
+respectent ce protocole. Les montages sont identifiés par les descripteurs réels
+et `/proc/self/fdinfo` puis `/proc/self/mountinfo`, y compris les sous-montages.
+Un montage inconnu, réseau, non qualifié, des métadonnées non sûres ou des
+informations noyau indisponibles provoquent un refus explicite.
+Tmpfs reste volatil ; les fsync ne le rendent pas persistant après redémarrage.
+
+L'acquisition utilise des tentatives non bloquantes et une échéance monotone de
+cinq secondes. Son échec lève `DesignLockError`, sous-classe de `DesignWriteError`,
+sans action ni publication. Le Web répond 503, jamais un faux conflit 409.
+Une révision obsolète sous verrou reste `DesignWriteConflictError` / HTTP 409.
+Une erreur après publication reste `DesignWriteError` / HTTP 500, notamment si
+la relecture finale observe des octets différents : ne pas promettre un rollback.
+Les fsync et les modes de publication atomique précédents sont conservés.
+
+Les descripteurs sont fermés sur exception et à la mort du détenteur.
+Ils sont non héritables par exec ; un callback fork ferme dans l'enfant les
+copies héritées sans déverrouiller l'occupation du parent. Aucun processus enfant
+ne peut réutiliser le contexte de mutation du parent.
+
+Les verrous sont consultatifs. Un éditeur externe ne respectant pas le protocole,
+un remplacement hostile de répertoire ou une suppression externe des verrous
+ne sont pas rendus atomiques par ce mécanisme. Les contrôles I/O restent actifs,
+mais aucune transaction globale de l'arborescence ni garantie multi-hôtes n'est
+revendiquée. Voir le [rapport de qualification](../rapports/FD-EDITOR-008-RAPPORT.md).
+
 
 
 ## Visibilité déclarative — FD-BINDING-003

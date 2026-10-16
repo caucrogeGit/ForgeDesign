@@ -645,7 +645,12 @@ def test_no_template_or_history_written(app: WSGIServer, root: Path) -> None:
     action(app, action="append", parent="0", block_type="text")
     action(app, action="props", path="0", props='{"class": "x"}')
     assert (template.read_bytes(), template.stat().st_mtime_ns) == before
-    assert not (root / ".forge-design").exists()
+    metadata = root / ".forge-design"
+    assert {p.name for p in metadata.iterdir()} == {"locks"}
+    locks = list((metadata / "locks").iterdir())
+    assert len(locks) == 1 and locks[0].name.startswith("design-")
+    assert locks[0].suffix == ".lock" and locks[0].read_bytes() == b""
+    assert not (metadata / "history.jsonl").exists()
     assert sorted(p.name for p in template.parent.iterdir()) == [
         "list.design.json",
         "list.html",

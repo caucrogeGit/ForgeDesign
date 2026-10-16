@@ -21,10 +21,12 @@ from forge_design.contracts.models import ViewContract
 from forge_design.contracts.reader import read_view_contract
 from forge_design.current_project import CurrentProjectContext
 from forge_design.design.io import (
+    DesignLockError,
     DesignReadResult,
     DesignWriteConflictError,
     DesignWriteError,
     InvalidDesignForWriteError,
+    design_mutation,
     design_source,
     read_design,
     write_design,
@@ -673,12 +675,18 @@ def _save(
     assert context.root is not None
     try:
         write_design(context.root, design_path, design, expected_revision=read.revision)
+    except DesignLockError as error:
+        return _render(context, error=str(error), status=503)
     except DesignWriteConflictError:
+        try:
+            current = load_design(context, design_path)
+        except EditorHttpError:
+            current = None
         return _render(
             context,
             design_path=design_path,
-            read=read,
-            selected_path=selected,
+            read=current,
+            reload_url=editor_url(design_path, (), None, preview),
             error=(
                 "Le Design a été modifié depuis sa lecture. "
                 "Rechargez la page avant de recommencer."
@@ -713,6 +721,39 @@ def _save(
 
 
 def editor_action(request: Request, context: CurrentProjectContext) -> Response:
+    """Acquérir avant la lecture décisionnelle, conserver jusqu’à publication."""
+    try:
+        check_editor_post(request, context)
+        fields = editor_form_fields(request)
+        if not is_revision_token(fields.get("revision")):
+            raise EditorHttpError(
+                400, "Révision du design absente ou invalide : rechargez l’éditeur."
+            )
+        path = fields.get("design")
+        if path is None or design_source(path) is None:
+            raise EditorHttpError(400, "Chemin de Design refusé.")
+        # La sélection d'un autre projet ne doit pas changer la cible sous verrou.
+        snapshot = CurrentProjectContext()
+        assert context.inspection is not None
+        snapshot.set_project(context.inspection)
+        assert snapshot.root is not None
+        with design_mutation(snapshot.root, path):
+            return _editor_action_locked(request, snapshot)
+    except DesignLockError as error:
+        return _render(context, error=str(error), status=503)
+    except EditorHttpError as error:
+        return _render(context, error=error.message, status=error.status)
+    except SourceReadError:
+        return _render(context, error="Chemin de Design refusé.", status=400)
+    except _PROJECT_ERRORS:
+        return _render(context, error="Projet courant indisponible.", status=409)
+    except OSError:
+        return _render(
+            context, error="Sauvegarde incertaine : relisez le Design.", status=500
+        )
+
+
+def _editor_action_locked(request: Request, context: CurrentProjectContext) -> Response:
     design_path: str | None = None
     read: DesignReadResult | None = None
     preview: PreviewViewportMode = DEFAULT_PREVIEW_MODE

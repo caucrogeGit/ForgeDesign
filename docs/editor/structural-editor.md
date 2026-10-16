@@ -445,16 +445,20 @@ POST /editor/action    revision=T1 → read_design → jeton courant T2
 - **Double garde** : la garde Web protège l'intention de l'utilisateur (la vue
   affichée) ; la révision attendue de `write_design`, inchangée, protège la
   publication pendant la requête (« Le Design a été modifié depuis sa lecture »).
-- **Concurrence** : le serveur traite une requête à la fois ; deux POST portant
-  la même révision passent l'un après l'autre et le second reçoit 409. Dans un
-  même processus multi-thread (hors serveur), `write_design` compare puis
-  publie sans verrou : deux appels simultanés peuvent tous deux publier (mêmes
-  octets) ou l'un recevoir 500 « Sauvegarde incertaine », jamais un design
-  mélangé. Fenêtre préexistante, hors de ce ticket.
+- **Concurrence (FD-EDITOR-008)** : un verrou interprocessus commun au Web et à
+  `write_design` couvre la relecture, la comparaison, l'action et la publication.
+  Deux mutations concurrentes de même révision donnent une réussite et un 409,
+  y compris entre processus indépendants, dans l'environnement Linux local
+  ext4/tmpfs qualifié. Le 409 affiche le design courant à la racine.
+- **Indisponibilité** : délai de verrouillage de cinq secondes dépassé ou
+  garantie invérifiable, 503 sans action. Publication potentiellement effectuée
+  mais résultat incertain, 500 avec invitation à relire. Aucun retry automatique.
 
-C'est un contrôle optimiste : ni verrou, ni session d'édition, ni identifiant de
-bloc, ni rebase automatique ; aucun état serveur ; le format `.design.json`,
-`DesignFile` et `NodePath` sont inchangés.
+La révision reste optimiste ; le verrou sérialise les mutations participantes.
+Aucune session d'édition, identité de bloc ou fusion n'est ajoutée.
+Le format `.design.json`, `DesignFile` et `NodePath` sont inchangés.
+Les fichiers de coordination restent dans `.forge-design/locks/`.
+Les limites sont celles de la [coordination I/O](../design/design-json.md#coordination-des-mutations-fd-editor-008).
 
 ### Hors périmètre
 
