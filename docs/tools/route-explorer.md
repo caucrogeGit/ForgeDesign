@@ -3,7 +3,9 @@
 Route Explorer analyse statiquement les routes d’un projet Forge, sans exécuter
 le projet. Il relie les routes aux handlers, contrôleurs, méthodes et templates,
 puis examine leurs dépendances Jinja. Il expose diagnostics, graphe, cycles,
-sources, filtres et sélection locale dans le graphe.
+sources, filtres et sélection locale dans le graphe. Seule l’action explicite
+« Prévisualiser réellement » d’une route éligible exécute le projet, par la
+preview réelle (FD-REALPREVIEW-008, voir plus bas).
 
 ## Utilisation
 
@@ -115,6 +117,32 @@ liens contrats ↔ templates sont faits une fois, puis indexés par chemin : auc
 relecture par route. L’analyse des contrats vérifie la racine Forge une seule fois
 et la transmet à ses lecteurs (FD-PERF-001) ; chaque fichier de contrat reste
 ouvert de façon confinée.
+
+## Preview réelle depuis une route
+
+FD-REALPREVIEW-008 : Route Explorer est le second point d'entrée de la preview
+réelle, **sans Design ni contrat de vue**. Le contrat complet, avec les deux
+parcours, les protections et les raisons, est dans
+[Preview réelle — contrat](../preview/real-preview-contract.md#deux-parcours-daccès-fd-realpreview-008).
+
+- Chaque chaîne porte `data-real-preview="available|unavailable"`. Une route
+  éligible est marquée « prévisualisable » dans son résumé et offre, dans son
+  détail, l'avertissement d'exécution réelle et le bouton **Prévisualiser
+  réellement**. Une route non éligible n'a aucune action, seulement sa raison.
+- Une route est éligible si elle satisfait toutes ces conditions :
+  - GET, chemin statique, publique ;
+  - méthode de contrôleur vérifiée, handler non dynamique ;
+  - template **exact** et présent sur disque ;
+  - identité `GET <chemin>` non ambiguë.
+
+  Une route de chaîne « partielle » faute de présence vérifiée (borne de
+  templates) n'est pas éligible.
+- L'action est un `POST` explicite. Le serveur relit l'inventaire, retrouve la
+  route par égalité exacte et recalcule son éligibilité avant tout démarrage.
+  La page `/routes/real-preview?route=…` montre l'état, l'iframe et Stop.
+- **Ce n'est plus de la lecture seule** : démarrer exécute réellement
+  l'application du projet, comme depuis l'éditeur. Tout le reste de Route
+  Explorer reste statique : les GET ne démarrent jamais rien.
 
 ## Compatibilité et limites
 

@@ -457,6 +457,42 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     for (const message of metrics.preview_console) assert.match(message, /fonts\.googleapis\.com|Content Security Policy|Content-Security-Policy/, message);
   });
 
+  // ── 9 bis. Preview réelle depuis Route Explorer, sans Design (FD-REALPREVIEW-008)
+  await step("preview réelle A-route-preview : Route Explorer sans Design, démarrage, iframe, arrêt", async () => {
+    const errorsBefore = page.errors.length;
+    await openProject(P("A-route-preview"));
+    await go("/routes");
+    const chain = await page.eval(`(() => {
+      const li = [...document.querySelectorAll('li[id^="route-chain-"]')]
+        .find((item) => item.querySelector(".route-chain")?.textContent.startsWith("GET /contacts "));
+      if (!li) return null;
+      li.querySelector("details").open = true;
+      return { id: li.id, state: li.dataset.realPreview };
+    })()`);
+    assert.ok(chain, "chaîne GET /contacts");
+    assert.equal(chain.state, "available");
+    assert.match(await text(), /La preview réelle exécute le projet/);
+    await clickAt(`#${chain.id} form[action="/routes/real-preview/start"] button`, "Prévisualiser réellement");
+    assert.equal(await path(), "/routes/real-preview?route=%2Fcontacts");
+    assert.equal(await page.eval(`document.querySelector(".real-preview-state")?.dataset.state`), "running");
+    const frame = await page.eval(`document.querySelector("iframe.real-preview-frame")?.getAttribute("src")`);
+    assert.match(frame ?? "", /^http:\/\/127\.0\.0\.1:\d+\/contacts$/);
+    assert.notEqual(new URL(frame).port, new URL(base).port);
+    metrics.route_preview_frame = frame;
+    const served = await fetch(frame, { redirect: "manual" });
+    const body = await served.text();
+    assert.equal(served.status, 200, "GET de l'URL de l'iframe");
+    assert.match(served.headers.get("content-type") ?? "", /^text\/html/);
+    assert.match(body, /<html/i);
+    metrics.route_preview_frame_get = { status: served.status, bytes: body.length };
+    await clickAt('form[action="/routes/real-preview/stop"] button', "Arrêter la preview réelle");
+    assert.equal(await page.eval(`document.querySelector(".real-preview-state")?.dataset.state`), "stopped");
+    assert.equal(await page.eval(`document.querySelectorAll("iframe.real-preview-frame").length`), 0);
+    await assert.rejects(fetch(frame), "proxy fermé après l'arrêt");
+    metrics.route_preview_console = page.errors.splice(errorsBefore).map((e) => e.slice(0, 160));
+    for (const message of metrics.route_preview_console) assert.match(message, /fonts\.googleapis\.com|Content Security Policy|Content-Security-Policy/, message);
+  });
+
   // ── 10. Debug Center : journal ─────────────────────────────────────────────
   await step("Debug Center : journal absent, vide, valide, partiellement invalide, au plafond", async () => {
     const cases = [

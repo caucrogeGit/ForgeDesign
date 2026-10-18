@@ -26,6 +26,10 @@ from forge_design.forge.routes import (
 from forge_design.forge.template_cycles import TemplateCycle
 from forge_design.forge.templates import TemplatesResult
 from forge_design.platform.tool_registry import ToolRegistry
+from forge_design.real_preview.route_selection import (
+    RealPreviewRouteSelection,
+    route_preview_selection,
+)
 from forge_design.tools.route_diagnostics import build_route_diagnostics
 from forge_design.tools.route_filters import RouteFilter, filter_route_explorer
 from forge_design.tools.route_graph import build_route_graph
@@ -35,6 +39,7 @@ from forge_design.tools.route_linkage import (
     build_route_linkage,
 )
 from forge_design.web.graphics import scene_json_payload
+from forge_design.web.real_preview import REAL_PREVIEW_WARNING
 from forge_design.web.rendering import render_page
 from forge_design.web.route_filters import parse_route_filter
 from forge_design.web.route_graph_layout import layout_route_graph
@@ -71,7 +76,11 @@ def _contract_links(
 
 
 def show_routes(
-    request: Request, context: CurrentProjectContext, registry: ToolRegistry
+    request: Request,
+    context: CurrentProjectContext,
+    registry: ToolRegistry,
+    *,
+    real_preview_enabled: bool = False,
 ) -> Response:
     result = None
     error = None
@@ -100,6 +109,7 @@ def show_routes(
             raise TypeError("route-explorer doit retourner RoutesResult.")
     linkage: RouteLinkageReport | None = None
     chains: tuple[RouteLinkage, ...] = ()
+    previews: dict[int, RealPreviewRouteSelection] = {}
     if result is not None and context.root is not None:
         methods = tuple(dict.fromkeys(route.method for route in result.routes))
         total_routes = len(result.routes)
@@ -116,6 +126,13 @@ def show_routes(
                 result, diagnostics, links, contracts_reason=reason
             )
             chains = linkage.select(view.routes)
+            # Éligibilité sur l'inventaire complet : l'unicité de GET <chemin> ne
+            # dépend pas des filtres affichés (FD-REALPREVIEW-008).
+            full = result
+            previews = {
+                chain.index: route_preview_selection(chain.route, full)
+                for chain in chains
+            }
             diagnostics = view.diagnostics
             result = replace(result, routes=view.routes)
     elif error is None and filters.method is not None:
@@ -155,6 +172,9 @@ def show_routes(
             "graph_nodes": {node.id: node for node in graph.nodes} if graph else {},
             "linkage": linkage,
             "chains": chains,
+            "previews": previews,
+            "real_preview_enabled": real_preview_enabled,
+            "real_preview_warning": REAL_PREVIEW_WARNING,
             "template_url": template_url,
             "contract_url": contract_url,
         },

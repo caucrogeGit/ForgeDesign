@@ -45,6 +45,8 @@ from forge_design.web.real_preview import (
     RealPreviewPanel,
     RealPreviewRuntime,
     real_preview_action,
+    route_real_preview_action,
+    show_route_real_preview,
 )
 from forge_design.web.recent_projects import recent_action, show_home
 from forge_design.web.rendering import ShellModules, with_shell
@@ -215,7 +217,18 @@ def create_application(
         return refresh_project(request, registry, context, release=runtime.stop)
 
     def routes(request: Request) -> Response:
-        return show_routes(request, context, registry)
+        return show_routes(
+            request, context, registry, real_preview_enabled=runtime.enabled
+        )
+
+    def route_preview(request: Request) -> Response:
+        return show_route_real_preview(request, context, panel)
+
+    def route_preview_start(request: Request) -> Response:
+        return route_real_preview_action(request, context, panel, stop=False)
+
+    def route_preview_stop(request: Request) -> Response:
+        return route_real_preview_action(request, context, panel, stop=True)
 
     def entities(request: Request) -> Response:
         return show_entities(request, context, registry)
@@ -311,6 +324,25 @@ def create_application(
         no_store=True,
     )
     add("GET", "/routes", routes, public=True, no_store=True)
+    # Preview réelle depuis Route Explorer (FD-REALPREVIEW-008) : même runtime,
+    # page d'état en GET (ne démarre rien), mutations en POST seulement.
+    add("GET", "/routes/real-preview", route_preview, public=True, no_store=True)
+    add(
+        "POST",
+        "/routes/real-preview/start",
+        route_preview_start,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
+    add(
+        "POST",
+        "/routes/real-preview/stop",
+        route_preview_stop,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
     add("GET", "/entities", entities, public=True, no_store=True)
     add("GET", "/debug", debug, public=True, no_store=True)
     add("GET", "/debug/event", debug_detail, public=True, no_store=True)

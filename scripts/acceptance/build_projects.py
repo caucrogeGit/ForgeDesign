@@ -11,6 +11,8 @@ Projets :
   A          squelette Forge nominal (entité, route, contrôleur, template,
              contrat, design, migration, journal vide) : parcours lecture seule
   A-preview  copie de A réservée à la preview réelle (exécute le projet)
+  A-route-preview  copie de A sans Design ni contrat de vue : preview réelle
+             depuis Route Explorer seulement (FD-REALPREVIEW-008)
   A-bare     squelette nu : ni entité ni journal (états optionnels)
   A-no-bootstrap  copie statique de A sans bootstrap.py ni .venv : projet Forge
              valide pour forge-mvc 1.0.0rc9 (FD-FORGE-004), jamais exécuté
@@ -231,6 +233,16 @@ def project_a(root: Path, venv: Path) -> Path:
     add_contacts(root)
     (root / "storage/logs/errors.dev.jsonl").write_text("")
     copy_venv(venv, root)
+    return root
+
+
+def project_a_route_preview(root: Path, a: Path) -> Path:
+    """A sans aucun .design.json ni .view.json : preview réelle depuis Route Explorer
+    seulement (FD-REALPREVIEW-008), même route publique GET /contacts."""
+    shutil.copytree(a, root, symlinks=True)
+    for name in ("list.design.json", "list.view.json"):
+        (root / "mvc/views/contacts" / name).unlink()
+    assert not list(root.rglob("*.design.json")) and not list(root.rglob("*.view.json"))
     return root
 
 
@@ -503,6 +515,7 @@ def main() -> None:
     projects.mkdir(parents=True)
     a = project_a(projects / "A", venv)
     shutil.copytree(a, projects / "A-preview", symlinks=True)
+    project_a_route_preview(projects / "A-route-preview", a)
     from_skeleton(projects / "A-bare", venv)
     project_a_no_bootstrap(projects / "A-no-bootstrap", venv)
     b = project_b(projects / "B", venv)

@@ -21,7 +21,7 @@ dans le `PATH`, `ss`, `curl`. Variables : `CIRCUIT_REPO` et `FLOWCHART_REPO`
 | Fichier | Rôle |
 |---|---|
 | `run.sh` | Orchestrateur : roues, venv neuf, serveur réel isolé (HOME/XDG propres), étapes |
-| `build_projects.py` | Projets A, A-preview, A-bare, A-no-bootstrap, B, B-write, C, C-check, C-timeout, D, invalides |
+| `build_projects.py` | Projets A, A-preview, A-route-preview (sans Design ni contrat), A-bare, A-no-bootstrap, B, B-write, C, C-check, C-timeout, D, invalides |
 | `fixtures/` | gx8 (projet hostile, base de B), ressources Circuit et Flowchart ; exclu de ruff |
 | `probes.py` | Instantanés sha256, écarts, écoute, garde Host/Origin, processus, mémoire, mesures, roue |
 | `drivers.mjs` | Pilotes Chromium (CDP) et Firefox (BiDi) sans dépendance ; réseau et CSP relevés |

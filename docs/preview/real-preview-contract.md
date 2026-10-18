@@ -151,6 +151,52 @@ les modifier (`forge_design/web/real_preview.py`).
   `; frame-src 'self' <origine proxy>`. Les autres pages et l'éditeur sans
   proxy gardent la CSP Forge, et `X-Frame-Options: DENY` reste en place.
 
+### Deux parcours d'accès (FD-REALPREVIEW-008)
+
+La preview réelle n'exige pas intrinsèquement un Design. Le runner, le proxy,
+l'origine dédiée, la garde `Host`, les délais et le Stop ne dépendent que du
+projet. Le Design n'était qu'un moyen de **choisir la route** cible. Deux
+entrées utilisateur pilotent donc **le même** `RealPreviewRuntime` : un seul
+runner, un seul proxy, une seule origine par instance.
+
+| Parcours | Entrée | Route | Exige |
+|---|---|---|---|
+| **A. Éditeur** | `/editor?design=…`, `POST /editor/real-preview/start` (champ `design`) | Déduite du template du contrat (`select_real_preview_route`) | Un `.design.json` valide et son `.view.json` |
+| **B. Route Explorer** | Bouton « Prévisualiser réellement » d'une chaîne de `/routes`, `POST /routes/real-preview/start` (champ `route`) | Désignée par l'utilisateur, revalidée (`select_route_for_preview`) | Une route GET éligible ; ni Design ni contrat |
+
+Parcours B :
+
+- **Affichage** : chaque chaîne de Route Explorer porte
+  `data-real-preview="available|unavailable"`. Une route éligible affiche
+  l'avertissement d'exécution réelle et le bouton « Prévisualiser
+  réellement ». Une route non éligible n'a **aucune action**, seulement
+  « Preview réelle indisponible : <raison> ». Si le runtime est indisponible
+  (serveur arrêté), aucune action n'est proposée. L'éligibilité est calculée
+  sur l'inventaire complet, et non sur la vue filtrée.
+- **Start** : `POST /routes/real-preview/start`, mêmes protections que le
+  parcours A (origine locale exacte, `Sec-Fetch-Site`,
+  `application/x-www-form-urlencoded`, `no-store`, garde `Host`) et un seul
+  champ exact, `route`.
+  - **Forme** : le chemin doit être un chemin d'origine statique, borné en
+    longueur ; sinon 400.
+  - **Revalidation** : le serveur relit l'inventaire de Route Explorer. Seule
+    l'**égalité exacte** avec une route GET inventoriée compte (aucune
+    normalisation, aucune complétion), sinon 404. Il recalcule ensuite
+    l'éligibilité, sinon 409.
+  - Dans tous ces cas, aucun appel au runner. Une route modifiée entre
+    l'affichage et le POST est refusée proprement, jamais remplacée par une
+    autre.
+- **Page d'état** : `GET /routes/real-preview?route=<chemin>`, qui ne démarre
+  jamais rien. Elle affiche la route, l'état, l'erreur et les logs, puis
+  l'iframe (mêmes attributs que le parcours A) vers `<origine proxy><route>`,
+  seulement si la route est encore éligible. La CSP `frame-src 'self' <origine
+  proxy>` n'est posée que sur cette réponse, quand un proxy est actif.
+- **Stop** : `POST /routes/real-preview/stop` (champ `route`, pour le retour)
+  appelle le même `RealPreviewRuntime.stop()` que le parcours A. Il est
+  idempotent et ne dépend pas de l'éligibilité de la route. Le Stop de
+  l'éditeur reste distinct parce qu'il exige un Design pour sa redirection.
+  Les deux arrêtent la même preview.
+
 ## Validation navigateur
 
 FD-REALPREVIEW-005 a utilisé la preview réelle dans deux vrais navigateurs, en
@@ -666,9 +712,44 @@ Résultat représenté explicitement :
 | Résolution `dynamic`/`ambiguous`, lecture partielle | indisponible | raison de Route Explorer |
 
 Seule la méthode `GET` est utilisée pour afficher une vue. `POST`, `PUT`,
-`PATCH` et `DELETE` ne sont jamais ouverts automatiquement. Le chemin de
-route est recalculé côté serveur à chaque démarrage, jamais reçu du
-navigateur.
+`PATCH` et `DELETE` ne sont jamais ouverts automatiquement. Dans le parcours A,
+le chemin de route est recalculé côté serveur à chaque démarrage, jamais reçu
+du navigateur. Dans le parcours B, le navigateur n'envoie qu'un
+**identifiant**, le chemin d'une route affichée. Il ne vaut que s'il est égal
+à une route GET de l'inventaire relu, et il ne fournit jamais de template, de
+port ni d'URL.
+
+### Route désignée (parcours B, FD-REALPREVIEW-008)
+
+Quand l'utilisateur désigne une route, son URL est fixée. Les garanties portent
+sur **cette route** (`route_preview_refusal`) : ce sont celles que le parcours
+A exige de la route qu'il retient. S'y ajoute l'unicité de son identité.
+
+| Situation de la route désignée | Raison affichée |
+|---|---|
+| Méthode autre que GET | « Méthode POST : seule une route GET est prévisualisable. » |
+| Segment dynamique `{param}` | « Route dynamique : aucune valeur fictive n'est utilisée. » |
+| Handler absent : fonction, référence non résolue ou handler dynamique | « Handler non analysé […] » |
+| Méthode du contrôleur non vérifiée | « Méthode du contrôleur non vérifiée […] » |
+| Template `dynamic` / `ambiguous` / aucun rendu | « Template dynamique […] » / « Plusieurs templates possibles […] » / « Aucun template rendu détecté […] » |
+| Présence non vérifiée (analyse partielle, borne de templates) | « Présence du template non vérifiée (analyse partielle). » |
+| Template absent, chemin refusé ou illisible | « Le template rendu par la route est absent du projet. » |
+| Route non publique | « Route protégée par authentification. » |
+| Plusieurs déclarations `GET <chemin>` qui diffèrent (visibilité, handler ou template) | « Route GET déclarée plusieurs fois : identité ambiguë. » |
+| Chemin absent de l'inventaire GET | « Route GET absente de l'inventaire du projet. » |
+
+Des déclarations `GET <chemin>` identiques désignent la même route, comme dans
+le parcours A.
+
+Les deux clauses de désambiguïsation du parcours A ne s'appliquent pas : une
+**autre** route GET au template indéterminable, ou plusieurs routes rendant le
+même template. Elles répondent à la question « quelle route pour ce template
+? ». Quand la route est désignée, aucune route n'est choisie à la place d'une
+autre. Un test de propriété vérifie que toute route retenue par le parcours A
+est éligible au parcours B, avec une exception démontrée. Le parcours A ne
+détecte pas deux déclarations `GET <chemin>` **différentes** du même chemin,
+que le parcours B refuse : c'est un constat pour un ticket ultérieur, le
+parcours A restant inchangé.
 
 ## Backend et authentification
 

@@ -49,3 +49,18 @@ def test_cli_reports_the_same_version(capsys: pytest.CaptureFixture[str]) -> Non
     except SystemExit as exit:
         assert exit.code == 0
     assert capsys.readouterr().out == f"Forge Design {forge_design.__version__}\n"
+
+
+def test_web_package_data_lists_every_template_and_asset() -> None:
+    """La liste de package-data est explicite : un fichier non déclaré manque à
+    la roue sans qu'aucun test sur la source ne le voie (FD-REALPREVIEW-008)."""
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = set(config["tool"]["setuptools"]["package-data"]["forge_design.web"])
+    web = ROOT / "forge_design" / "web"
+    present = {
+        path.relative_to(web).as_posix()
+        for pattern in ("templates/*.html", "static/**/*.css", "static/**/*.js")
+        for path in web.glob(pattern)
+    }
+    assert sorted(present - declared) == []
+    assert sorted(declared - present) == []

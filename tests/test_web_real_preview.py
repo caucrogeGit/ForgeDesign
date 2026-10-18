@@ -1296,3 +1296,503 @@ def test_real_signal_stops_preview(
     assert wait_until_dead(processes_mentioning(str(root))) == []
     with pytest.raises(OSError):
         socket.create_connection(("127.0.0.1", proxy), timeout=1).close()
+
+
+# ── Entrée Route Explorer, sans Design (FD-REALPREVIEW-008) ──────────────────
+
+ROUTES_MIX = """from core.http.router import Router
+from mvc.controllers.contacts_controller import ContactsController
+
+router = Router()
+router.add("GET", "/contacts", ContactsController.index, public=True)
+router.add("POST", "/contacts/delete", ContactsController.index, public=True)
+router.add("GET", "/contacts/{id}", ContactsController.index, public=True)
+router.add("GET", "/prive", ContactsController.index, public=False)
+router.add("GET", "/dynamique", ContactsController.dynamic, public=True)
+"""
+CONTROLLER_MIX = """from core.mvc.controller import BaseController
+
+
+class ContactsController:
+    @staticmethod
+    def index(request):
+        return BaseController.render("contacts/list.html", {})
+
+    @staticmethod
+    def dynamic(request):
+        name = request.query("vue") or "contacts/list.html"
+        return BaseController.render(name, {})
+"""
+ROUTE_START = "/routes/real-preview/start"
+ROUTE_STOP = "/routes/real-preview/stop"
+CHAIN = re.compile(
+    r'<li id="route-chain-\d+"[^>]*data-real-preview="(\w+)">\s*'
+    r'<details><summary><span class="route-chain">(\S+) (\S+) →(.*?)</details></li>',
+    re.S,
+)
+
+
+def routes_project(
+    path: Path,
+    *,
+    routes: str = ROUTES.format(public=True),
+    controller: str = CONTROLLER.format(),
+) -> Path:
+    """Projet Forge sans aucun .design.json ni .view.json (cas de SéquenCiel)."""
+    from test_web_recent_projects import project
+
+    root = project(path)
+    (root / "mvc/routes/__init__.py").write_text(routes)
+    (root / "mvc/controllers").mkdir()
+    (root / "mvc/controllers/contacts_controller.py").write_text(controller)
+    (root / "mvc/views/contacts").mkdir(parents=True)
+    (root / "mvc/views/contacts/list.html").write_text("<p>liste</p>\n")
+    assert not list(root.rglob("*.design.json")) and not list(root.rglob("*.view.json"))
+    return root.resolve()
+
+
+@pytest.fixture
+def bare_root(tmp_path: Path) -> Path:
+    return routes_project(tmp_path / "bare")
+
+
+def mix_project(path: Path) -> Path:
+    """Routes éligible et non éligibles côte à côte, sans Design."""
+    return routes_project(path, routes=ROUTES_MIX, controller=CONTROLLER_MIX)
+
+
+def chains(html: str) -> dict[tuple[str, str], tuple[str, str]]:
+    """(méthode, chemin) → (état data-real-preview, fragment HTML de la chaîne)."""
+    return {
+        (method, path): (state, body)
+        for state, method, path, body in CHAIN.findall(html)
+    }
+
+
+def route_page(server: web.ForgeDesignServer, path: str = "/contacts") -> Reply:
+    return http(server, "GET", "/routes/real-preview?" + urlencode({"route": path}))
+
+
+def route_start(
+    server: web.ForgeDesignServer, path: str = "/contacts", **options: Any
+) -> Reply:
+    return http(server, "POST", ROUTE_START, [("route", path)], **options)
+
+
+def route_stop(
+    server: web.ForgeDesignServer, path: str = "/contacts", **options: Any
+) -> Reply:
+    return http(server, "POST", ROUTE_STOP, [("route", path)], **options)
+
+
+def test_routes_offers_preview_without_design(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    status, html, _ = http(server, "GET", "/routes")
+    assert status == 200
+    state, body = chains(html)[("GET", "/contacts")]
+    assert state == "available"
+    assert 'class="real-preview-badge">prévisualisable' in body
+    assert f'action="{ROUTE_START}"' in body
+    assert '<input type="hidden" name="route" value="/contacts">' in body
+    assert "Prévisualiser réellement" in body
+    assert REAL_PREVIEW_WARNING in unescape(body)
+    assert harness.starts == []
+
+
+def test_routes_unavailable_routes_show_reason_without_action(
+    harness: Harness, server: web.ForgeDesignServer, tmp_path: Path
+) -> None:
+    root = mix_project(tmp_path / "mix")
+    open_project(server, root)
+    found = chains(http(server, "GET", "/routes")[1])
+    expected = {
+        ("POST", "/contacts/delete"): "Méthode POST : seule une route GET",
+        ("GET", "/contacts/{id}"): "Route dynamique",
+        ("GET", "/prive"): "Route protégée par authentification.",
+        ("GET", "/dynamique"): "Template dynamique",
+    }
+    for key, reason in expected.items():
+        state, body = found[key]
+        assert state == "unavailable", key
+        assert f"Preview réelle indisponible : {reason}" in unescape(body), key
+        assert ROUTE_START not in body and "Prévisualiser réellement" not in body
+    # Une route GET incertaine ailleurs ne bloque pas la route désignée.
+    assert found[("GET", "/contacts")][0] == "available"
+    assert harness.starts == []
+
+
+def test_routes_with_closed_runtime_offers_no_action(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    harness.runtime.close()
+    state, body = chains(http(server, "GET", "/routes")[1])[("GET", "/contacts")]
+    assert state == "available"
+    assert "Preview réelle indisponible sur ce serveur." in unescape(body)
+    assert ROUTE_START not in body
+    reply = route_start(server)
+    assert reply[0] == 409 and "indisponible sur ce serveur" in unescape(reply[1])
+    assert harness.starts == []
+
+
+def test_route_start_running_iframe_and_csp(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    status, _, headers = route_start(server)
+    assert status == 303
+    assert headers["Location"] == "/routes/real-preview?" + urlencode(
+        {"route": "/contacts"}
+    )
+    # Le même runtime que l'éditeur : même runner, même proxy, même origine.
+    assert harness.starts == [("runner-start", bare_root)]
+    assert ("proxy-create", f"http://127.0.0.1:{server.server_port}") in harness.events
+    status, html, headers = route_page(server)
+    assert status == 200
+    frame = iframe(html)
+    assert frame is not None
+    assert f'src="http://127.0.0.1:{PROXY_PORT}/contacts"' in frame
+    assert 'sandbox="allow-scripts allow-same-origin"' in frame
+    assert 'referrerpolicy="no-referrer"' in frame
+    assert f'action="{ROUTE_STOP}"' in html
+    assert str(RUNNER_PORT) not in html
+    assert headers["Content-Security-Policy"] == (
+        build_csp_header() + f"; frame-src 'self' http://127.0.0.1:{PROXY_PORT}"
+    )
+    assert headers["X-Frame-Options"] == "DENY"
+    assert headers["Cache-Control"] == "no-store"
+    # Route Explorer et les autres pages gardent la CSP Forge.
+    assert http(server, "GET", "/routes")[2]["Content-Security-Policy"] == (
+        build_csp_header()
+    )
+
+
+def test_route_start_twice_same_project(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    route_start(server)
+    assert route_start(server)[0] == 303
+    assert len(harness.starts) == 1 and len(harness.proxies) == 1
+
+
+@pytest.mark.parametrize(
+    ("options", "status"),
+    [
+        ({"origin": None}, 403),
+        ({"origin": "http://evil.example"}, 403),
+        ({"origin": "http://127.0.0.1:1"}, 403),
+        ({"site": "cross-site"}, 403),
+        ({"content_type": "text/plain"}, 415),
+        ({"content_type": "multipart/form-data"}, 415),
+    ],
+)
+def test_route_actions_require_local_form(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    bare_root: Path,
+    options: dict[str, Any],
+    status: int,
+) -> None:
+    open_project(server, bare_root)
+    assert route_start(server, **options)[0] == status
+    assert route_stop(server, **options)[0] == status
+    assert "runner-start" not in harness.names()
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        [],
+        [("route", "/contacts"), ("route", "/contacts")],
+        [("route", "/contacts"), ("design", DESIGN)],
+        [("route", "/contacts"), ("port", "1234")],
+        [("route", "/contacts"), ("url", "http://127.0.0.1:1/contacts")],
+        [("route", "/contacts"), ("template", "mvc/views/contacts/list.html")],
+        [("route", "/contacts"), ("method", "GET")],
+        [("design", DESIGN)],
+        [("path", "/contacts")],
+    ],
+)
+def test_route_start_refuses_unexpected_fields(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    bare_root: Path,
+    fields: list[tuple[str, str]],
+) -> None:
+    open_project(server, bare_root)
+    assert http(server, "POST", ROUTE_START, fields)[0] == 400
+    assert http(server, "POST", ROUTE_STOP, fields)[0] == 400
+    assert harness.events == [] or "runner-start" not in harness.names()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "",
+        "contacts",
+        "//evil.example/contacts",
+        "/contacts?x=1",
+        "/contacts#f",
+        "/contacts/{id}",
+        "/a b",
+        "/é",
+        "/a\\b",
+        "mvc/views/contacts/list.html",
+        "../../etc/passwd",
+        "http://127.0.0.1:1/contacts",
+        "/" + "a" * 5000,
+    ],
+)
+def test_route_start_refuses_malformed_path(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path, path: str
+) -> None:
+    open_project(server, bare_root)
+    status, html, _ = route_start(server, path)
+    assert status == 400 and "Chemin de route refusé." in unescape(html)
+    assert harness.starts == []
+
+
+@pytest.mark.parametrize(
+    "path", ["/inconnue", "/etc/passwd", "/../etc/passwd", "/contacts/", "/Contacts"]
+)
+def test_route_start_refuses_unknown_route(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path, path: str
+) -> None:
+    open_project(server, bare_root)
+    status, html, _ = route_start(server, path)
+    assert status == 404
+    assert "Route GET absente de l'inventaire du projet." in unescape(html)
+    assert harness.starts == []
+
+
+@pytest.mark.parametrize(
+    ("path", "status", "reason"),
+    [
+        ("/contacts/delete", 404, "Route GET absente"),
+        ("/prive", 409, "Route protégée"),
+        ("/dynamique", 409, "Template dynamique"),
+    ],
+)
+def test_route_start_forged_for_ineligible_route(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    tmp_path: Path,
+    path: str,
+    status: int,
+    reason: str,
+) -> None:
+    root = mix_project(tmp_path / "mix")
+    open_project(server, root)
+    reply = route_start(server, path)
+    assert reply[0] == status
+    assert reason in unescape(reply[1])
+    assert harness.starts == []
+
+
+def _make_protected(root: Path) -> None:
+    (root / "mvc/routes/__init__.py").write_text(ROUTES.format(public=False))
+
+
+def _remove_template(root: Path) -> None:
+    (root / "mvc/views/contacts/list.html").unlink()
+
+
+def _rename_route(root: Path) -> None:
+    source = ROUTES.format(public=True).replace('"/contacts"', '"/contacts-v2"')
+    (root / "mvc/routes/__init__.py").write_text(source)
+
+
+def _make_dynamic(root: Path) -> None:
+    (root / "mvc/controllers/contacts_controller.py").write_text(
+        CONTROLLER_MIX.replace("def index", "def _index").replace(
+            "def dynamic", "def index"
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("change", "status", "reason"),
+    [
+        (_make_protected, 409, "Route protégée"),
+        (_remove_template, 409, "absent"),
+        (_rename_route, 404, "Route GET absente"),
+        (_make_dynamic, 409, "Template dynamique"),
+    ],
+)
+def test_route_start_revalidates_after_display(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    bare_root: Path,
+    change: Callable[[Path], None],
+    status: int,
+    reason: str,
+) -> None:
+    """Route affichée éligible, puis modifiée avant le POST : refus, aucun runner."""
+    open_project(server, bare_root)
+    assert chains(http(server, "GET", "/routes")[1])[("GET", "/contacts")][0] == (
+        "available"
+    )
+    change(bare_root)
+    reply = route_start(server)
+    assert reply[0] == status and reason in unescape(reply[1])
+    assert harness.starts == []
+
+
+def test_route_start_without_project(
+    harness: Harness, server: web.ForgeDesignServer
+) -> None:
+    assert route_start(server)[0] == 409
+    assert route_stop(server)[0] == 409
+    assert harness.events == []
+
+
+def test_route_stop_closes_proxy_then_runner(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    route_start(server)
+    harness.events.clear()
+    status, _, headers = route_stop(server)
+    assert status == 303
+    assert headers["Location"] == "/routes/real-preview?" + urlencode(
+        {"route": "/contacts"}
+    )
+    assert harness.names() == ["proxy-shutdown", "proxy-close", "runner-stop"]
+    _, html, headers = route_page(server)
+    assert iframe(html) is None
+    assert headers["Content-Security-Policy"] == build_csp_header()
+    assert f"127.0.0.1:{PROXY_PORT}" not in html
+    assert route_stop(server)[0] == 303
+
+
+def test_route_stop_does_not_need_eligible_route(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    route_start(server)
+    _remove_template(bare_root)
+    assert route_stop(server)[0] == 303
+    assert harness.names()[-1] == "runner-stop"
+
+
+def test_route_stop_failure_is_reported(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    route_start(server)
+    harness.controller.stop_ok = False
+    status, html, _ = route_stop(server)
+    assert status == 500
+    assert "Preview réelle impossible à arrêter." in unescape(html)
+
+
+def test_route_start_runner_failure_shows_logs(
+    harness: Harness, server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    harness.controller.start_state = "failed"
+    assert route_start(server)[0] == 303
+    _, html, _ = route_page(server)
+    assert 'data-state="failed"' in html
+    assert "RuntimeError: boom" in html and iframe(html) is None
+    assert "Démarrer à nouveau" in html
+
+
+@pytest.mark.parametrize(
+    ("query", "status"),
+    [
+        ("", 400),
+        ("?route=%2Fcontacts&route=%2Fcontacts", 400),
+        ("?route=%2Fcontacts&design=x", 400),
+        ("?route=contacts", 400),
+        ("?route=%2F%2Fevil", 400),
+        ("?route=%2Finconnue", 200),
+        ("?route=%2Fcontacts", 200),
+    ],
+)
+def test_route_page_never_starts(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    bare_root: Path,
+    query: str,
+    status: int,
+) -> None:
+    open_project(server, bare_root)
+    reply = http(server, "GET", "/routes/real-preview" + query)
+    assert reply[0] == status
+    assert reply[2]["Cache-Control"] == "no-store"
+    assert harness.starts == []
+
+
+def test_route_page_unknown_route_shows_reason(
+    server: web.ForgeDesignServer, bare_root: Path
+) -> None:
+    open_project(server, bare_root)
+    html = unescape(route_page(server, "/inconnue")[1])
+    assert "Preview réelle indisponible : Route GET absente" in html
+    assert ROUTE_START not in html
+
+
+def test_route_page_without_project(server: web.ForgeDesignServer) -> None:
+    assert route_page(server)[0] == 409
+
+
+def test_editor_and_route_entry_share_one_runtime(
+    harness: Harness, server: web.ForgeDesignServer, project_root: Path
+) -> None:
+    """Projet avec Design : les deux entrées pilotent le même runner."""
+    open_project(server, project_root)
+    assert route_start(server)[0] == 303
+    _, html, _ = editor(server)
+    assert iframe(html) is not None and 'action="/editor/real-preview/stop"' in html
+    assert start(server)[0] == 303
+    assert len(harness.starts) == 1
+    assert stop(server)[0] == 303
+    assert iframe(route_page(server)[1]) is None
+    assert harness.names().count("runner-start") == 1
+
+
+def test_real_route_entry_without_design(tmp_path: Path, no_survivors: None) -> None:
+    """Squelette rc9 réel, 0 Design, 0 contrat : GET / → home/index.html."""
+    root = make_forge_project(tmp_path / "a")
+    (root / "requirements.txt").write_text("forge-mvc==1.0.0rc9\n")
+    root = root.resolve()
+    assert not list(root.rglob("*.design.json")) and not list(root.rglob("*.view.json"))
+    before = tree_snapshot(root)
+    with serving() as server:
+        assert open_project(server, root)[0] == 200
+        state, body = chains(http(server, "GET", "/routes")[1])[("GET", "/")]
+        assert state == "available" and "Prévisualiser réellement" in body
+        assert route_start(server, "/")[0] == 303
+        _, html, headers = route_page(server, "/")
+        frame = iframe(html)
+        assert frame is not None
+        src = unescape(re.search(r'src="([^"]+)"', frame).group(1))  # type: ignore[union-attr]
+        origin = src.removesuffix("/")
+        assert re.fullmatch(r"http://127\.0\.0\.1:[0-9]+", origin)
+        assert src == origin + "/"
+        assert headers["Content-Security-Policy"].endswith(
+            f"; frame-src 'self' {origin}"
+        )
+        # Même runner qu'avant : -I -B -u, bootstrap de la roue, nouvelle session.
+        (pid,) = processes_mentioning(str(root))
+        argv = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+        assert argv[1:4] == [b"-I", b"-B", b"-u"]
+        assert argv[4].endswith(b"forge_design/real_preview/child_bootstrap.py")
+        assert os.getsid(pid) == pid and os.getpgid(pid) == pid
+        assert Path(os.readlink(f"/proc/{pid}/cwd")) == root
+        (runner_port,) = runner_ports(str(root))
+        assert f":{runner_port}" not in html
+        code, content_type, response = proxy_get(src)
+        assert code == 200 and content_type.startswith("text/html")
+        assert b"<html" in response.lower()
+        assert route_stop(server, "/")[0] == 303
+        with pytest.raises(OSError):
+            proxy_get(src)
+        assert processes_mentioning(str(root)) == []
+        assert iframe(route_page(server, "/")[1]) is None
+    # Aucun bytecode ni autre écriture dans le projet (ACC-003).
+    assert tree_changes(before, tree_snapshot(root)) == []

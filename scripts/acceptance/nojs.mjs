@@ -72,9 +72,10 @@ const go = (path) => send("browsingContext.navigate", { context, url: `${base}${
 const loaded = async (before) => {
   for (let i = 0; i < 400 && !events.slice(before).some((e) => e.method === "browsingContext.load"); i += 1) await sleep(50);
 };
-// Vrai clic sur un élément, attente du chargement suivant.
-const click = async (css) => {
-  const [node] = await locate(css);
+// Vrai clic sur un élément, attente du chargement suivant (sauf wait: false, par
+// exemple pour ouvrir un <details>, natif sans script).
+const click = async (css, { type = "css", wait = true } = {}) => {
+  const [node] = await locate(css, type);
   assert.ok(node, `élément absent : ${css}`);
   const before = events.length;
   const reply = await send("input.performActions", {
@@ -86,7 +87,7 @@ const click = async (css) => {
     ] }],
   });
   assert.ok(!reply.error, JSON.stringify(reply).slice(0, 300));
-  await loaded(before);
+  if (wait) await loaded(before);
 };
 // Vraie saisie dans un champ : clic, effacement, frappe, Entrée.
 const fill = async (css, value, submit = true) => {
@@ -272,6 +273,23 @@ await step("sans JS : éditeur, vue périmée refusée par formulaire natif, auc
   assert.ok(await hasText("Le design a été modifié depuis l’affichage de cette page."));
   assert.ok(await hasText("Recharger l’éditeur"));
   assert.ok(Buffer.compare(readFileSync(file), s1) === 0, "design identique à S1");
+});
+
+// FD-REALPREVIEW-008 : la preview réelle depuis Route Explorer est un formulaire
+// HTML natif ; sans script, le cadre est rendu et l'arrêt reste un POST natif.
+await step("sans JS : preview réelle depuis Route Explorer sans Design, POST natif, arrêt", async () => {
+  await open(P("A-route-preview"));
+  await go("/routes");
+  const chain = "//li[starts-with(@id, 'route-chain-')][.//span[@class='route-chain' and starts-with(., 'GET /contacts ')]]";
+  assert.equal((await locate(`${chain}[@data-real-preview='available']`, "xpath")).length, 1);
+  await click(`${chain}/details/summary`, { type: "xpath", wait: false });
+  await click(`${chain}//form[@action='/routes/real-preview/start']/button`, { type: "xpath" });
+  assert.equal(await count('.real-preview-state[data-state="running"]'), 1);
+  assert.equal(await count('iframe.real-preview-frame[src$="/contacts"]'), 1);
+  await noLeak("/routes/real-preview");
+  await click('form[action="/routes/real-preview/stop"] button');
+  assert.equal(await count('.real-preview-state[data-state="stopped"]'), 1);
+  assert.equal(await count("iframe.real-preview-frame"), 0);
 });
 
 await step("sans JS : aucune requête hors 127.0.0.1", async () => {

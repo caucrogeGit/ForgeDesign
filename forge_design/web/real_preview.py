@@ -7,7 +7,15 @@ de l'éditeur (connue après le bind de Forge Design) et le thread du proxy.
 
 Seuls les POST Start/Stop, à origine locale exacte, agissent. La route est
 recalculée côté serveur depuis Route Explorer ; le navigateur ne fournit ni
-route, ni port, ni URL. Aucune lecture d'état ne démarre la preview.
+port, ni URL. Aucune lecture d'état ne démarre la preview.
+
+Deux entrées utilisateur, un seul runtime (FD-REALPREVIEW-008) :
+
+- l'éditeur : Design → contrat de vue → route déduite du template ;
+- Route Explorer : route désignée par son chemin, sans Design ni contrat. Le
+  chemin reçu n'est qu'un identifiant : il doit être égal à une route GET de
+  l'inventaire relu à chaque requête, puis satisfaire les mêmes garanties de
+  route (route_preview_refusal) ; sinon aucun démarrage.
 """
 
 import threading
@@ -15,6 +23,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import urlencode
 
 from core.http.request import Request
 from core.http.response import Response
@@ -42,15 +51,18 @@ from forge_design.real_preview import (
 )
 from forge_design.real_preview.proxy import validate_frame_ancestor_origin
 from forge_design.real_preview.route_selection import (
+    REASON_UNKNOWN_ROUTE,
     RealPreviewRouteSelection,
     is_static_route_path,
     select_real_preview_route,
+    select_route_for_preview,
 )
 from forge_design.web.editor import (
     ContractState,
     EditorHttpError,
     check_editor_post,
     editor_form_fields,
+    editor_frame_policy,
     editor_url,
     load_contract,
     load_design,
@@ -58,6 +70,7 @@ from forge_design.web.editor import (
     parse_preview_mode,
     render_editor_error,
 )
+from forge_design.web.rendering import render_page
 
 REAL_PREVIEW_WARNING = (
     "La preview réelle exécute le projet Forge sélectionné et peut déclencher "
@@ -74,6 +87,8 @@ _PROXY_POLL_INTERVAL = 0.1
 _PROXY_JOIN_TIMEOUT = 5.0
 _REQUIRED_FIELDS = frozenset({"design"})
 _OPTIONAL_FIELDS = frozenset({"node", "preview"})
+_ROUTE_FIELDS = frozenset({"route"})
+ROUTE_PREVIEW_PAGE = "/routes/real-preview"
 _ROUTE_ERRORS = (
     ProjectRootNotFoundError,
     ProjectRootNotDirectoryError,
@@ -292,6 +307,30 @@ def route_selection(
     return select_real_preview_route(contract.contract.template, result)
 
 
+def route_entry_selection(
+    context: CurrentProjectContext, registry: ToolRegistry, path: str
+) -> RealPreviewRouteSelection:
+    """Route désignée revalidée côté serveur : inventaire relu à chaque appel."""
+    if context.root is None:
+        return RealPreviewRouteSelection(False, None, "Aucun projet ouvert.")
+    try:
+        result = registry.get("route-explorer").run(context.root)
+    except _ROUTE_ERRORS:
+        return RealPreviewRouteSelection(False, None, "Routes du projet illisibles.")
+    if not isinstance(result, RoutesResult):
+        raise TypeError("route-explorer doit retourner RoutesResult.")
+    return select_route_for_preview(path, result)
+
+
+def valid_route_field(path: str) -> bool:
+    """Forme seulement : l'inventaire décide ensuite si la route existe."""
+    return len(path) <= MAX_SOURCE_PATH_LENGTH and is_static_route_path(path)
+
+
+def route_preview_url(path: str) -> str:
+    return f"{ROUTE_PREVIEW_PAGE}?{urlencode({'route': path})}"
+
+
 @dataclass(frozen=True)
 class RealPreviewWebState:
     """Données primitives du panneau ; aucun contrôleur, proxy ni thread."""
@@ -319,7 +358,22 @@ class RealPreviewPanel:
     def view(
         self, context: CurrentProjectContext, contract: ContractState
     ) -> RealPreviewWebState:
-        selection = route_selection(context, self.registry, contract)
+        """Éditeur : route déduite du contrat du Design."""
+        return self._web_state(
+            context, route_selection(context, self.registry, contract)
+        )
+
+    def view_route(
+        self, context: CurrentProjectContext, path: str
+    ) -> RealPreviewWebState:
+        """Route Explorer : route désignée, revalidée à chaque affichage."""
+        return self._web_state(
+            context, route_entry_selection(context, self.registry, path)
+        )
+
+    def _web_state(
+        self, context: CurrentProjectContext, selection: RealPreviewRouteSelection
+    ) -> RealPreviewWebState:
         status = self.runtime.status()
         # Le runtime représente l'application courante, pas un Design.
         same = status.project_root is not None and status.project_root == context.root
@@ -406,3 +460,97 @@ def real_preview_action(
         return render_editor_error(context, design_path, error.message, error.status)
     notice = "real-started" if status.state == "running" else "real-failed"
     return _redirect(editor_url(design_path, node, notice, preview))
+
+
+def render_route_preview(
+    context: CurrentProjectContext,
+    panel: RealPreviewPanel,
+    path: str | None,
+    *,
+    error: str | None = None,
+    status: int = 200,
+) -> Response:
+    """Page de preview d'une route ; frame-src élargi au seul proxy actif."""
+    view = (
+        panel.view_route(context, path)
+        if path is not None and context.root is not None
+        else None
+    )
+    response = render_page(
+        "route_real_preview.html",
+        {
+            "active_page": "routes",
+            "current_project": context.inspection,
+            "route_path": path,
+            "rp": view,
+            "error": error,
+        },
+        status=status,
+    )
+    if view is not None and view.proxy_origin is not None:
+        response.headers["Content-Security-Policy"] = editor_frame_policy(
+            view.proxy_origin
+        )
+    return response
+
+
+def show_route_real_preview(
+    request: Request, context: CurrentProjectContext, panel: RealPreviewPanel
+) -> Response:
+    """GET : état et cadre de la preview d'une route ; ne démarre jamais rien."""
+    params = request.params
+    if set(params) != {"route"} or len(params["route"]) != 1:
+        return render_route_preview(
+            context, panel, None, error="Paramètres invalides.", status=400
+        )
+    path = params["route"][0]
+    if not valid_route_field(path):
+        return render_route_preview(
+            context, panel, None, error="Chemin de route refusé.", status=400
+        )
+    if context.root is None:
+        return render_route_preview(
+            context, panel, path, error="Aucun projet ouvert.", status=409
+        )
+    return render_route_preview(context, panel, path)
+
+
+def route_real_preview_action(
+    request: Request,
+    context: CurrentProjectContext,
+    panel: RealPreviewPanel,
+    *,
+    stop: bool,
+) -> Response:
+    """POST Start/Stop depuis Route Explorer : un seul champ, route."""
+    path: str | None = None
+    runtime = panel.runtime
+    try:
+        check_editor_post(request, context)
+        fields = editor_form_fields(request)
+        if frozenset(fields) != _ROUTE_FIELDS:
+            raise EditorHttpError(400, "Champs de formulaire inattendus.")
+        if not valid_route_field(fields["route"]):
+            raise EditorHttpError(400, "Chemin de route refusé.")
+        path = fields["route"]
+        if stop:
+            # La route ne sert qu'au retour : l'arrêt ne dépend pas de l'inventaire.
+            if not runtime.stop():
+                raise EditorHttpError(500, "Preview réelle impossible à arrêter.")
+            return _redirect(route_preview_url(path))
+        selection = route_entry_selection(context, panel.registry, path)
+        if not selection.available:
+            code = 404 if selection.reason == REASON_UNKNOWN_ROUTE else 409
+            raise EditorHttpError(
+                code, f"Preview réelle indisponible : {selection.reason}"
+            )
+        assert context.root is not None
+        try:
+            runtime.start(context.root)
+        except RealPreviewError as error:
+            raise EditorHttpError(409, str(error)) from None
+    except EditorHttpError as error:
+        return render_route_preview(
+            context, panel, path, error=error.message, status=error.status
+        )
+    return _redirect(route_preview_url(path))
