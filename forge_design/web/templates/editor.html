@@ -25,7 +25,7 @@
 {% if rows %}
 {% set contract = contract_state.contract %}
 <p>Les modifications validées sont enregistrées immédiatement dans le fichier Design. Aucun template HTML n'est généré ni écrit.</p>
-<div class="editor-layout">
+<div class="editor-studio">
 <section class="editor-tree" aria-labelledby="tree-title">
 <h2 id="tree-title">Arbre</h2>
 {% if truncated %}<p>Arbre tronqué par les limites d'affichage.</p>{% endif %}
@@ -39,6 +39,28 @@
 {% if row.opens %}<ul class="editor-nodes">{% else %}</li>{% for level in range(row.close_levels) %}</ul></li>{% endfor %}{% endif %}
 {% endfor %}
 </ul>
+{% if selected and editable %}<div class="editor-add">
+<form action="/editor/action" method="post">
+  <input type="hidden" name="action" value="append">
+  <input type="hidden" name="design" value="{{ design_path }}">
+  <input type="hidden" name="revision" value="{{ revision }}">
+  <input type="hidden" name="preview" value="{{ preview_mode }}">
+  <input type="hidden" name="parent" value="{{ selected.path_value }}">
+  <label for="block-type">Ajouter un enfant</label>
+  {% if child_types %}<select id="block-type" name="block_type">{% for kind in child_types %}<option value="{{ kind }}">{{ kind }}</option>{% endfor %}</select>
+  <button type="submit">Ajouter</button>{% else %}<p>Ce bloc n'accepte aucun enfant.</p>{% endif %}
+</form>
+</div>{% endif %}
+</section>
+<section class="editor-preview" aria-labelledby="preview-title">
+<h2 id="preview-title">Prévisualisation indicative</h2>
+<p>Aperçu structurel avec données fictives : les classes Tailwind sont conservées mais non compilées, ce n'est pas le rendu final.</p>
+<nav class="preview-modes" aria-label="Largeur de l'aperçu">
+{% for mode, label in preview_modes %}<a href="{{ editor_url(design_path, selected.path if selected else (), preview=mode) }}"{% if mode == preview_mode %} aria-current="true"{% endif %}>{{ label }}</a>
+{% endfor %}</nav>
+<div class="preview-viewport">
+<iframe class="preview-frame preview-frame--{{ preview_mode }}" src="{{ preview_frame_url(design_path, preview_mode) }}" title="Prévisualisation du Design" sandbox></iframe>
+</div>
 </section>
 {% if selected %}
 <section class="editor-panel" aria-labelledby="panel-title">
@@ -52,16 +74,6 @@
 <p>Contrat : {{ contract_state.path }}{% if not contract %} — indisponible : {{ contract_state.messages | join(" ") }} Binding, condition et colonnes sont désactivés.{% endif %}</p>
 {% if editable %}
 
-<form action="/editor/action" method="post">
-  <input type="hidden" name="action" value="append">
-  <input type="hidden" name="design" value="{{ design_path }}">
-  <input type="hidden" name="revision" value="{{ revision }}">
-  <input type="hidden" name="preview" value="{{ preview_mode }}">
-  <input type="hidden" name="parent" value="{{ selected.path_value }}">
-  <label for="block-type">Ajouter un enfant</label>
-  {% if child_types %}<select id="block-type" name="block_type">{% for kind in child_types %}<option value="{{ kind }}">{{ kind }}</option>{% endfor %}</select>
-  <button type="submit">Ajouter</button>{% else %}<p>Ce bloc n'accepte aucun enfant.</p>{% endif %}
-</form>
 
 {% if selected.path %}
 <form action="/editor/action" method="post">
@@ -202,16 +214,6 @@
 </section>
 {% endif %}
 </div>
-<section class="editor-preview" aria-labelledby="preview-title">
-<h2 id="preview-title">Prévisualisation indicative</h2>
-<p>Aperçu structurel avec données fictives : les classes Tailwind sont conservées mais non compilées, ce n'est pas le rendu final.</p>
-<nav class="preview-modes" aria-label="Largeur de l'aperçu">
-{% for mode, label in preview_modes %}<a href="{{ editor_url(design_path, selected.path if selected else (), preview=mode) }}"{% if mode == preview_mode %} aria-current="true"{% endif %}>{{ label }}</a>
-{% endfor %}</nav>
-<div class="preview-viewport">
-<iframe class="preview-frame preview-frame--{{ preview_mode }}" src="{{ preview_frame_url(design_path, preview_mode) }}" title="Prévisualisation du Design" sandbox></iframe>
-</div>
-</section>
 {% if real_preview %}{% set rp = real_preview %}
 <section class="real-preview" aria-labelledby="real-preview-title">
 <h2 id="real-preview-title">Preview réelle</h2>

@@ -340,15 +340,38 @@ li[data-method="DELETE"] .route-method { color: var(--err); background: var(--er
 .template-tree li { overflow-wrap: anywhere; }
 
 /* Éditeur de Design : arbre indenté et panneau, sans JavaScript. */
-.editor-layout { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(20rem, 2fr); gap: 2rem; align-items: start; }
-@media (max-width: 50rem) { .editor-layout { grid-template-columns: 1fr; } }
+/* Studio (FD-UX-004) : arbre et ajout à gauche, aperçu au centre, bloc
+   sélectionné à droite ; les colonnes latérales restent visibles au défilement. */
+.editor-studio { display: grid; grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr) minmax(17rem, 22rem); gap: .9rem; align-items: start; margin-top: .75rem; }
+.editor-studio > section { margin: 0; }
+main:has(> .editor-studio) > h2:not([id]) { margin: 0; font-family: var(--font-mono); font-size: .85rem; font-weight: 500; color: var(--ink-2); }
+main:has(> .editor-studio) > h2:not([id]) + p { margin: .1rem 0 0; color: var(--muted); font-size: .8rem; }
+.editor-tree, .editor-panel { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; }
+.editor-studio h2 { margin: 0 0 .6rem; font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.editor-panel > h2 { color: var(--ink); font-size: .95rem; letter-spacing: 0; text-transform: none; }
+.editor-add { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--border); }
+.editor-add form { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem; align-items: center; }
+.editor-add label { grid-column: 1 / -1; margin: 0; }
+.editor-add select { width: 100%; min-height: 2.25rem; padding: .35rem .5rem; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); }
+.editor-studio > .editor-preview { background: #e9ebef; border-color: transparent; }
+@media (max-width: 75rem) { .editor-studio { grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); } .editor-panel { grid-column: 1 / -1; position: static; max-height: none; } }
+@media (max-width: 50rem) { .editor-studio { grid-template-columns: 1fr; } .editor-tree { position: static; max-height: none; } }
 .editor-nodes { list-style: none; padding-left: 0; }
-.editor-nodes .editor-nodes { padding-left: 1.25rem; border-left: 1px solid var(--border); }
-.editor-node { margin-block: .3rem; }
-.editor-meta { color: var(--muted); font-size: .9rem; }
-.editor-panel form { margin-top: 1.25rem; }
-.editor-panel select, .editor-panel textarea { width: 100%; padding: .6rem; border: 1px solid var(--border-strong); border-radius: .3rem; font: inherit; background: white; }
-.editor-panel textarea { font-family: monospace; }
+.editor-nodes .editor-nodes { margin-left: .4rem; padding-left: .8rem; border-left: 1px solid var(--border); }
+.editor-node { margin-block: .15rem; font-family: var(--font-mono); font-size: .8rem; }
+.editor-node > a, .editor-node > strong { display: inline-block; padding: .1rem .4rem; border-radius: var(--radius-s); text-decoration: none; }
+.editor-node > a { color: var(--ink); }
+.editor-node > a:hover { background: var(--surface-2); }
+.editor-node > strong { color: var(--accent-hover); background: var(--accent-soft); }
+.editor-meta { color: var(--muted); font-family: var(--font-sans); font-size: .75rem; }
+.editor-panel form { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--border); }
+.editor-panel dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .15rem .75rem; margin: 0 0 .5rem; font-size: .8rem; }
+.editor-panel dl dt, .editor-panel dl dd { margin: 0; }
+.editor-panel > p { font-size: .8rem; color: var(--muted); }
+.editor-panel label { color: var(--ink-2); }
+.editor-panel form button { margin-top: .4rem; }
+.editor-panel select, .editor-panel textarea { width: 100%; padding: .4rem .55rem; border: 1px solid var(--border-strong); border-radius: var(--radius); font: inherit; background: var(--surface); }
+.editor-panel textarea { font-family: var(--font-mono); font-size: .8rem; }
 .editor-panel select:focus-visible, .editor-panel textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .class-tokens { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
 .class-token { display: flex; align-items: center; gap: .4rem; margin: 0; padding: .2rem .2rem .2rem .6rem; border: 1px solid var(--border-strong); border-radius: 1rem; }
@@ -359,10 +382,13 @@ li[data-method="DELETE"] .route-method { color: var(--err); background: var(--er
 .tailwind-suggestions button { min-height: 0; margin: 0 .3rem .3rem 0; padding: .25rem .7rem; border-style: dashed; border-radius: 999px; font-family: var(--font-mono); font-size: .8rem; }
 .tailwind-suggestions button:disabled { opacity: .45; cursor: default; }
 /* Prévisualisation encadrée : largeurs indicatives (preview/responsive.py), sans style inline. */
-.editor-preview { margin-top: 2.5rem; }
-.preview-modes { display: flex; gap: 1rem; margin: 1rem 0; }
-.preview-modes a[aria-current="true"] { font-weight: 700; text-decoration: underline; text-decoration-thickness: .15em; }
-.preview-viewport { overflow: auto; border: 1px solid var(--border); background: #eef1f0; padding: 1rem 0; }
+.editor-preview { margin-top: 1.25rem; }
+.editor-preview > p { font-size: .8rem; color: var(--muted); }
+.preview-modes { display: inline-flex; gap: 0; margin: .25rem 0 .75rem; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.preview-modes a { padding: .3rem .8rem; color: var(--ink); text-decoration: none; }
+.preview-modes a + a { border-left: 1px solid var(--border-strong); }
+.preview-modes a[aria-current="true"] { color: #fff; background: var(--ink); font-weight: 500; text-decoration: none; }
+.preview-viewport { overflow: auto; border-radius: var(--radius); background: transparent; padding: 0; }
 .preview-frame { display: block; margin: 0 auto; max-width: 100%; height: 40rem; border: 1px solid var(--border-strong); background: white; }
 .preview-frame--desktop { width: 1440px; }
 .preview-frame--tablet { width: 768px; }

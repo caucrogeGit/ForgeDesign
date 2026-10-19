@@ -310,6 +310,24 @@ Navigateur ─► Web Editor ─► read_design / read_view_contract
                           .design.json   (aucun .html écrit)
 ```
 
+### Studio — FD-UX-004
+
+La page est disposée en studio de trois colonnes, avec les mêmes formulaires,
+les mêmes champs et les mêmes actions :
+
+- **à gauche**, l'arbre du Design, où le bloc sélectionné est mis en évidence,
+  et le formulaire « Ajouter un enfant », qui ne propose que les types admis
+  sous ce bloc ;
+- **au centre**, la prévisualisation indicative et ses largeurs (Desktop,
+  Tablette, Mobile) ;
+- **à droite**, le bloc sélectionné : chemin, binding, condition, props,
+  contrat, puis les formulaires de déplacement, de suppression, de binding, de
+  condition, de props, de classes Tailwind et de colonnes.
+
+Les colonnes latérales restent visibles au défilement. Sous 75 rem de large, le
+panneau passe sous l'arbre et l'aperçu ; sous 50 rem, tout s'empile. La preview
+réelle reste sous le studio.
+
 ### Routes
 
 | Route | Rôle |
