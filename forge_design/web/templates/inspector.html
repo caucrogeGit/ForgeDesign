@@ -17,18 +17,45 @@
       {% for section in health.sections %}
       <section class="health-section" aria-labelledby="health-{{ section.key }}" data-health-section="{{ section.key }}" data-status="{{ section.status }}">
         <h3 id="health-{{ section.key }}">{{ section.title }} — {{ health_status(section.status) }}</h3>
-        <p>{{ section.summary }}</p>
+        <p class="health-headline">{{ section.summary }}</p>
         {% if section.facts %}
         <dl>{% for label, value in section.facts %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
         {% endif %}
         {% if section.diagnostic_total %}
-        <p>{{ section.diagnostic_total }} diagnostic{% if section.diagnostic_total > 1 %}s{% endif %}{% if section.diagnostic_total > section.diagnostics | length %} ; {{ section.diagnostics | length }} premiers affichés{% endif %}.</p>
-        <ul class="health-diagnostics">{% for item in section.diagnostics %}<li data-severity="{{ item.severity }}">{{ severity_labels[item.severity] }} : {{ item.message }}{% if item.subject %} <code>{{ item.subject }}</code>{% endif %}</li>{% endfor %}</ul>
+        <details class="health-details">
+          <summary>{{ section.diagnostic_total }} diagnostic{% if section.diagnostic_total > 1 %}s{% endif %}</summary>
+          <p>{{ section.diagnostic_total }} diagnostic{% if section.diagnostic_total > 1 %}s{% endif %}{% if section.diagnostic_total > section.diagnostics | length %} ; {{ section.diagnostics | length }} premiers affichés{% endif %}.</p>
+          <ul class="health-diagnostics">{% for item in section.diagnostics %}<li data-severity="{{ item.severity }}">{{ severity_labels[item.severity] }} : {{ item.message }}{% if item.subject %} <code>{{ item.subject }}</code>{% endif %}</li>{% endfor %}</ul>
+        </details>
         {% endif %}
-        {% if section.action %}<p><a href="{{ section.action.url }}">{{ section.action.label }}</a></p>{% endif %}
+        {% if section.action %}<p class="health-action"><a href="{{ section.action.url }}">{{ section.action.label }}</a></p>{% endif %}
       </section>
       {% endfor %}
     </section>
+    {#- Priorités : diagnostics visibles des sections, erreurs puis avertissements. #}
+    {% set found = namespace(errors=[], warnings=[]) %}
+    {% for section in health.sections %}{% for item in section.diagnostics %}{% if item.severity == "error" %}{% set found.errors = found.errors + [(section, item)] %}{% elif item.severity == "warning" %}{% set found.warnings = found.warnings + [(section, item)] %}{% endif %}{% endfor %}{% endfor %}
+    {% set priorities = found.errors + found.warnings %}
+    <div class="inspector-panels">
+      <section class="inspector-priorities" aria-labelledby="priorities-title">
+        <h2 id="priorities-title">À traiter en priorité</h2>
+        {% if priorities %}
+        <ul class="priority-list">{% for section, item in priorities[:6] %}
+          <li data-severity="{{ item.severity }}"><span class="priority-dot" aria-hidden="true"></span><span class="priority-text"><a href="#health-{{ section.key }}">{{ item.message }}</a><span class="priority-origin">{{ severity_labels[item.severity] }} · {{ section.title }}{% if item.subject %} · <code>{{ item.subject }}</code>{% endif %}</span></span></li>{% endfor %}
+        </ul>
+        {% if priorities | length > 6 %}<p class="panel-note">{{ priorities | length - 6 }} autre{% if priorities | length - 6 > 1 %}s{% endif %} dans les tuiles ci-dessus.</p>{% endif %}
+        {% else %}<p class="panel-note">Aucune erreur ni aucun avertissement dans la synthèse.</p>{% endif %}
+      </section>
+      <section class="inspector-commands" aria-labelledby="commands-title">
+        <h2 id="commands-title">Commandes Forge</h2>
+        <p class="panel-note">Lancées depuis Debug Center, uniquement sur votre demande.</p>
+        <ul class="command-list">
+          <li><span class="command-text"><code>project:audit</code><span>Lecture seule, n’exécute aucun code du projet.</span></span><span class="trust-pill" data-trust="read">Lecture seule</span><a href="/debug#forge-audit-title">Ouvrir</a></li>
+          <li><span class="command-text"><code>doctor</code><span>Exécute la configuration du projet et peut joindre ses services, dont la base de données.</span></span><span class="trust-pill" data-trust="config">Configuration</span><a href="/debug#forge-diagnostic-title">Ouvrir</a></li>
+          <li><span class="command-text"><code>project:check</code><span>Importe réellement les routes : exécute du code applicatif.</span></span><span class="trust-pill" data-trust="code">Exécute le projet</span><a href="/debug#forge-check-title">Ouvrir</a></li>
+        </ul>
+      </section>
+    </div>
     {% else %}
     <p class="health-empty" role="status">Aucun projet sélectionné : aucune analyse. Saisissez le chemin d’un projet Forge ci-dessous, ou <a href="/">ouvrez un projet récent depuis l’accueil</a>.</p>
     {% endif %}

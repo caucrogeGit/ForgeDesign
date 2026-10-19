@@ -123,6 +123,48 @@ def test_bounded_diagnostics_and_attention(tmp_path: Path) -> None:
     )
 
 
+def test_dashboard_tiles_priorities_and_commands(tmp_path: Path) -> None:
+    """Tableau de bord (FD-UX-002) : résumé en titre de tuile, faits visibles,
+    diagnostics repliables, priorités hors de la synthèse (erreurs d'abord, six
+    au plus), commandes renvoyées vers les sections réelles de Debug Center."""
+    root = healthy(tmp_path / "projet")
+    for index in range(8):
+        (root / f"mvc/migrations/bad{index}.sql").write_text("x")
+    journal(root, "ERROR")
+    with serving(tmp_path, None) as app:
+        html = open_project(app, root)
+        _, debug, _ = call(app, "/debug")
+    migrations = section(health(html), "migrations")
+    assert '<p class="health-headline">' in migrations
+    assert "<summary>8 diagnostics</summary>" in migrations
+    # Les faits clés restent visibles : une tuile en Attention montre sa raison.
+    assert "<dl>" in migrations.split("<details", 1)[0]
+    panels = html.split('<div class="inspector-panels">', 1)[1]
+    priorities, commands = panels.split('<section class="inspector-commands"', 1)
+    severities = re.findall(r'<li data-severity="([a-z]+)">', priorities)
+    assert 0 < len(severities) <= 6
+    assert severities == sorted(severities, key=lambda severity: severity != "error")
+    assert "ERROR · RuntimeError" in priorities
+    anchors = re.findall(r'href="/debug#([a-z-]+)"', commands)
+    assert anchors == [
+        "forge-audit-title",
+        "forge-diagnostic-title",
+        "forge-check-title",
+    ]
+    for anchor in anchors:
+        assert f'id="{anchor}"' in debug
+
+
+def test_dashboard_without_priorities(tmp_path: Path) -> None:
+    root = healthy(tmp_path / "projet")
+    with serving(tmp_path, None) as app:
+        html = open_project(app, root)
+    priorities = html.split('<section class="inspector-priorities"', 1)[1]
+    priorities = priorities.split("</section>", 1)[0]
+    assert "Aucune erreur ni aucun avertissement dans la synthèse." in priorities
+    assert "<li" not in priorities
+
+
 def test_inaccessible_project_is_a_controlled_diagnostic(tmp_path: Path) -> None:
     root = healthy(tmp_path / "projet")
     with serving(tmp_path, None) as app:

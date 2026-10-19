@@ -78,6 +78,28 @@ illisible) et devient alors « indisponible » avec un message ; les autres
 sections restent présentées. Une erreur inattendue est un bug et produit une
 erreur serveur, jamais une section silencieusement vide.
 
+### Tableau de bord (FD-UX-002)
+
+La synthèse s'affiche en tuiles, avec le même contenu, les mêmes données et les
+mêmes calculs :
+
+- chaque tuile donne son titre et son état écrit, puis son résumé en chiffre clé
+  (« 629 routes déclarées. ») ;
+- les faits clés restent visibles : une tuile en Attention montre sa raison,
+  par exemple « Invalides 3 » ;
+- la liste des diagnostics se déplie sous leur nombre (« 8 diagnostics ») ;
+- l'action vers l'outil reste en pied de tuile.
+
+Sous la synthèse, deux panneaux :
+
+- **À traiter en priorité** reprend les diagnostics déjà visibles dans les tuiles,
+  les erreurs puis les avertissements, six au plus. Chacun renvoie à sa tuile,
+  et le reste est compté. Sans erreur ni avertissement, le panneau l'écrit.
+- **Commandes Forge** présente `project:audit`, `doctor` et `project:check` avec
+  leur niveau de confiance (lecture seule, configuration, exécution du projet).
+  Chaque commande renvoie à sa section de Debug Center, où elle se lance par un
+  POST explicite. Rien n'est exécuté depuis cette page.
+
 ## Lecture seule et coût
 
 La synthèse est recalculée à chaque affichage, sans cache ni persistance

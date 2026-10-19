@@ -138,6 +138,38 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
 .health-status[data-status="erreur"] { color: var(--err); background: var(--err-soft); }
 .health-status[data-status="indisponible"] { color: var(--muted); background: var(--surface-2); border-color: var(--border-strong); border-style: dashed; }
 .health-diagnostics { margin: .35rem 0; padding-left: 1.1rem; font-size: .8rem; }
+/* Tableau de bord de Project Inspector (FD-UX-002) : la tuile donne le résumé,
+   le détail se déplie, l'action reste en pied de tuile. */
+.health-summary > .health-section { display: flex; flex-direction: column; gap: .35rem; }
+.health-headline { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.35; }
+.health-details { font-size: .8rem; }
+.health-details > summary { width: fit-content; color: var(--muted); cursor: pointer; }
+.health-details[open] > summary { margin-bottom: .35rem; }
+.health-details dl { margin-top: .25rem; }
+.health-details p { margin: .5rem 0 .2rem; }
+.health-action { margin: auto 0 0; padding-top: .35rem; }
+.inspector-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: .9rem; margin-top: .9rem; }
+.inspector-panels > section { margin: 0; }
+.panel-note { color: var(--muted); font-size: .8rem; }
+.priority-list, .command-list { margin: .25rem 0 0; padding: 0; list-style: none; }
+.priority-list li, .command-list li { display: flex; align-items: flex-start; gap: .65rem; margin: 0; padding: .6rem 0; border-top: 1px solid var(--border); }
+.priority-list li:first-child, .command-list li:first-child { border-top: 0; }
+.priority-dot { flex: none; width: .5rem; height: .5rem; margin-top: .45rem; border-radius: 50%; background: var(--warn); }
+.priority-list li[data-severity="error"] .priority-dot { background: var(--err); }
+.priority-text, .command-text { display: block; min-width: 0; }
+.priority-text a { color: var(--ink); font-weight: 500; text-decoration: none; }
+.priority-text a:hover { color: var(--accent-ink); text-decoration: underline; }
+.priority-origin { display: block; color: var(--muted); font-size: .8rem; }
+.command-list li { align-items: center; }
+.command-text { flex: 1; }
+.command-text code { display: block; font-weight: 500; }
+.command-text span { display: block; color: var(--muted); font-size: .8rem; }
+.trust-pill { flex: none; padding: .05rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; white-space: nowrap; }
+.trust-pill[data-trust="read"] { color: var(--ok); background: var(--ok-soft); }
+.trust-pill[data-trust="config"] { color: var(--info); background: var(--info-soft); }
+.trust-pill[data-trust="code"] { color: var(--warn); background: var(--warn-soft); }
+.command-list a { flex: none; padding: .3rem .75rem; border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--ink); font-weight: 500; text-decoration: none; }
+.command-list a:hover { background: var(--surface-2); }
 .health-empty { margin-top: 1rem; }
 
 /* Chaînes des routes (FD-ROUTES-021) : l'état est écrit et marqué. */
