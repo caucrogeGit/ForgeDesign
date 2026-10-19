@@ -6,5 +6,5 @@ import forge_design
 
 
 def test_import_and_distribution_version() -> None:
-    assert forge_design.__version__ == "0.3.0"
+    assert forge_design.__version__ == "0.3.1"
     assert version("forge-design") == forge_design.__version__
