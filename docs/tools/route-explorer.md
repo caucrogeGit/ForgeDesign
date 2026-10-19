@@ -13,7 +13,28 @@ Ouvrir le projet avec Project Inspector, puis choisir **Route Explorer**.
 Chaque GET relit le projet courant ; les résultats ne sont pas persistés.
 Les fichiers du projet ne sont jamais modifiés.
 
-Le tableau présente méthode et chemin HTTP, référence syntaxique du handler,
+### Organisation de la page (FD-UX-003)
+
+Les mêmes informations sont réorganisées autour des chaînes :
+
+1. sous le titre, des **compteurs** des chaînes affichées : complètes, partielles,
+   problématiques, prévisualisables ;
+2. les **filtres** en barre d'outils ;
+3. la ligne « N routes affichées sur M », puis la source et les remarques
+   d'analyse, repliées sous leur nombre ;
+4. la section **Diagnostics** : son total reste visible, sa liste se déplie ;
+5. la **liste des chaînes**, en lignes compactes. Chaque ligne donne la méthode
+   en pastille, puis le chemin, le handler, le ou les templates, le ou les
+   contrats et l'état. Le texte est tronqué tant que la ligne est fermée, et le
+   déplier donne le détail, les diagnostics et la preview réelle ;
+6. les contrats de vue, puis le **tableau technique**, replié : c'est le tableau
+   décrit ci-dessous ;
+7. les cycles, et le graphe, dont la liste des relations est repliée sous son
+   nombre.
+
+Une page large défile dans ses cadres, jamais horizontalement en entier.
+
+Le tableau technique présente méthode et chemin HTTP, référence syntaxique du handler,
 fichier contrôleur, vérification de méthode, template, présence, syntaxe Jinja,
 nom et caractère public. « — » signifie non applicable ou non résolu, pas
 nécessairement absent. « Trouvée » désigne une définition directe de méthode :

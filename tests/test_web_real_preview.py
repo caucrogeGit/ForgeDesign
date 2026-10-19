@@ -1327,7 +1327,9 @@ ROUTE_START = "/routes/real-preview/start"
 ROUTE_STOP = "/routes/real-preview/stop"
 CHAIN = re.compile(
     r'<li id="route-chain-\d+"[^>]*data-real-preview="(\w+)">\s*'
-    r'<details><summary><span class="route-chain">(\S+) (\S+) →(.*?)</details></li>',
+    # FD-UX-003 : la méthode est stylée dans le texte de la chaîne, inchangé.
+    r'<details><summary><span class="route-chain">'
+    r'<span class="route-method">(\S+)</span> (\S+) →(.*?)</details></li>',
     re.S,
 )
 
