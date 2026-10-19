@@ -5,8 +5,14 @@ import threading
 from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from importlib.resources import files
-from typing import Any
-from wsgiref.simple_server import WSGIServer, make_server
+from socketserver import BaseRequestHandler, ThreadingMixIn
+from typing import IO, Any, cast
+from wsgiref.simple_server import (
+    ServerHandler,
+    WSGIRequestHandler,
+    WSGIServer,
+    make_server,
+)
 
 from core.app.application import Application
 from core.app.wsgi import create_wsgi_app
@@ -431,19 +437,99 @@ def create_application(
     return Application(router, api_routes_module=None)
 
 
-class ForgeDesignServer(WSGIServer):
-    """Écoute Forge Design et runtime de preview réelle qu'elle possède.
+#: Délai de lecture et d'écriture d'une connexion. Une connexion ouverte sans
+#: requête (transfert de port d'un éditeur, préconnexion du navigateur) n'occupe
+#: que son propre thread, au plus ce délai, puis elle est fermée sans réponse.
+CLIENT_TIMEOUT = 15.0
 
-    server_close() (donc la sortie d'un bloc with) ferme d'abord le runtime :
-    proxy, puis runner.
+
+class ForgeDesignRequestHandler(WSGIRequestHandler):
+    """WSGIRequestHandler.handle, avec délai client et exécution sérialisée.
+
+    La lecture de la requête se fait dans le thread de la connexion : un client
+    muet ou lent ne retient plus les autres. Seul l'appel de l'application passe
+    par ForgeDesignServer.dispatching, une requête à la fois comme avant.
     """
 
+    timeout = CLIENT_TIMEOUT
+
+    def handle(self) -> None:
+        try:
+            self.raw_requestline = self.rfile.readline(65537)
+            if len(self.raw_requestline) > 65536:
+                self.requestline = ""
+                self.request_version = ""
+                self.command = ""
+                self.send_error(414)
+                return
+            if not self.parse_request():
+                return
+        except TimeoutError:
+            # Aucune requête complète dans le délai : rien à répondre.
+            self.close_connection = True
+            return
+        server = self.server
+        assert isinstance(server, ForgeDesignServer)
+        handler = ServerHandler(
+            self.rfile,
+            # Même objet que wsgiref ; seuls les stubs le typent BufferedIOBase.
+            cast(IO[bytes], self.wfile),
+            self.get_stderr(),
+            self.get_environ(),
+            multithread=False,
+        )
+        # Attribut non déclaré par les stubs : wsgiref s'en sert pour journaliser.
+        handler.request_handler = self  # pyright: ignore[reportAttributeAccessIssue]
+        with server.dispatching() as accepted:
+            if not accepted:
+                self.send_error(503, "Forge Design s'arrête.")
+                return
+            application = server.get_app()
+            assert application is not None
+            handler.run(application)
+
+
+class ForgeDesignServer(ThreadingMixIn, WSGIServer):
+    """Écoute Forge Design et runtime de preview réelle qu'elle possède.
+
+    Un thread par connexion pour les échanges réseau, bornés par CLIENT_TIMEOUT ;
+    l'application ne traite qu'une requête à la fois (dispatching). La fermeture
+    n'attend pas les connexions muettes : Ctrl+C reste immédiat.
+
+    server_close() (donc la sortie d'un bloc with) refuse d'abord les requêtes
+    suivantes, attend celle en cours, puis ferme le runtime : proxy, puis runner.
+    """
+
+    daemon_threads = True
+    block_on_close = False
     real_preview: RealPreviewRuntime | None = None
+
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        handler_class: type[BaseRequestHandler],
+        bind_and_activate: bool = True,
+    ) -> None:
+        self._dispatch_lock = threading.Lock()
+        self._closing = False
+        super().__init__(server_address, handler_class, bind_and_activate)
+
+    @contextmanager
+    def dispatching(self) -> Generator[bool, None, None]:
+        """Exclusivité de l'application ; False une fois la fermeture engagée."""
+        with self._dispatch_lock:
+            yield not self._closing
+
+    def close_real_preview(self) -> None:
+        """Refuser les requêtes suivantes, attendre la courante, fermer la preview."""
+        with self._dispatch_lock:
+            self._closing = True
+        if self.real_preview is not None:
+            self.real_preview.close()
 
     def server_close(self) -> None:
         try:
-            if self.real_preview is not None:
-                self.real_preview.close()
+            self.close_real_preview()
         finally:
             super().server_close()
 
@@ -474,7 +560,13 @@ def create_server(
         recent_projects=recent_projects, real_preview=runtime, modules=modules
     )
     wsgi_app = create_wsgi_app(application)
-    server = make_server(host, port, wsgi_app, server_class=ForgeDesignServer)
+    server = make_server(
+        host,
+        port,
+        wsgi_app,
+        server_class=ForgeDesignServer,
+        handler_class=ForgeDesignRequestHandler,
+    )
     server.real_preview = runtime
     # Le port effectif (0 → éphémère) n'est connu qu'après le bind : il fixe
     # l'origine d'encadrement du proxy, jamais l'en-tête Host d'une requête.
@@ -540,5 +632,4 @@ def run_server(
         except KeyboardInterrupt:
             pass
         finally:
-            if server.real_preview is not None:
-                server.real_preview.close()
+            server.close_real_preview()

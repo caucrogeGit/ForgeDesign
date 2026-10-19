@@ -127,6 +127,9 @@ def test_startup_has_no_business_or_browser_effects(
         def serve_forever(self) -> None:
             raise KeyboardInterrupt
 
+        def close_real_preview(self) -> None:
+            pass
+
     instance = FakeServer()
 
     def create(host: str, port: int, *, modules: object = None) -> FakeServer:
@@ -165,6 +168,9 @@ def test_browser_after_socket_ready(
             events.append("serve")
             raise KeyboardInterrupt
 
+        def close_real_preview(self) -> None:
+            events.append("preview-closed")
+
     def create(host: str, port: int, *, modules: object = None) -> FakeServer:
         assert (host, port) == ("127.0.0.1", 8765)
         return FakeServer()
@@ -180,7 +186,7 @@ def test_browser_after_socket_ready(
     monkeypatch.setattr(server, "create_server", create)
     monkeypatch.setattr(webbrowser, "open", open_browser)
     assert main([]) == 0
-    assert events == ["ready", "browser", "serve", "closed"]
+    assert events == ["ready", "browser", "serve", "preview-closed", "closed"]
     output = capsys.readouterr()
     assert "http://127.0.0.1:8765/" in output.out
     assert bool(output.err) == (outcome is not True)

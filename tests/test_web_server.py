@@ -2,8 +2,11 @@
 
 import errno
 import inspect
+import socket
 import sys
-from collections.abc import Iterator
+import threading
+import time
+from collections.abc import Callable, Iterator
 from http.client import HTTPConnection
 from importlib.resources import files
 from pathlib import Path
@@ -109,6 +112,103 @@ def test_no_project_access(
 
     monkeypatch.setattr(Path, "open", guarded_open)
     test_local_binding_and_response(running_server)
+
+
+def _idle(server: WSGIServer) -> socket.socket:
+    """Connexion ouverte sans requête, acceptée par le serveur avant la suite."""
+    idle = socket.create_connection(("127.0.0.1", server.server_port), timeout=3)
+    time.sleep(0.1)
+    return idle
+
+
+def _get_status(server: WSGIServer, path: str = "/") -> int:
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        response.read()
+        return response.status
+    finally:
+        connection.close()
+
+
+def test_idle_connection_does_not_block_requests(running_server: WSGIServer) -> None:
+    """Une connexion muette (transfert de port d'un éditeur, préconnexion) ne fige
+    plus l'interface : elle n'occupe que son propre thread."""
+    idle = _idle(running_server)
+    try:
+        start = time.monotonic()
+        test_local_binding_and_response(running_server)
+        assert time.monotonic() - start < 2
+    finally:
+        idle.close()
+
+
+def test_idle_connection_closed_after_timeout(
+    monkeypatch: pytest.MonkeyPatch, running_server: WSGIServer
+) -> None:
+    monkeypatch.setattr(web.ForgeDesignRequestHandler, "timeout", 0.2)
+    idle = _idle(running_server)
+    try:
+        start = time.monotonic()
+        assert idle.recv(1) == b""
+        assert time.monotonic() - start < 2
+    finally:
+        idle.close()
+    assert _get_status(running_server) == 200
+
+
+def test_application_runs_one_request_at_a_time(running_server: WSGIServer) -> None:
+    lock = threading.Lock()
+    active = peak = 0
+
+    def slow(environ: object, start_response: Callable[..., object]) -> list[bytes]:
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        time.sleep(0.1)
+        with lock:
+            active -= 1
+        start_response("200 OK", [("Content-Type", "text/plain")])
+        return [b"ok"]
+
+    original = running_server.get_app()
+    assert original is not None
+    running_server.set_app(slow)
+    statuses: list[int] = []
+    try:
+        clients = [
+            Thread(target=lambda: statuses.append(_get_status(running_server)))
+            for _ in range(3)
+        ]
+        for client in clients:
+            client.start()
+        for client in clients:
+            client.join(timeout=5)
+    finally:
+        running_server.set_app(original)
+    assert statuses == [200, 200, 200]
+    assert peak == 1
+
+
+def test_requests_refused_once_closing(running_server: WSGIServer) -> None:
+    assert isinstance(running_server, web.ForgeDesignServer)
+    running_server.close_real_preview()
+    assert _get_status(running_server) == 503
+
+
+def test_close_does_not_wait_for_idle_connection() -> None:
+    with web.create_server(port=0) as server:
+        thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
+        thread.start()
+        idle = _idle(server)
+        start = time.monotonic()
+        server.shutdown()
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+    assert time.monotonic() - start < 2
+    idle.close()
 
 
 def test_stop_releases_port() -> None:

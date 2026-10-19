@@ -83,7 +83,14 @@ Seul `127.0.0.1` est accepté ; le port `0` demande un port éphémère.
 Les erreurs de port occupé restent des `OSError`, sans repli automatique.
 Le cycle piloté reste `serve_forever` dans un thread, `shutdown` depuis un autre
 thread, puis `join` et fermeture du serveur.
-Le transport standard n'hérite pas du délai d'inactivité de l'ancien gestionnaire.
+Chaque connexion est lue et écrite dans son propre thread, avec un délai client
+de 15 s (`CLIENT_TIMEOUT`) : une connexion ouverte sans requête, comme celle du
+transfert de port d'un éditeur ou une préconnexion du navigateur, est fermée sans
+réponse à l'échéance et ne fige plus les autres. L'application, elle, ne traite
+qu'une requête à la fois (`ForgeDesignServer.dispatching`), comme avec l'ancien
+serveur à un seul thread. À la fermeture, les requêtes suivantes reçoivent 503,
+la requête en cours se termine, puis la preview réelle est fermée ; les
+connexions muettes ne sont pas attendues.
 
 `GET /` conserve le shell HTML « Aucun projet ouvert. ».
 `GET /shell.css` sert une unique ressource CSS explicitement nommée : les styles

@@ -388,15 +388,36 @@ def test_in_process_concurrency_never_corrupts_the_design(
 
 
 def test_http_server_serialises_requests() -> None:
-    """Hypothèse de la garantie HTTP : le serveur traite une requête à la fois,
+    """Hypothèse de la garantie HTTP : l'application traite une requête à la fois,
     donc deux POST sur la même révision passent l'un après l'autre et le second
-    est refusé par la garde Web (test suivant)."""
+    est refusé par la garde Web (test suivant). Chaque connexion a son thread
+    réseau, mais l'appel de l'application passe par dispatching, exclusif."""
     import socketserver
 
-    from forge_design.web.server import ForgeDesignServer
+    from forge_design.web.server import (
+        ForgeDesignRequestHandler,
+        ForgeDesignServer,
+        create_server,
+    )
 
-    assert not issubclass(ForgeDesignServer, socketserver.ThreadingMixIn)
     assert not issubclass(ForgeDesignServer, socketserver.ForkingMixIn)
+    with create_server(port=0) as server:
+        assert server.RequestHandlerClass is ForgeDesignRequestHandler
+        second = threading.Event()
+
+        def other() -> None:
+            with server.dispatching() as accepted:
+                assert accepted
+                second.set()
+
+        with server.dispatching() as accepted:
+            assert accepted
+            thread = threading.Thread(target=other)
+            thread.start()
+            assert not second.wait(0.2)
+        assert second.wait(2)
+        thread.join(timeout=2)
+        assert not thread.is_alive()
 
 
 def test_serial_posts_with_the_same_revision_second_is_stale(tmp_path: Path) -> None:
