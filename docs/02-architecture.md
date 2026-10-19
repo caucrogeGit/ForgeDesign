@@ -99,7 +99,42 @@ sa CSP. Les ressources sont packagées et chargées via `importlib.resources`.
 Les deux pages utilisent le renderer Jinja public de Forge et héritent de `layout.html`.
 Ce layout partage le head, la navigation sémantique et le conteneur principal.
 Les liens fixes Accueil et Project Inspector utilisent un état actif explicite
-(`aria-current` et soulignement), sans consulter le registre pour la navigation.
+(`aria-current` et fond marqué), sans consulter le registre pour la navigation.
+
+#### Shell d'application et système « Atelier » (FD-UX-001)
+
+Le layout est un shell d'application, sans changer les routes ni les pages :
+
+- une **barre latérale** contient la marque et la version, le projet courant
+  (`Projet : <racine>` et la version Forge) et la navigation
+  `Navigation principale`, regroupée en Projet, Explorer (Route, Entity,
+  Template), Concevoir (Éditeur) et Diagnostiquer (Debug Center) ; la zone
+  `Modules` reste distincte ; sur un écran étroit, la barre passe au-dessus du
+  contenu ;
+- une **barre du haut** porte le fil de la page et les actions du projet
+  (Actualiser, Fermer le projet) ;
+- le **contenu** occupe toute la largeur disponible (`main` borné à 82 rem), avec
+  des titres à l'échelle d'un outil.
+
+`shell.css` commence par les jetons du système (couleurs, états, rayons,
+polices), puis le shell et les éléments de base : sections, formulaires,
+boutons secondaires par défaut, bouton principal pour les actions qui exécutent
+ou ouvrent, et tableaux dans un conteneur `.table-scroll` qui défile seul, sans
+jamais faire déborder la page. Les composants existants (graphes, éditeur,
+aperçus) gardent leurs règles. La synthèse de Project Inspector s'affiche en
+tuiles par la seule CSS. Les états restent écrits et marqués, en ligne et jamais
+en flex, pour être lus d'un seul tenant (« ✓ OK »).
+
+La CSP du cœur n'est pas assouplie. Aucun attribut `style` ni balise `<style>` :
+les icônes sont des masques CSS, des SVG en `data:` autorisés par
+`img-src 'self' data:`, colorés par `currentColor` et décoratifs
+(`aria-hidden`). Les polices IBM Plex Sans (400, 500 et 600) et IBM Plex Mono
+(400 et 500) sont les fichiers woff2 non modifiés des paquets npm
+`@ibm/plex-sans` 1.1.0 et `@ibm/plex-mono` 2.5.0, dont l'intégrité a été
+vérifiée. Ils sont servis depuis l'origine locale par des routes fixes
+`/fonts/<nom>.woff2` (`font/woff2`, liste fermée `FONT_FILES`), sous licence SIL
+OFL 1.1 jointe dans `static/fonts/LICENSE-IBM-Plex.txt`, packagée mais jamais
+servie.
 Les erreurs et en-têtes de sécurité relèvent de Forge.
 La sonde `/health` est fournie nativement par son adaptateur WSGI.
 Les paramètres de requête suivent le parsing Forge ; ils ne sélectionnent aucun projet.

@@ -7,39 +7,64 @@
   <link rel="stylesheet" href="/shell.css">
 {% block head %}{% endblock %}
 </head>
+{#- Icônes : masques CSS (shell.css), aucun SVG ni style dans le HTML. #}
+{% macro icon(name) -%}
+<span class="icon icon-{{ name }}" aria-hidden="true"></span>
+{%- endmacro %}
+{% macro link(path, page, name, label) -%}
+<a href="{{ path }}"{% if active_page == page %} aria-current="page"{% endif %}>{{ icon(name) }}{{ label }}</a>
+{%- endmacro %}
+{% set page_labels = {"home": "Accueil", "inspector": "Project Inspector", "routes": "Route Explorer", "entities": "Entity Explorer", "templates": "Template Viewer", "editor": "Éditeur", "debug": "Debug Center"} %}
 <body>
-  <header>
-    <p class="brand">Forge Design</p>
-    <nav aria-label="Navigation principale">
-      <a href="/"{% if active_page == 'home' %} aria-current="page"{% endif %}>Accueil</a>
-      <a href="/inspector"{% if active_page == 'inspector' %} aria-current="page"{% endif %}>Project Inspector</a>
-      <a href="/routes"{% if active_page == 'routes' %} aria-current="page"{% endif %}>Route Explorer</a>
-      <a href="/entities"{% if active_page == 'entities' %} aria-current="page"{% endif %}>Entity Explorer</a>
-      <a href="/debug"{% if active_page == 'debug' %} aria-current="page"{% endif %}>Debug Center</a>
-      <a href="/templates"{% if active_page == 'templates' %} aria-current="page"{% endif %}>Template Viewer</a>
-      <a href="/editor"{% if active_page == 'editor' %} aria-current="page"{% endif %}>Éditeur</a>
-    </nav>
-    {% if module_navigation %}
-    <nav class="module-navigation" aria-label="Modules">
-      <span class="module-navigation-title">Modules</span>
-      {% for entry in module_navigation %}<a href="{{ entry.url }}"{% if active_page == 'module:' ~ entry.module_id %} aria-current="page"{% endif %}>{{ entry.label }}</a>{% endfor %}
-    </nav>
-    {% endif %}
-    <div class="current-project">
-      {% if current_project %}
-      <p>Projet : {{ current_project.root }}</p>
-      {% if current_project.forge_version %}<p>Forge {{ current_project.forge_version }}</p>{% endif %}
-      <form action="/project/refresh" method="post">
-        <button type="submit">Actualiser</button>
-      </form>
-      <form action="/project/close" method="post">
-        <button type="submit">Fermer le projet</button>
-      </form>
-      {% else %}<p>Aucun projet ouvert.</p>{% endif %}
-    </div>
-  </header>
-  <main>
+  <div class="app">
+    <aside class="app-sidebar">
+      <a class="app-brand" href="/"><span class="app-brand-mark" aria-hidden="true"></span><span class="app-brand-name">Forge Design</span>{% if app_version %}<span class="app-version">{{ app_version }}</span>{% endif %}</a>
+      <div class="current-project">
+        {% if current_project %}
+        <p class="app-project-name">{{ current_project.root.name }}</p>
+        <p class="app-project-path" title="{{ current_project.root }}">Projet : {{ current_project.root }}</p>
+        {% if current_project.forge_version %}<p class="app-project-meta">Forge {{ current_project.forge_version }}</p>{% endif %}
+        {% else %}<p class="app-project-empty">Aucun projet ouvert.</p>
+        <p class="app-project-meta"><a href="/inspector">Ouvrir un projet</a></p>{% endif %}
+      </div>
+      <nav aria-label="Navigation principale">
+        {{ link("/", "home", "home", "Accueil") }}
+        {{ link("/inspector", "inspector", "inspector", "Project Inspector") }}
+        <p class="app-nav-group">Explorer</p>
+        {{ link("/routes", "routes", "routes", "Route Explorer") }}
+        {{ link("/entities", "entities", "entities", "Entity Explorer") }}
+        {{ link("/templates", "templates", "templates", "Template Viewer") }}
+        <p class="app-nav-group">Concevoir</p>
+        {{ link("/editor", "editor", "editor", "Éditeur") }}
+        <p class="app-nav-group">Diagnostiquer</p>
+        {{ link("/debug", "debug", "debug", "Debug Center") }}
+      </nav>
+      {% if module_navigation %}
+      <nav class="module-navigation" aria-label="Modules">
+        <span class="module-navigation-title">Modules</span>
+        {% for entry in module_navigation %}<a href="{{ entry.url }}"{% if active_page == 'module:' ~ entry.module_id %} aria-current="page"{% endif %}>{{ icon("module") }}{{ entry.label }}</a>{% endfor %}
+      </nav>
+      {% endif %}
+      <p class="app-sidebar-footer">Serveur local · 127.0.0.1</p>
+    </aside>
+    <div class="app-content">
+      <header class="app-topbar">
+        <p class="app-crumb">{% if current_project %}<span>{{ current_project.root.name }}</span><span class="app-crumb-separator" aria-hidden="true">/</span>{% endif %}<span class="app-crumb-current">{{ page_labels.get(active_page, "Forge Design") }}</span></p>
+        {% if current_project %}
+        <div class="app-topbar-actions">
+          <form action="/project/refresh" method="post">
+            <button type="submit">{{ icon("refresh") }}Actualiser</button>
+          </form>
+          <form action="/project/close" method="post">
+            <button type="submit">{{ icon("close") }}Fermer le projet</button>
+          </form>
+        </div>
+        {% endif %}
+      </header>
+      <main>
 {% block content %}{% endblock %}
-  </main>
+      </main>
+    </div>
+  </div>
 </body>
 </html>

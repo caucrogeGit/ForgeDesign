@@ -315,6 +315,49 @@ def test_forge_headers_and_css(running_server: WSGIServer) -> None:
         connection.close()
 
 
+def _get(server: WSGIServer, path: str) -> tuple[int, str | None, bytes]:
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        return response.status, response.getheader("Content-Type"), response.read()
+    finally:
+        connection.close()
+
+
+def test_fonts_are_served_from_a_closed_list(running_server: WSGIServer) -> None:
+    """Polices IBM Plex locales (FD-UX-001) : routes fixes, fichiers packagés tels
+    quels, licence OFL jointe mais jamais servie, aucun autre nom."""
+    static = files("forge_design.web").joinpath("static")
+    css = static.joinpath("shell.css").read_text(encoding="utf-8")
+    for name in web.FONT_FILES:
+        assert f'url("/fonts/{name}.woff2")' in css
+        status, content_type, body = _get(running_server, f"/fonts/{name}.woff2")
+        assert status == 200 and content_type == "font/woff2"
+        assert body == static.joinpath(f"fonts/{name}.woff2").read_bytes()
+        assert body.startswith(b"wOF2")
+    for path in ("/fonts/LICENSE-IBM-Plex.txt", "/fonts/Other.woff2", "/fonts/"):
+        assert _get(running_server, path)[0] == 404, path
+    license_text = static.joinpath("fonts/LICENSE-IBM-Plex.txt").read_text("utf-8")
+    assert "SIL Open Font License, Version 1.1" in license_text
+
+
+def test_shell_sidebar_and_no_inline_style(running_server: WSGIServer) -> None:
+    import forge_design
+
+    status, _, body = _get(running_server, "/")
+    html = body.decode("utf-8")
+    assert status == 200
+    shell, content = html.split("<main>", 1)
+    assert '<aside class="app-sidebar">' in shell
+    assert f'<span class="app-version">{forge_design.__version__}</span>' in shell
+    assert "Aucun projet ouvert." in shell
+    assert '<header class="app-topbar">' in shell
+    assert "<h1>Forge Design</h1>" in content
+    # CSP style-src 'self' : aucun attribut style, aucune balise style.
+    assert "style=" not in html and "<style" not in html
+
+
 def test_forge_native_health(running_server: WSGIServer) -> None:
     connection = HTTPConnection("127.0.0.1", running_server.server_port, timeout=3)
     try:

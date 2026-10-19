@@ -18,14 +18,15 @@ from forge_design.recent_projects import RecentProjects
 from forge_design.web.server import ForgeDesignServer, create_server
 
 HOSTILE = "</script><svg onload=alert(1)>"
+# Ordre des groupes du shell (FD-UX-001) : projet, Explorer, Concevoir, Diagnostiquer.
 CORE_NAV = [
     "/",
     "/inspector",
     "/routes",
     "/entities",
-    "/debug",
     "/templates",
     "/editor",
+    "/debug",
 ]
 
 

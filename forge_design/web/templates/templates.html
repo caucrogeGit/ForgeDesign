@@ -11,7 +11,7 @@
 <ul>{% for issue in result.issues %}<li><code>{{ issue.code }}</code> : {{ issue.message }}{% if issue.path %} — {{ issue.path }}{% endif %}</li>{% endfor %}</ul>
 {% endif %}
 {% if result.templates %}
-<table>
+<div class="table-scroll"><table>
   <caption>Templates locaux</caption>
   <thead><tr><th scope="col">Template</th><th scope="col">Taille</th><th scope="col">Modification</th><th scope="col">Action</th></tr></thead>
   <tbody>
@@ -22,7 +22,7 @@
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% else %}<p>Aucun template disponible.</p>{% endif %}
 {% endif %}
 {% endblock %}

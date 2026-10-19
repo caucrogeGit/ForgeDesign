@@ -59,7 +59,13 @@ def test_web_package_data_lists_every_template_and_asset() -> None:
     web = ROOT / "forge_design" / "web"
     present = {
         path.relative_to(web).as_posix()
-        for pattern in ("templates/*.html", "static/**/*.css", "static/**/*.js")
+        for pattern in (
+            "templates/*.html",
+            "static/**/*.css",
+            "static/**/*.js",
+            "static/**/*.woff2",
+            "static/**/*.txt",
+        )
         for path in web.glob(pattern)
     }
     assert sorted(present - declared) == []

@@ -68,8 +68,8 @@
 </section>
 <section aria-labelledby="debug-traceback"><h2 id="debug-traceback">Traceback</h2>
 {% if event.traceback %}
-<table><thead><tr><th scope="col">#</th><th scope="col">Fichier</th><th scope="col">Ligne</th><th scope="col">Fonction</th></tr></thead>
-<tbody>{% for frame in event.traceback %}<tr><td>{{ loop.index }}</td><td>{{ frame.file }}</td><td>{{ frame.line }}</td><td>{{ frame.function }}</td></tr>{% endfor %}</tbody></table>
+<div class="table-scroll"><table><thead><tr><th scope="col">#</th><th scope="col">Fichier</th><th scope="col">Ligne</th><th scope="col">Fonction</th></tr></thead>
+<tbody>{% for frame in event.traceback %}<tr><td>{{ loop.index }}</td><td>{{ frame.file }}</td><td>{{ frame.line }}</td><td>{{ frame.function }}</td></tr>{% endfor %}</tbody></table></div>
 {% else %}<p>Aucune traceback structurée disponible.</p>{% endif %}
 </section>
 {% if event.hint is not none %}<section aria-labelledby="debug-hint"><h2 id="debug-hint">Piste Forge</h2><p>{{ event.hint }}</p></section>{% endif %}

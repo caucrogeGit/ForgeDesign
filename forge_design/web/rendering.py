@@ -11,6 +11,8 @@ from integrations.jinja2.renderer import (  # pyright: ignore[reportMissingTypeS
     Jinja2Renderer,
 )
 
+from forge_design import __version__
+
 
 @dataclass(frozen=True)
 class ShellModules:
@@ -48,6 +50,7 @@ def render_page(
     """Rendre un nom de template interne, jamais un chemin fourni par HTTP."""
     shell = _SHELL.get()
     page = {
+        "app_version": __version__,
         "module_navigation": shell.navigation,
         "module_diagnostics": shell.diagnostics,
         **context,

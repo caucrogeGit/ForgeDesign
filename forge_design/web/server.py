@@ -105,6 +105,26 @@ def _graphics_module(name: str) -> Callable[[Request], Response]:
     return serve
 
 
+# Polices IBM Plex (SIL OFL 1.1, static/fonts/LICENSE-IBM-Plex.txt) : liste
+# fermée de fichiers non modifiés, servis par routes fixes depuis l'origine
+# locale, que la CSP du cœur (default-src 'self') autorise.
+FONT_FILES = (
+    "IBMPlexSans-Regular",
+    "IBMPlexSans-Medium",
+    "IBMPlexSans-SemiBold",
+    "IBMPlexMono-Regular",
+    "IBMPlexMono-Medium",
+)
+
+
+def _font(name: str) -> Callable[[Request], Response]:
+    def serve(request: Request) -> Response:
+        font = files("forge_design.web").joinpath(f"static/fonts/{name}.woff2")
+        return Response(body=font.read_bytes(), content_type="font/woff2")
+
+    return serve
+
+
 def _editor_preview_style(request: Request) -> Response:
     css = files("forge_design.web").joinpath("static/editor-preview.css")
     return Response(body=css.read_bytes(), content_type="text/css; charset=utf-8")
@@ -308,6 +328,8 @@ def create_application(
     add("GET", "/debug-flow.js", _debug_flow_script, public=True)
     for module in GRAPHICS_MODULES:
         add("GET", f"/graphics/{module}.js", _graphics_module(module), public=True)
+    for font in FONT_FILES:
+        add("GET", f"/fonts/{font}.woff2", _font(font), public=True)
     add("GET", "/inspector", show, public=True, no_store=True)
     # Ces actions runtime sans session exigent une origine locale exacte.
     add("POST", "/inspector", inspect, public=True, csrf=False, no_store=True)
