@@ -10,7 +10,7 @@ from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.project_selector import ProjectSelector
 from forge_design.recent_project_states import inspect_recent_projects
 from forge_design.recent_projects import RecentProjects, RecentProjectsError
-from forge_design.web.inspector import MAX_PATH_LENGTH
+from forge_design.web.inspector import MAX_PATH_LENGTH, show_opened_project
 from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
 
@@ -113,13 +113,9 @@ def recent_action(
                 error="Le projet récent n’est plus disponible.",
                 status=200 if selection.status == "invalid" else 400,
             )
-        return show_home(
-            request,
-            context,
-            store,
-            registry,
-            message="Projet ouvert.",
-            selection_warning=selection.recent_warning,
+        # Ouvrir un projet récent mène à sa Vue d'ensemble (FD-UX-011).
+        return show_opened_project(
+            context, registry, selection.inspection, warning=selection.recent_warning
         )
     try:
         store.remove(Path(value))

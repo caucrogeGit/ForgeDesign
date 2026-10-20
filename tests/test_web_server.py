@@ -352,13 +352,12 @@ def test_shell_sidebar_and_no_inline_style(running_server: WSGIServer) -> None:
     assert '<aside class="app-sidebar">' in shell
     assert f'<span class="app-version">{forge_design.__version__}</span>' in shell
     assert "Aucun projet ouvert." in shell
-    assert '<header class="app-topbar">' in shell
+    # Barre du haut : actions du projet ouvert seulement, sans fil d'Ariane.
+    assert '<header class="app-topbar">' not in shell and "app-crumb" not in html
     assert "<h1>Vue d’ensemble</h1>" in content
     # L'accueil garde le menu de l'atelier ; son contenu est le lanceur (FD-UX-010).
     home = _get(running_server, "/")[2].decode("utf-8")
-    assert (
-        '<aside class="app-sidebar">' in home and '<header class="app-topbar">' in home
-    )
+    assert '<aside class="app-sidebar">' in home and "app-topbar" not in home
     assert '<main class="launcher" data-current-project="">' in home
     assert "style=" not in home and "<style" not in home
     # CSP style-src 'self' : aucun attribut style, aucune balise style.

@@ -210,7 +210,13 @@ l'accueil, comme le lien « Ouvrir un projet » de la barre latérale. Un échec
 d'ouverture (origine, format, chemin vide ou trop long, racine absente,
 preview impossible à arrêter) rend l'accueil, avec l'erreur et le chemin
 saisi, au même code HTTP qu'avant. Un projet inspecté mais non reconnu reste
-affiché sur la Vue d'ensemble, avec ses constats et un lien vers l'accueil. Le
+affiché sur la Vue d'ensemble, avec ses constats et un lien vers l'accueil.
+
+Depuis FD-UX-011, ouvrir un projet, par le champ ou par la carte d'un projet
+récent, affiche directement sa Vue d'ensemble (« Projet ouvert. »), en
+réutilisant l'inspection de l'ouverture. La barre du haut n'a plus de fil
+d'Ariane : elle ne porte que « Actualiser » et « Fermer le projet », et
+n'apparaît qu'avec un projet ouvert. Le
 menu de l'atelier (outils, modules) reste sur toutes les pages.
 
 ### Contrôle de l'en-tête Host (FD-WEB-003)

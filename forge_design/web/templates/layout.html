@@ -14,7 +14,6 @@
 {% macro link(path, page, name, label) -%}
 <a href="{{ path }}"{% if active_page == page %} aria-current="page"{% endif %}>{{ icon(name) }}{{ label }}</a>
 {%- endmacro %}
-{% set page_labels = {"home": "Accueil", "inspector": "Vue d’ensemble", "routes": "Routes", "entities": "Entités", "templates": "Gabarits", "editor": "Éditeur", "debug": "Diagnostic"} %}
 <body>
   <div class="app">
     <aside class="app-sidebar">
@@ -48,9 +47,9 @@
       <p class="app-sidebar-footer">Serveur local · 127.0.0.1</p>
     </aside>
     <div class="app-content">
+      {#- Barre du haut : actions du projet ouvert seulement, sans fil d'Ariane (FD-UX-011). #}
+      {% if current_project %}
       <header class="app-topbar">
-        <p class="app-crumb">{% if current_project %}<span>{{ current_project.root.name }}</span><span class="app-crumb-separator" aria-hidden="true">/</span>{% endif %}<span class="app-crumb-current">{{ page_labels.get(active_page, "Forge Design") }}</span></p>
-        {% if current_project %}
         <div class="app-topbar-actions">
           <form action="/project/refresh" method="post">
             <button type="submit">{{ icon("refresh") }}Actualiser</button>
@@ -59,8 +58,8 @@
             <button type="submit">{{ icon("close") }}Fermer le projet</button>
           </form>
         </div>
-        {% endif %}
       </header>
+      {% endif %}
       <main{% if launcher %} class="launcher" data-current-project="{{ current_project.root if current_project else '' }}"{% endif %}>
 {% block content %}{% endblock %}
       </main>

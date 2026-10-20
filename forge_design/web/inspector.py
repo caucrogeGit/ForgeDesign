@@ -72,6 +72,23 @@ def _render(
     )
 
 
+def show_opened_project(
+    context: CurrentProjectContext,
+    registry: ToolRegistry,
+    result: ProjectInspection | None,
+    *,
+    warning: str | None = None,
+) -> Response:
+    """Vue d'ensemble du projet que l'on vient d'ouvrir depuis l'accueil (FD-UX-011).
+
+    L'inspection de l'ouverture est réutilisée, jamais relancée.
+    """
+    message = (
+        f"Projet ouvert. Avertissement : {warning}" if warning else "Projet ouvert."
+    )
+    return _render(context, registry=registry, result=result, message=message)
+
+
 def show_inspector(
     request: Request, context: CurrentProjectContext, registry: ToolRegistry
 ) -> Response:
