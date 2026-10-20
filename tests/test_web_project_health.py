@@ -35,7 +35,7 @@ def open_project(app: ForgeDesignServer, root: Path) -> str:
 
 
 def health(html: str) -> str:
-    match = re.search(r'<section class="health-summary".*?\n    </section>', html, re.S)
+    match = re.search(r'<div class="health-summary".*?\n    </div>', html, re.S)
     assert match is not None
     return match.group(0)
 
@@ -80,11 +80,14 @@ def test_summary_after_opening_and_on_reload(tmp_path: Path) -> None:
     summary = health(html)
     assert summary == opened
     assert 'data-health-status="ok"' in summary
-    assert '<h2 id="health-title">Synthèse du projet projet</h2>' in summary
+    # Sans cadre de synthèse ni état global écrit (FD-UX-017) ; une invite tient
+    # lieu de contenu tant qu'aucune rubrique n'est choisie.
+    assert "Synthèse du projet" not in html and "État global" not in html
+    assert "Choisissez une rubrique dans le menu" in summary
     assert re.findall(r'data-health-section="([a-z]+)"', summary) == SECTIONS
     # Chaque état est écrit et marqué, jamais transmis par la seule couleur.
     assert (
-        summary.count('<span class="health-mark" aria-hidden="true">✓</span> OK') == 10
+        summary.count('<span class="health-mark" aria-hidden="true">✓</span> OK') == 9
     )
     links = re.findall(r'<a href="([^"]+)">([^<]+)</a>', summary)
     assert links == [
@@ -97,9 +100,10 @@ def test_summary_after_opening_and_on_reload(tmp_path: Path) -> None:
         ("/templates", "Voir les templates et leurs contrats"),
     ]
     assert 'id="inspection-details"' in html
-    # Hiérarchie : h1, puis h2 de synthèse, puis un h3 par section.
+    # Hiérarchie : h1 (masqué), puis un h2 par carte.
     headings = re.findall(r"<h([1-3])", html)
-    assert headings[:3] == ["1", "2", "3"] and headings.count("3") >= len(SECTIONS)
+    assert headings[:2] == ["1", "2"] and headings.count("2") >= len(SECTIONS)
+    assert '<h1 class="visually-hidden">' in html
     assert "<script" not in summary and "hx-" not in html
     assert snapshot(root) == before and not (root / ".forge-design").exists()
 
@@ -120,7 +124,7 @@ def test_summary_navigation_with_tooltips(tmp_path: Path) -> None:
     assert tips == [f"health-tip-{key}" for key in SECTIONS]
     # Chaque cible existe, et l'infobulle reprend nom, état et résumé.
     for key in SECTIONS:
-        assert f'<h3 id="health-{key}">' in html
+        assert f'<h2 id="health-{key}">' in html
     routes = section(html, "routes")
     headline = re.search(r'class="health-headline">([^<]+)<', routes)
     assert headline is not None

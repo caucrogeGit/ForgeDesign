@@ -92,8 +92,13 @@ mêmes calculs :
 
 Au-dessus des tuiles, un **sommaire** (FD-UX-015) reste collé en haut de la
 page pendant le défilement. Il compte une entrée par tuile, dans le même ordre :
-icône, nom et marque d'état (✓ ! ✕ –). Chaque entrée mène à sa tuile, qui est
-alors encadrée, comme depuis « À traiter en priorité ». Une infobulle, au survol
+icône, nom et marque d'état (✓ ! ✕ –). Depuis FD-UX-017, le menu est centré,
+et le cadre « Synthèse du projet » (titre, état global écrit, aide) n'existe
+plus. Les tuiles ne s'affichent qu'à la demande : aucune avant un choix (une
+invite à la place), puis seulement celle de l'entrée choisie, centrée sous le
+menu, avec l'entrée mise en valeur. « À traiter en priorité » ouvre de même sa
+tuile. Sans JavaScript : la tuile visée par l'ancre (`:target`). Les titres de
+tuile sont des `h2`, sous le `h1` masqué de la page. Une infobulle, au survol
 ou au focus clavier, reprend le nom, l'état écrit et le résumé de la tuile.
 Elle est reliée au lien par `aria-describedby`. Quand la place manque pour les
 noms, seules les icônes restent visibles ; le nom reste lu par les lecteurs

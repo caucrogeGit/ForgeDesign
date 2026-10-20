@@ -130,17 +130,16 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
 
 /* Synthèse de santé de Project Inspector (FD-PROJECT-006) : l'état est toujours
    écrit et marqué ; la couleur ne fait que le souligner. */
-.health-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .9rem; align-items: stretch; }
-.health-summary > h2, .health-summary > p { grid-column: 1 / -1; margin: 0; }
+.health-summary { max-width: 52rem; margin: 0 auto; }
+.health-hint { margin: 1.5rem 0 0; text-align: center; }
 .health-summary > .health-section { margin: 0; padding: 1rem 1.1rem; background: var(--surface); }
 .health-section[data-status="attention"] { border-color: var(--warn-line); }
 .health-section[data-status="erreur"] { border-color: #f3c2bd; }
 /* Mise en page en ligne, jamais flex : un état se lit « ✓ OK » d'un seul tenant
    (innerText, lecteurs d'écran), pas « ✓ » puis « OK » sur deux lignes. */
-.health-section h3 { margin: 0 0 .35rem; font-size: .95rem; line-height: 1.6; }
+.health-section h2 { margin: 0 0 .35rem; font-size: .95rem; line-height: 1.6; }
 .health-section dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .1rem .75rem; margin: .5rem 0 0; font-size: .8rem; }
 .health-section dt, .health-section dd { margin: 0; }
-.health-global { font-weight: 600; }
 .health-status { display: inline-block; margin-left: .2rem; padding: .05rem .55rem; border: 1px solid transparent; border-radius: 999px; font-size: .75rem; font-weight: 600; line-height: 1.5; white-space: nowrap; }
 .health-status[data-status="ok"] { color: var(--ok); background: var(--ok-soft); }
 .health-status[data-status="attention"] { color: var(--warn); background: var(--warn-soft); }
@@ -149,7 +148,7 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
 .health-diagnostics { margin: .35rem 0; padding-left: 1.1rem; font-size: .8rem; }
 /* Tableau de bord de Project Inspector (FD-UX-002) : la tuile donne le résumé,
    le détail se déplie, l'action reste en pied de tuile. */
-.health-summary > .health-section { display: flex; flex-direction: column; gap: .35rem; }
+.health-summary > .health-section { display: none; flex-direction: column; gap: .35rem; }
 .health-headline { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.35; }
 .health-details { font-size: .8rem; }
 .health-details > summary { width: fit-content; color: var(--muted); cursor: pointer; }
@@ -157,8 +156,10 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
    une entrée par carte (icône, nom, marque d'état), infobulle au survol et au
    focus clavier. Sans la place pour les noms, il ne reste que les icônes : le
    nom reste lu par les lecteurs d'écran et repris par l'infobulle. */
-.health-nav { position: sticky; top: .5rem; z-index: 5; container: health-nav / inline-size; margin: 0 0 1rem; padding: .3rem; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); box-shadow: 0 6px 18px -14px rgba(21, 24, 28, .45); }
-.health-nav ul { display: flex; flex-wrap: wrap; gap: .15rem; margin: 0; padding: 0; list-style: none; }
+.health-nav { position: sticky; top: .5rem; z-index: 5; container: health-nav / inline-size; margin: 0 0 1rem; pointer-events: none; }
+/* Menu centré (FD-UX-017) : le cadre est sur la liste, à la largeur de son
+   contenu ; la bande pleine largeur reste le conteneur des bascules. */
+.health-nav ul { display: flex; flex-wrap: wrap; justify-content: center; gap: .15rem; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 0 auto; padding: .3rem; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); box-shadow: 0 6px 18px -14px rgba(21, 24, 28, .45); list-style: none; pointer-events: auto; }
 .health-nav li { position: relative; margin: 0; }
 .health-nav a { display: flex; align-items: center; gap: .4rem; padding: .4rem .55rem; border-radius: var(--radius); color: var(--ink); font-size: .8rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
 .health-nav a:hover { background: var(--surface-2); color: var(--ink); }
@@ -177,10 +178,21 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
 @container health-nav (max-width: 72rem) {
   .health-nav-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 }
-/* La carte visée par le sommaire (ou par « À traiter en priorité ») est
-   encadrée ; son titre s'arrête sous le sommaire collé. */
-.health-section h3 { scroll-margin-top: 5rem; }
-.health-summary > .health-section:has(> h3:target) { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Une seule carte, celle que vise le menu (ou « À traiter en priorité ») ;
+   aucune avant un choix, l'invite à la place. La marge d'ancre évite de faire
+   sauter la page quand la carte est déjà sous le menu. */
+.health-section h2 { scroll-margin-top: 9rem; }
+.health-summary > .health-section:has(> h2:target) { display: flex; }
+.health-summary:has(.health-section > h2:target) > .health-hint { display: none; }
+main:has(#health-project:target) .health-nav a[href="#health-project"],
+main:has(#health-forge:target) .health-nav a[href="#health-forge"],
+main:has(#health-structure:target) .health-nav a[href="#health-structure"],
+main:has(#health-routes:target) .health-nav a[href="#health-routes"],
+main:has(#health-entities:target) .health-nav a[href="#health-entities"],
+main:has(#health-templates:target) .health-nav a[href="#health-templates"],
+main:has(#health-migrations:target) .health-nav a[href="#health-migrations"],
+main:has(#health-diagnostics:target) .health-nav a[href="#health-diagnostics"],
+main:has(#health-contracts:target) .health-nav a[href="#health-contracts"] { background: var(--accent-soft); color: var(--accent-ink); }
 .health-details[open] > summary { margin-bottom: .35rem; }
 .health-details dl { margin-top: .25rem; }
 .health-details p { margin: .5rem 0 .2rem; }

@@ -24,13 +24,13 @@
         {% endfor %}
       </ul>
     </nav>
-    <section class="health-summary" aria-labelledby="health-title" data-health-status="{{ health.status }}">
-      <h2 id="health-title">Synthèse du projet {{ health.name }}</h2>
-      <p class="health-global">État global : {{ health_status(health.status) }}</p>
-      <p class="help-text">Synthèse en lecture seule, recalculée à chaque affichage. Aucun fichier du projet n’est modifié.</p>
+    {#- Cartes sans cadre de synthèse (FD-UX-017) : une seule s'affiche, celle
+        que vise le menu (:target, sans JavaScript) ; aucune avant un choix. #}
+    <div class="health-summary" data-health-status="{{ health.status }}">
+      <p class="health-hint help-text">Choisissez une rubrique dans le menu pour afficher son détail.</p>
       {% for section in health.sections %}
       <section class="health-section" aria-labelledby="health-{{ section.key }}" data-health-section="{{ section.key }}" data-status="{{ section.status }}">
-        <h3 id="health-{{ section.key }}">{{ section.title }} · {{ health_status(section.status) }}</h3>
+        <h2 id="health-{{ section.key }}">{{ section.title }} · {{ health_status(section.status) }}</h2>
         <p class="health-headline">{{ section.summary }}</p>
         {% if section.facts %}
         <dl>{% for label, value in section.facts %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
@@ -45,7 +45,7 @@
         {% if section.action %}<p class="health-action"><a href="{{ section.action.url }}">{{ section.action.label }}</a></p>{% endif %}
       </section>
       {% endfor %}
-    </section>
+    </div>
     {#- Priorités : diagnostics visibles des sections, erreurs puis avertissements. #}
     {% set found = namespace(errors=[], warnings=[]) %}
     {% for section in health.sections %}{% for item in section.diagnostics %}{% if item.severity == "error" %}{% set found.errors = found.errors + [(section, item)] %}{% elif item.severity == "warning" %}{% set found.warnings = found.warnings + [(section, item)] %}{% endif %}{% endfor %}{% endfor %}
