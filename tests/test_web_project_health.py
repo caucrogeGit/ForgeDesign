@@ -104,6 +104,30 @@ def test_summary_after_opening_and_on_reload(tmp_path: Path) -> None:
     assert snapshot(root) == before and not (root / ".forge-design").exists()
 
 
+def test_summary_navigation_with_tooltips(tmp_path: Path) -> None:
+    """Sommaire (FD-UX-015) : une entrée par carte, liens internes, état marqué,
+    infobulle reliée à son lien et reprenant le résumé de la carte."""
+    root = healthy(tmp_path / "projet")
+    with serving(tmp_path, None) as app:
+        html = open_project(app, root)
+    nav = html.split('<nav class="health-nav"', 1)[1].split("</nav>", 1)[0]
+    assert html.index('<nav class="health-nav"') < html.index("health-summary")
+    assert 'aria-label="Sommaire de la synthèse"' in nav
+    links = re.findall(r'<a href="#health-([a-z]+)" aria-describedby="([^"]+)">', nav)
+    assert links == [(key, f"health-tip-{key}") for key in SECTIONS]
+    assert "/routes" not in nav and nav.count('data-status="ok"') == len(SECTIONS)
+    tips = re.findall(r'<span class="health-nav-tip" role="tooltip" id="([^"]+)">', nav)
+    assert tips == [f"health-tip-{key}" for key in SECTIONS]
+    # Chaque cible existe, et l'infobulle reprend nom, état et résumé.
+    for key in SECTIONS:
+        assert f'<h3 id="health-{key}">' in html
+    routes = section(html, "routes")
+    headline = re.search(r'class="health-headline">([^<]+)<', routes)
+    assert headline is not None
+    summary = unescape(headline[1])
+    assert f"<strong>Routes · OK</strong> {summary}" in unescape(nav)
+
+
 def test_bounded_diagnostics_and_attention(tmp_path: Path) -> None:
     root = healthy(tmp_path / "projet")
     for index in range(8):

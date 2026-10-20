@@ -431,7 +431,12 @@ def test_pages_extend_same_layout() -> None:
     for name in ("index.html", "inspector.html"):
         source = templates.joinpath(name).read_text()
         assert '{% extends "layout.html" %}' in source
-        assert "<head>" not in source and "<nav" not in source
+        assert "<head>" not in source and "app-sidebar" not in source
+        assert "Navigation principale" not in source
+        # Une navigation propre à la page reste permise si elle est nommée
+        # (sommaire de la Vue d'ensemble, FD-UX-015).
+        named = source.count('<nav class="health-nav" aria-label=')
+        assert source.count("<nav") == named
 
 
 def _status_with_host(server: WSGIServer, path: str, host: str | None) -> int:

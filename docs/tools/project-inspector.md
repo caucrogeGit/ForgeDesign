@@ -90,6 +90,16 @@ mêmes calculs :
 - la liste des diagnostics se déplie sous leur nombre (« 8 diagnostics ») ;
 - l'action vers l'outil reste en pied de tuile.
 
+Au-dessus des tuiles, un **sommaire** (FD-UX-015) reste collé en haut de la
+page pendant le défilement. Il compte une entrée par tuile, dans le même ordre :
+icône, nom et marque d'état (✓ ! ✕ –). Chaque entrée mène à sa tuile, qui est
+alors encadrée, comme depuis « À traiter en priorité ». Une infobulle, au survol
+ou au focus clavier, reprend le nom, l'état écrit et le résumé de la tuile.
+Elle est reliée au lien par `aria-describedby`. Quand la place manque pour les
+noms, seules les icônes restent visibles ; le nom reste lu par les lecteurs
+d'écran et repris par l'infobulle. Le sommaire ne mène qu'aux tuiles : les
+outils restent dans les tuiles et dans la barre latérale. Sans JavaScript.
+
 Sous la synthèse, deux panneaux :
 
 - **À traiter en priorité** reprend les diagnostics déjà visibles dans les tuiles,

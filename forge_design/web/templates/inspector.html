@@ -10,6 +10,20 @@
     <h1>Vue d’ensemble</h1>
     <p class="intro">Consultez la structure et la version déclarée d’un projet Forge.</p>
     {% if health %}
+    {#- Sommaire (FD-UX-015) : une entrée par carte, avec son état ; l'infobulle
+        reprend le résumé. Liens internes seulement : les outils restent dans les
+        cartes et dans la barre latérale. #}
+    {% set nav_icons = {"project": "folder", "forge": "hammer", "structure": "structure", "routes": "routes", "entities": "entities", "templates": "templates", "migrations": "migrations", "diagnostics": "debug", "contracts": "contract"} %}
+    <nav class="health-nav" aria-label="Sommaire de la synthèse">
+      <ul>
+        {% for section in health.sections %}
+        <li data-status="{{ section.status }}">
+          <a href="#health-{{ section.key }}" aria-describedby="health-tip-{{ section.key }}"><span class="icon icon-{{ nav_icons.get(section.key, 'inspector') }}" aria-hidden="true"></span><span class="health-nav-label">{{ section.title }}</span><span class="health-nav-mark" aria-hidden="true">{{ status_marks[section.status] }}</span></a>
+          <span class="health-nav-tip" role="tooltip" id="health-tip-{{ section.key }}"><strong>{{ section.title }} · {{ status_labels[section.status] }}</strong> {{ section.summary }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
     <section class="health-summary" aria-labelledby="health-title" data-health-status="{{ health.status }}">
       <h2 id="health-title">Synthèse du projet {{ health.name }}</h2>
       <p class="health-global">État global : {{ health_status(health.status) }}</p>
