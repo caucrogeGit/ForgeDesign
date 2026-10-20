@@ -1,5 +1,6 @@
 """Composition réelle du Bridge sur des projets temporaires locaux."""
 
+import json
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -190,3 +191,56 @@ def test_unreadable_version_source(project: Path) -> None:
         result.warnings
         == ("Version Forge illisible.",) + read_forge_version(project).details
     )
+
+
+COMMIT = "1af6301dbd4d33e09e9803a2a727036e9efe4509"
+
+
+def venv(root: Path, commit: str) -> None:
+    dist_info = root / ".venv/lib/python3.13/site-packages/forge_mvc-1.0.0rc9.dist-info"
+    dist_info.mkdir(parents=True)
+    (dist_info / "METADATA").write_text("Name: forge-mvc\nVersion: 1.0.0rc9\n")
+    vcs = {"commit_id": commit, "vcs": "git"}
+    (dist_info / "direct_url.json").write_text(json.dumps({"vcs_info": vcs}))
+
+
+def test_git_pin_confirmed_by_venv(project: Path) -> None:
+    """FD-FORGE-005 : épinglage par commit, version lue dans .venv."""
+    pin = f"forge-mvc @ git+https://github.com/caucrogeGit/Forge.git@{COMMIT}"
+    (project / "requirements.txt").write_text(pin)
+    venv(project, COMMIT)
+    result = inspect_project(project)
+    assert result.forge_version == "1.0.0rc9"
+    assert result.forge_version_source == "requirements.txt (commit 1af6301), .venv"
+    assert result.errors == result.warnings == ()
+
+
+@pytest.mark.parametrize("installed", ["0" * 40, None])
+def test_git_pin_not_confirmed(project: Path, installed: str | None) -> None:
+    pin = f"forge-mvc @ git+https://github.com/caucrogeGit/Forge.git@{COMMIT}"
+    (project / "requirements.txt").write_text(pin)
+    if installed is not None:
+        venv(project, installed)
+    result = inspect_project(project)
+    assert result.forge_version is None
+    assert result.forge_version_source == "requirements.txt"
+    detail = (
+        "Le commit de forge-mvc installé dans .venv diffère du commit déclaré."
+        if installed
+        else "Environnement .venv absent."
+    )
+    assert result.warnings == (
+        "Version Forge absente ou indéterminable.",
+        "Ligne 1 : aucune version exacte inconditionnelle.",
+        detail,
+    )
+
+
+def test_exact_pin_ignores_venv(project: Path) -> None:
+    """Une version déclarée exacte reste la seule source : .venv n'est pas lu."""
+    venv(project, COMMIT)
+    (
+        project
+        / ".venv/lib/python3.13/site-packages/forge_mvc-1.0.0rc9.dist-info/METADATA"
+    ).write_text("Name: forge-mvc\nVersion: 7.0\n")
+    assert inspect_project(project).forge_version == "1.0.0rc9"

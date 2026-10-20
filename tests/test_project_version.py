@@ -235,3 +235,39 @@ def test_invalid_declaration_takes_precedence(project: Path) -> None:
     )
     result = read_forge_version(project)
     assert result.status == "unreadable" and result.version is None
+
+
+COMMIT = "1af6301dbd4d33e09e9803a2a727036e9efe4509"
+GIT = "forge-mvc @ git+https://github.com/caucrogeGit/Forge.git"
+
+
+@pytest.mark.parametrize(
+    ("content", "commit"),
+    [
+        (f"{GIT}@{COMMIT}", COMMIT),
+        (f"{GIT}@{COMMIT[:7].upper()}", COMMIT[:7]),
+        (f"{GIT}@{COMMIT}#egg=forge-mvc  # commentaire", COMMIT),
+        (f"forge-mvc @ git+https://u@h.example/F.git@{COMMIT}", COMMIT),
+        (f"{GIT}@{COMMIT}\nForge_MVC @ git+https://e.invalid/F.git@{COMMIT}", COMMIT),
+        ("forge-mvc @ git+https://example.invalid/Forge.git@abcdef", None),
+        (f"{GIT}@main", None),
+        (GIT, None),
+        (f"forge-mvc @ https://e.invalid/forge.zip#{COMMIT}", None),
+        (f"{GIT}@{COMMIT}\nforge-mvc>=1.0", None),
+        (f"{GIT}@{COMMIT}\nforge-mvc==1.0", None),
+        (f"{GIT}@{COMMIT}\n{GIT}@{'0' * 40}", None),
+        (f'{GIT}@{COMMIT} ; python_version >= "3.12"', None),
+    ],
+)
+def test_declared_commit(project: Path, content: str, commit: str | None) -> None:
+    """FD-FORGE-005 : le commit déclaré n'est pas une version ; il est signalé
+    seulement si toutes les déclarations épinglent le même commit."""
+    (project / "requirements.txt").write_text(content)
+    result = read_forge_version(project)
+    assert result.status == "absent" and result.version is None
+    assert result.commit == commit
+
+
+def test_exact_version_has_no_commit(project: Path) -> None:
+    (project / "requirements.txt").write_text("forge-mvc==1.0.0rc9")
+    assert read_forge_version(project).commit is None

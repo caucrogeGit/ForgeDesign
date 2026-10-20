@@ -30,12 +30,28 @@ class ForgeVersionInfo:
     version: str | None
     source: str | None
     details: tuple[str, ...] = ()
+    # Commit Git déclaré (FD-FORGE-005) : seulement pour « absent », quand toutes
+    # les déclarations forge-mvc épinglent le même commit hexadécimal. Ce n'est
+    # pas une version : installed_version la lit dans .venv et la confirme.
+    commit: str | None = None
+
+
+def _git_commit(url: str) -> str | None:
+    """Commit hexadécimal (7 à 40) d'une URL git+…@<commit>, sinon None."""
+    if not url.startswith("git+"):
+        return None
+    last = url.split("#", 1)[0].rsplit("/", 1)[-1]
+    if "@" not in last:
+        return None
+    revision = last.rsplit("@", 1)[1].lower()
+    return revision if re.fullmatch(r"[0-9a-f]{7,40}", revision) else None
 
 
 def _parse(content: str) -> ForgeVersionInfo:
     versions: list[Version] = []
     errors: list[str] = []
     unresolved: list[str] = []
+    commits: list[str | None] = []
     for number, raw in enumerate(content.splitlines(), 1):
         line = re.split(r"\s+#", raw.strip(), maxsplit=1)[0].strip()
         if not line or line.startswith("#"):
@@ -64,6 +80,8 @@ def _parse(content: str) -> ForgeVersionInfo:
             unresolved.append(
                 f"Ligne {number} : aucune version exacte inconditionnelle."
             )
+            pinned = requirement.marker is None and not specs and requirement.url
+            commits.append(_git_commit(pinned) if pinned else None)
             continue
         versions.extend(Version(s.version) for s in specs)
     if errors:
@@ -73,7 +91,8 @@ def _parse(content: str) -> ForgeVersionInfo:
             "conflict", None, _SOURCE, ("Déclarations Forge exactes contradictoires.",)
         )
     if unresolved:
-        return ForgeVersionInfo("absent", None, _SOURCE, tuple(unresolved))
+        commit = commits[0] if not versions and len(set(commits)) == 1 else None
+        return ForgeVersionInfo("absent", None, _SOURCE, tuple(unresolved), commit)
     if not versions:
         return ForgeVersionInfo(
             "absent", None, _SOURCE, ("Aucune déclaration Forge exacte.",)

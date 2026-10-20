@@ -180,6 +180,38 @@ Ce contrat décrit la version **déclarée**, pas nécessairement la version ins
 (notamment en mode `FORGE_DEV_SRC`). Il ne compare pas cette version à Forge Design
 et ne statue pas sur son support.
 
+### Épinglage par commit confirmé par `.venv` (FD-FORGE-005)
+
+Un projet peut épingler Forge par un commit Git, sans numéro de version :
+`forge-mvc @ git+https://…/Forge.git@<commit>` (cas de SéquenCiel). Le contrat
+ci-dessus reste inchangé : `read_forge_version` rend `absent`, et ne lit que
+`requirements.txt`. Il expose en plus `commit`, seulement pour `absent`, quand
+toutes les déclarations `forge-mvc` sont des URL `git+…@<commit>` désignant le
+même commit hexadécimal de 7 à 40 caractères, sans condition ni pin exact. Une
+branche, une étiquette ou un mélange avec une plage ou un pin exact ne donnent
+pas de commit.
+
+L'inspection du projet (`inspect_project`) consulte alors l'environnement
+installé, par `read_installed_forge(root, commit)`, et seulement dans ce cas :
+
+- lieu unique : `<racine>/.venv/lib/python3.<n>/site-packages/forge_mvc-*.dist-info`,
+  qui doit être seul (deux installations rendent la lecture refusée) ;
+- seuls `METADATA` (en-têtes `Name` et `Version`, au plus 256 Kio) et
+  `direct_url.json` (`vcs_info.commit_id`, au plus 64 Kio) sont lus ; rien n'est
+  importé ni exécuté, aucun réseau ;
+- chaque dossier est ouvert relativement au précédent depuis la racine
+  (`dir_fd`, `O_NOFOLLOW`) : un `.venv` ou un `site-packages` lié est refusé, un
+  dossier `python3.<n>` ou `dist-info` lié est ignoré, une métadonnée liée ou
+  non ordinaire est refusée ; l'identité du fichier ouvert est contrôlée ;
+- la version n'est retenue que si le commit installé commence par le commit
+  déclaré. Elle est alors normalisée PEP 440, et la source affichée vaut
+  `requirements.txt (commit <7 caractères>), .venv`.
+
+Sinon, la version reste indéterminée et l'avertissement de version reçoit un
+détail : `.venv` absent, `forge-mvc` non installé, installé sans commit Git,
+commit différent, ou métadonnées illisibles. Un pin exact `==` reste la seule
+source : `.venv` n'est alors jamais lu.
+
 ## 7. Détection de projet
 
 La détection doit utiliser un petit ensemble de signatures stables.

@@ -1,9 +1,10 @@
 """Diagnostic de projet en lecture seule, composé à partir du Forge Bridge."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from os import PathLike
 from pathlib import Path
 
+from forge_design.forge.installed_version import VENV, read_installed_forge
 from forge_design.forge.project_detection import detect_forge_project
 from forge_design.forge.project_root import resolve_project_root
 from forge_design.forge.project_version import read_forge_version
@@ -39,6 +40,21 @@ def inspect_project(root: str | PathLike[str]) -> ProjectInspection:
 
     version = read_forge_version(canonical)
     warnings = structure.warnings
+    if version.commit is not None:
+        # Épinglage par commit (FD-FORGE-005) : la version de distribution est
+        # celle installée dans .venv, si elle porte bien le commit déclaré.
+        installed = read_installed_forge(canonical, version.commit)
+        if installed.status == "match":
+            source = f"{version.source} (commit {version.commit[:7]}), {VENV}"
+            return ProjectInspection(
+                canonical,
+                structure.valid,
+                installed.version,
+                source,
+                structure.errors,
+                warnings,
+            )
+        version = replace(version, details=version.details + (installed.detail,))
     if version.status != "found":
         labels = {
             "absent": "Version Forge absente ou indéterminable.",
