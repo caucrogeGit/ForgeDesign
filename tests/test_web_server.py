@@ -355,7 +355,9 @@ def test_shell_sidebar_and_no_inline_style(running_server: WSGIServer) -> None:
     # Plus de barre du haut ni de fil d'Ariane ; sans projet, aucune action (FD-UX-012).
     assert "app-topbar" not in html and "app-crumb" not in html
     assert "app-project-actions" not in html
-    assert "<h1>Vue d’ensemble</h1>" in content
+    # Titre masqué, sans phrase d'introduction (FD-UX-016).
+    assert '<h1 class="visually-hidden">Vue d’ensemble</h1>' in content
+    assert "Consultez la structure" not in content
     # L'accueil garde le menu de l'atelier ; son contenu est le lanceur (FD-UX-010).
     home = _get(running_server, "/")[2].decode("utf-8")
     assert '<aside class="app-sidebar">' in home and "app-topbar" not in home

@@ -44,7 +44,7 @@ def test_handlers_delegate_without_parallel_mutations(
         )
         # Ouvrir un projet récent mène à sa Vue d'ensemble (FD-UX-011).
         assert status == 200 and "Projet ouvert." in html
-        assert "<h1>Vue d’ensemble</h1>" in html
+        assert '<h1 class="visually-hidden">Vue d’ensemble</h1>' in html
         assert "&lt;private&gt; warning" in html and "<private>" not in html
         assert headers["Cache-Control"] == "no-store"
         assert calls[0][0] is calls[1][0]

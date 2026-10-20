@@ -7,8 +7,8 @@
 {%- endmacro %}
 {% block title %}Vue d’ensemble · Forge Design{% endblock %}
 {% block content %}
-    <h1>Vue d’ensemble</h1>
-    <p class="intro">Consultez la structure et la version déclarée d’un projet Forge.</p>
+    {#- Titre lu par les lecteurs d'écran seulement ; le sommaire ouvre la page (FD-UX-016). #}
+    <h1 class="visually-hidden">Vue d’ensemble</h1>
     {% if health %}
     {#- Sommaire (FD-UX-015) : une entrée par carte, avec son état ; l'infobulle
         reprend le résumé. Liens internes seulement : les outils restent dans les
