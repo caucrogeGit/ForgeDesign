@@ -97,7 +97,9 @@ et le cadre « Synthèse du projet » (titre, état global écrit, aide) n'exist
 plus. Les tuiles ne s'affichent qu'à la demande : aucune avant un choix (une
 invite à la place), puis seulement celle de l'entrée choisie, centrée sous le
 menu, avec l'entrée mise en valeur. « À traiter en priorité » ouvre de même sa
-tuile. Sans JavaScript : la tuile visée par l'ancre (`:target`). Les titres de
+tuile. Son contenu est centré, comme le menu (FD-UX-018) : les faits gardent
+leurs libellés à droite et leurs valeurs à gauche. Sans JavaScript : la tuile
+visée par l'ancre (`:target`). Les titres de
 tuile sont des `h2`, sous le `h1` masqué de la page. Une infobulle, au survol
 ou au focus clavier, reprend le nom, l'état écrit et le résumé de la tuile.
 Elle est reliée au lien par `aria-describedby`. Quand la place manque pour les

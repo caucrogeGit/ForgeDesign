@@ -183,6 +183,15 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
    sauter la page quand la carte est déjà sous le menu. */
 .health-section h2 { scroll-margin-top: 9rem; }
 .health-summary > .health-section:has(> h2:target) { display: flex; }
+/* Contenu de la tuile centré, comme le menu (FD-UX-018) : faits en deux
+   colonnes autour de l'axe (libellés à droite, valeurs à gauche) ; la liste
+   des diagnostics, centrée en bloc, reste lisible alignée à gauche. */
+.health-summary > .health-section { align-items: center; text-align: center; }
+.health-summary > .health-section dl { width: fit-content; max-width: 100%; }
+.health-summary > .health-section dt { text-align: right; }
+.health-summary > .health-section dd { text-align: left; }
+.health-summary > .health-section .health-details { display: flex; flex-direction: column; align-items: center; }
+.health-summary > .health-section .health-diagnostics { width: fit-content; max-width: 100%; box-sizing: border-box; text-align: left; }
 .health-summary:has(.health-section > h2:target) > .health-hint { display: none; }
 main:has(#health-project:target) .health-nav a[href="#health-project"],
 main:has(#health-forge:target) .health-nav a[href="#health-forge"],
