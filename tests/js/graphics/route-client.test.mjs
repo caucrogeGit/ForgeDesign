@@ -68,7 +68,7 @@ test("montage : moteur créé, repli masqué, détails depuis les données opaqu
   nodes[1].dispatch("click");
   assert.equal(view.details.hidden, false);
   assert.deepEqual(view.fields.map((f) => f.textContent), ["Template", "<script>.html", "Absent"]);
-  assert.equal(view.status.textContent, "Élément sélectionné : <script>.html");
+  assert.equal(view.status.textContent, "Élément sélectionné\u00a0: <script>.html");
   view.clear.dispatch("click");
   assert.equal(engine.selection(), null);
   assert.equal(view.details.hidden, true);

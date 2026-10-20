@@ -28,6 +28,11 @@ dans le `PATH`, `ss`, `curl`. Variables : `CIRCUIT_REPO` et `FLOWCHART_REPO`
 | `browser.mjs`, `scenario.mjs` | Parcours complet avec JavaScript, modules actifs |
 | `nojs.mjs` | Parcours Firefox sans JavaScript |
 
+À chaque page, `scenario.mjs` contrôle aussi l'accessibilité de base, la CSP,
+l'absence de valeur sensible et deux règles de l'ADR-002 (FD-UX-008) que seul
+un navigateur voit. Chaque `.help-text` se calcule en `--ink` et en italique.
+Aucune phrase d'un bloc ne compte plus d'un deux-points, code exclu.
+
 `ONLY=<regex>` restreint `scenario.mjs` aux étapes dont le nom correspond.
 Les valeurs « secrètes » des fixtures sont synthétiques (`AccSecret123`…) et
 servent uniquement à vérifier le masquage.

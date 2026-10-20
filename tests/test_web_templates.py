@@ -51,7 +51,7 @@ def test_list_detail_reload_and_no_write(
         assert "Source mvc/views/ absente" in html and calls == [root]
         views = root / "mvc/views"
         views.mkdir()
-        assert "Aucun template disponible." in call(app, "/templates")[1]
+        assert "Aucun gabarit disponible." in call(app, "/templates")[1]
         name = 'é space &+?#"<tag>.jinja'
         file = views / name
         content = (
@@ -189,7 +189,7 @@ def test_date_out_of_range() -> None:
 def test_grouping_and_kinds_for_the_list() -> None:
     """Présentation de la liste (FD-UX-006) : type par suffixe exact, dossiers
     triés (racine d'abord), ordre d'inventaire conservé dans chaque dossier."""
-    assert template_kind("contacts/list.html") == ("template", "Template")
+    assert template_kind("contacts/list.html") == ("template", "Gabarit")
     assert template_kind("contacts/list.view.json") == ("contract", "Contrat")
     assert template_kind("contacts/list.design.json") == ("design", "Design")
     assert template_kind("contacts/list.view.JSON") == ("other", "Autre")

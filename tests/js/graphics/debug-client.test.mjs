@@ -28,7 +28,7 @@ function page(sceneText) {
 function step(id, x, label, detail) {
   return {
     id,
-    label: detail ? `${label} — ${detail}` : label,
+    label: detail ? `${label} · ${detail}` : label,
     rect: { x, y: 20, width: 220, height: 90 },
     lines: detail ? [label, detail] : [label],
     levels: { overview: [], normal: [0] },
@@ -54,10 +54,10 @@ test("montage : moteur créé, repli masqué, statut de l'étape sélectionnée"
   assert.ok(engine && view.fallback.hidden);
   assert.equal(view.status.textContent, "Sélectionnez une étape du flux.");
   const nodes = rendered(view.host).nodes;
-  assert.deepEqual(nodes.map((node) => node.getAttribute("aria-label")), ["Requête — GET /", `Contrôleur — ${HOSTILE}`, "Template"]);
+  assert.deepEqual(nodes.map((node) => node.getAttribute("aria-label")), ["Requête · GET /", `Contrôleur · ${HOSTILE}`, "Template"]);
   nodes[1].dispatch("click");
   assert.deepEqual(engine.selection().neighbourIds, ["a", "c"]);
-  assert.equal(view.status.textContent, `Étape sélectionnée : Contrôleur — ${HOSTILE}`);
+  assert.equal(view.status.textContent, `Étape sélectionnée\u00a0: Contrôleur · ${HOSTILE}`);
   // Le texte hostile reste un nœud texte, jamais du balisage.
   const texts = nodes[1].querySelectorAll("text");
   assert.equal(texts[1].textContent, HOSTILE);

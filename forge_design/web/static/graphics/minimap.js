@@ -108,7 +108,7 @@ export function describeVisible(bounds, visible) {
   const x2 = percent(visible.x + visible.width, bounds.width);
   const y1 = percent(visible.y, bounds.height);
   const y2 = percent(visible.y + visible.height, bounds.height);
-  return `Mini-carte de la scène. Zone visible : de ${x1} à ${x2} % de la largeur, de ${y1} à ${y2} % de la hauteur.`;
+  return `Mini-carte de la scène. Zone visible\u00a0: de ${x1} à ${x2}\u00a0% de la largeur, de ${y1} à ${y2}\u00a0% de la hauteur.`;
 }
 
 const round = (value) => Math.round(value * 10) / 10;

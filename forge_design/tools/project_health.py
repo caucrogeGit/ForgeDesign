@@ -242,7 +242,7 @@ def _forge(
         "ok" if found else "attention",
         f"Forge {inspection.forge_version} détecté."
         if found
-        else "Projet Forge reconnu ; version indéterminée.",
+        else "Projet Forge reconnu, version indéterminée.",
         facts,
         (HealthDiagnostic("warning", message) for message in version_warnings),
     )
@@ -330,7 +330,7 @@ def _routes(result: RoutesResult) -> HealthSection:
             ("Méthodes HTTP", ", ".join(methods) if methods else "aucune"),
             ("Routes sans diagnostic", str(total - len(flagged))),
             ("Routes avec diagnostic", str(len(flagged))),
-            ("Lecture", "statique ; liste possiblement partielle"),
+            ("Lecture", "statique, liste possiblement partielle"),
             (
                 "Diagnostics",
                 f"{report.error_count} erreur(s), "
@@ -489,7 +489,7 @@ def _diagnostics(result: DebugErrorsResult) -> HealthSection:
     return _section(
         "diagnostics",
         status,
-        "Journal runtime de développement (Debug Center)."
+        "Journal runtime de développement (page Diagnostic)."
         if result.source_present
         else "Aucun journal runtime : aucune erreur enregistrée.",
         (

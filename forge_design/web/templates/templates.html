@@ -1,25 +1,25 @@
 {% extends "layout.html" %}
-{% block title %}Template Viewer — Forge Design{% endblock %}
+{% block title %}Gabarits · Forge Design{% endblock %}
 {% block content %}
-<h1>Template Viewer</h1>
-<p class="intro">Templates physiques de mvc/views/, en lecture seule. Les templates fournis exclusivement par les loaders d’opt-in ne sont pas inclus.</p>
+<h1>Gabarits</h1>
+<p class="intro">Gabarits physiques de mvc/views/, en lecture seule. Les gabarits fournis exclusivement par les loaders d’opt-in ne sont pas inclus.</p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
 {% if result %}
 {% if not result.source_present %}<p>Source mvc/views/ absente ou inaccessible.</p>{% endif %}
 {% if result.issues %}
-<ul>{% for issue in result.issues %}<li><code>{{ issue.code }}</code> : {{ issue.message }}{% if issue.path %} — {{ issue.path }}{% endif %}</li>{% endfor %}</ul>
+<ul>{% for issue in result.issues %}<li><code>{{ issue.code }}</code> : {{ issue.message }}{% if issue.path %} · {{ issue.path }}{% endif %}</li>{% endfor %}</ul>
 {% endif %}
 {% if result.templates %}
 <ul class="route-tally" aria-label="Fichiers de mvc/views">
   <li><strong>{{ result.templates | length }}</strong> fichier{% if result.templates | length > 1 %}s{% endif %}</li>
-  <li data-kind="template"><strong>{{ template_counts.template }}</strong> template{% if template_counts.template > 1 %}s{% endif %}</li>
+  <li data-kind="template"><strong>{{ template_counts.template }}</strong> gabarit{% if template_counts.template > 1 %}s{% endif %}</li>
   <li data-kind="contract"><strong>{{ template_counts.contract }}</strong> contrat{% if template_counts.contract > 1 %}s{% endif %} de vue</li>
   <li data-kind="design"><strong>{{ template_counts.design }}</strong> design{% if template_counts.design > 1 %}s{% endif %}</li>
   {% if template_counts.other %}<li><strong>{{ template_counts.other }}</strong> autre{% if template_counts.other > 1 %}s{% endif %}</li>{% endif %}
 </ul>
 <div class="table-scroll"><table class="template-table">
-  <caption>Templates locaux, par dossier</caption>
+  <caption>Gabarits locaux par dossier</caption>
   <thead><tr><th scope="col">Fichier</th><th scope="col">Type</th><th scope="col">Taille</th><th scope="col">Modification</th><th scope="col">Action</th></tr></thead>
   {% for folder, entries in template_groups %}
   <tbody>
@@ -33,6 +33,6 @@
   </tbody>
   {% endfor %}
 </table></div>
-{% else %}<p>Aucun template disponible.</p>{% endif %}
+{% else %}<p>Aucun gabarit disponible.</p>{% endif %}
 {% endif %}
 {% endblock %}

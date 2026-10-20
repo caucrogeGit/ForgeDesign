@@ -71,7 +71,7 @@ def test_nominal_ids_order_endpoints_positions_and_size() -> None:
     ]
     first = scene["nodes"][0]
     assert first["lines"] == ["Requête", "POST /valeur"]
-    assert first["label"] == "Requête — POST /valeur"
+    assert first["label"] == "Requête · POST /valeur"
     assert first["levels"] == {"overview": [], "normal": [0]}
     assert "data" not in first
     assert "trace d'exécution" in scene["description"]

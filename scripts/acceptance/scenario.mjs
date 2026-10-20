@@ -62,6 +62,36 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     })()`);
     for (const p of problems) a11y.add(p);
     const where = await path();
+    // ADR-002, règle 12 : chaque texte d'aide se calcule en --ink et en italique,
+    // quel que soit le contexte (une règle plus spécifique ne doit pas l'atténuer).
+    const helpIssues = await page.eval(`(() => {
+      const probe = document.body.appendChild(document.createElement("span"));
+      probe.style.color = "var(--ink)";
+      const ink = getComputedStyle(probe).color;
+      probe.remove();
+      return [...document.querySelectorAll(".help-text")]
+        .map((el) => [el, getComputedStyle(el)])
+        .filter(([, cs]) => cs.color !== ink || cs.fontStyle !== "italic")
+        .map(([el, cs]) => cs.color + " " + cs.fontStyle + " " + el.textContent.trim().slice(0, 40));
+    })()`);
+    assert.deepEqual(helpIssues, [], `aide atténuée sur ${where}`);
+    // ADR-002, règle 3 : au plus un deux-points par phrase, dans le texte de
+    // chaque bloc feuille, sans le code (horodatages, classes md:… exclus).
+    const colonIssues = await page.eval(`(() => {
+      const blocks = "p,li,dt,dd,td,th,h1,h2,h3,h4,summary,label,caption,legend,button";
+      const out = [];
+      for (const el of document.querySelectorAll(blocks)) {
+        if (el.querySelector("p,li,ul,ol,div,dl,table,section,details")) continue;
+        const copy = el.cloneNode(true);
+        for (const code of copy.querySelectorAll("code,pre,kbd,samp,script,style")) code.remove();
+        for (const br of copy.querySelectorAll("br")) br.replaceWith("\\n");
+        for (const line of copy.textContent.split("\\n"))
+          for (const sentence of line.split(/(?<=[.!?…])\\s+/))
+            if ((sentence.match(/\\s:/g) ?? []).length > 1) out.push(sentence.trim().replace(/\\s+/g, " ").slice(0, 120));
+      }
+      return [...new Set(out)];
+    })()`);
+    assert.deepEqual(colonIssues, [], `deux deux-points dans une phrase sur ${where}`);
     const violations = await csp();
     assert.deepEqual(violations, [], `CSP sur ${where} : ${violations.join(" ; ")}`);
     // Le champ de recherche réaffiche la saisie de l'utilisateur : hors contrôle.
@@ -187,7 +217,7 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     await openProject(P("A-no-bootstrap"));
     const body = await text();
     assert.match(body, /Synthèse du projet A-no-bootstrap/);
-    assert.doesNotMatch(body, /bootstrap\.py : absent\./);
+    assert.doesNotMatch(body, /bootstrap\.py\s:\sabsent\./);
     assert.equal(await healthStatus("structure"), "ok");
     const info = await page.eval(`[...document.querySelectorAll('[data-health-section="structure"] li[data-severity="info"]')].map((li) => li.textContent.replace(/\\s+/g, " "))`);
     assert.ok(info.some((line) => line.includes("Élément optionnel absent.") && line.includes("bootstrap.py")), info.join(" | "));
@@ -221,7 +251,7 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     const recent = () => page.eval(`[...document.querySelectorAll('form[action="/project/recent/remove"] input[name=recent]')].map((i) => i.value)`);
     assert.deepEqual((await recent()).slice(0, 4), [gone, P("C"), P("B"), P("A")]);
     await clickAt(`form[action="/project/open-recent"]:has(input[value="${P("A")}"]) button`, "Ouvrir A");
-    assert.match(await text(), /Synthèse du projet A|Projet : .*\/A\b/);
+    assert.match(await text(), /Synthèse du projet A|Projet\s:\s.*\/A\b/);
     await go("/");
     await clickAt(`form[action="/project/recent/remove"]:has(input[value="${P("B")}"]) button`, "Retirer B");
     await go("/");
@@ -410,7 +440,7 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     // Onglet A soumet sa vue périmée : refus, aucun bloc touché.
     await submit(`document.querySelector('form input[name=action][value=remove]').form.requestSubmit()`, "suppression depuis la vue périmée");
     const body = await text();
-    assert.match(body, /Le design a été modifié depuis l’affichage de cette page\. Rechargez l’éditeur avant de recommencer\./);
+    assert.match(body, /Le design a été modifié depuis l’affichage de cette page\.\s+Rechargez l’éditeur avant de recommencer\./);
     assert.equal(sha(), s1, "design identique octet pour octet à S1");
     assert.deepEqual(kids(), ["table", "section"]);
     metrics.editor_stale_result = { blocks: kids(), message: body.match(/Le design a été modifié[^\n]*/)?.[0] };

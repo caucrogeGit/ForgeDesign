@@ -20,11 +20,11 @@ export function mountDebugFlow(container) {
     engine = createGraphicEngine(host, JSON.parse(source.textContent), {
       onSelectionChange(state) {
         const node = state ? engine.node(state.nodeId) : null;
-        status.textContent = node ? `Étape sélectionnée : ${node.label}` : IDLE;
+        status.textContent = node ? `Étape sélectionnée\u00a0: ${node.label}` : IDLE;
       },
     });
   } catch (error) {
-    status.textContent = `Vue interactive indisponible (${error.message}) ; le schéma statique reste affiché.`;
+    status.textContent = `Vue interactive indisponible (${error.message}), le schéma statique reste affiché.`;
     return null;
   }
   if (fallback) fallback.hidden = true;

@@ -120,7 +120,7 @@ def test_core_version_matrix(core: str, requires: str | None, compatible: bool) 
         [diagnostic] = result.diagnostics
         assert diagnostic.code == "core-version-incompatible"
         assert diagnostic.message == (
-            f"Le module « flow » nécessite forge-design {requires} ; "
+            f"Le module « flow » nécessite forge-design {requires}, "
             f"version installée : {core}."
         )
 
@@ -141,7 +141,7 @@ def test_unknown_core_version_fails_closed_only_for_constrained_modules(
         "core-version-unknown",
     )
     assert diagnostic.message == (
-        "Le module « bound » nécessite forge-design >=0.2.0 ; "
+        "Le module « bound » nécessite forge-design >=0.2.0, "
         "version de Forge Design indéterminée."
     )
 
@@ -154,8 +154,7 @@ def test_production_version_is_the_authoritative_core_version() -> None:
     )
     assert [module.descriptor.id for module in result.modules] == ["ok"]
     assert result.diagnostics[0].message == (
-        "Le module « future » nécessite forge-design >=9999 ; "
-        "version installée : 0.4.0."
+        "Le module « future » nécessite forge-design >=9999, version installée : 0.4.0."
     )
 
 

@@ -145,13 +145,13 @@ def _core_refusal(
     if version is None:
         return (
             "core-version-unknown",
-            f"Le module « {descriptor.id} » nécessite forge-design {requirement} ; "
+            f"Le module « {descriptor.id} » nécessite forge-design {requirement}, "
             "version de Forge Design indéterminée.",
         )
     if not specifier.contains(version, prereleases=True):
         return (
             "core-version-incompatible",
-            f"Le module « {descriptor.id} » nécessite forge-design {requirement} ; "
+            f"Le module « {descriptor.id} » nécessite forge-design {requirement}, "
             f"version installée : {core}.",
         )
     return None
@@ -189,7 +189,7 @@ def activate_modules(
                 refuse(
                     package,
                     "module-missing",
-                    "Module non installé ; rien n'est chargé.",
+                    "Module non installé. Rien n'est chargé.",
                 )
             else:
                 refuse(

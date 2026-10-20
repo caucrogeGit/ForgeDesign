@@ -123,7 +123,7 @@ def test_tree_single_pipeline(
                 assert message in html
         if "selected" in source:
             assert "Référence dynamique" in html and "from-import" in html
-            assert html.count("title — ligne 1") == 2
+            assert html.count("title · ligne 1") == 2
         if "{% if" in source:
             assert "Syntaxe Jinja invalide" in html
             assert "Arbre construit à partir d’une analyse partielle." in html
@@ -144,7 +144,7 @@ def test_tree_single_pipeline(
         )
         assert call(app, "/templates/tree", method="POST")[0] == 405
         file.write_text('{% include "new" %}{% block changed %}<article>{% endblock %}')
-        assert "changed — ligne 1" in call(app, url)[1]
+        assert "changed · ligne 1" in call(app, url)[1]
         file.unlink()
         assert call(app, url)[0] == 404
 

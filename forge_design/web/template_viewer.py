@@ -56,7 +56,7 @@ def modified_date(modified_ns: int) -> str:
 _KINDS = (
     (".design.json", "design", "Design"),
     (".view.json", "contract", "Contrat"),
-    (".html", "template", "Template"),
+    (".html", "template", "Gabarit"),
 )
 
 

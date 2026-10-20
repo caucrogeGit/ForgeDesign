@@ -1,8 +1,8 @@
 {% extends "layout.html" %}
-{% block title %}Template brut — Forge Design{% endblock %}
+{% block title %}Gabarit brut · Forge Design{% endblock %}
 {% block content %}
-<h1>Template brut</h1>
-<p><a href="/templates">Retour à Template Viewer</a></p>
+<h1>Gabarit brut</h1>
+<p><a href="/templates">Retour aux gabarits</a></p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if source %}
 <div class="template-header">
@@ -33,11 +33,11 @@
 </tbody></table></div>
 {% else %}<p>Aucune dépendance relevée.</p>{% endif %}
 <h3>Blocks</h3>
-{% if structure.blocks %}<ul>{% for block in structure.blocks %}<li>{{ block.name }} — ligne {{ block.line }}</li>{% endfor %}</ul>
+{% if structure.blocks %}<ul>{% for block in structure.blocks %}<li>{{ block.name }} · ligne {{ block.line }}</li>{% endfor %}</ul>
 {% else %}<p>Aucun block relevé.</p>{% endif %}
 <h3>Structure HTML légère</h3>
-<p>Balises déclarées, sans validation HTML ni exécution des branches Jinja. Indentation visuelle limitée à 32 niveaux ; profondeur exacte indiquée.</p>
-<pre class="source-code">{% for element in structure.html_elements %}{{ '  ' * ([element.depth, 32]|min) }}{{ element.tag }} — ligne {{ element.line }}, profondeur {{ element.depth }}
+<p>Balises déclarées, sans validation HTML ni exécution des branches Jinja. Indentation visuelle limitée à 32 niveaux. Profondeur exacte indiquée.</p>
+<pre class="source-code">{% for element in structure.html_elements %}{{ '  ' * ([element.depth, 32]|min) }}{{ element.tag }} · ligne {{ element.line }}, profondeur {{ element.depth }}
 {% else %}Aucune balise relevée.
 {% endfor %}</pre>
 </section>

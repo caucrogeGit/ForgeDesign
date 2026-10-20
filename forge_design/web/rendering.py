@@ -12,6 +12,7 @@ from integrations.jinja2.renderer import (  # pyright: ignore[reportMissingTypeS
 )
 
 from forge_design import __version__
+from forge_design.web.typography import french_typography
 
 
 @dataclass(frozen=True)
@@ -45,9 +46,17 @@ def with_shell(
 
 
 def render_page(
-    template: str, context: dict[str, object], *, status: int = 200
+    template: str,
+    context: dict[str, object],
+    *,
+    status: int = 200,
+    typography: bool = True,
 ) -> Response:
-    """Rendre un nom de template interne, jamais un chemin fourni par HTTP."""
+    """Rendre un nom de template interne, jamais un chemin fourni par HTTP.
+
+    ``typography`` applique la typographie française au texte de l'interface ;
+    l'aperçu d'un Design, contenu du projet, la désactive.
+    """
     shell = _SHELL.get()
     page = {
         "app_version": __version__,
@@ -57,4 +66,6 @@ def render_page(
     }
     with as_file(files("forge_design.web").joinpath("templates")) as templates:
         html = Jinja2Renderer(str(templates)).render(template, page)
+    if typography:
+        html = french_typography(html)
     return Response.html(html, status=status)

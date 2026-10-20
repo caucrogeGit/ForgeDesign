@@ -528,7 +528,7 @@ def write_specialized_resource(
         ) from error
     except (_Refused, OSError) as error:
         raise SpecializedResourceError(
-            "Écriture impossible ; relire la ressource avant de réessayer."
+            "Écriture impossible. Relire la ressource avant de réessayer."
         ) from error
     created = expected_revision is None
     try:

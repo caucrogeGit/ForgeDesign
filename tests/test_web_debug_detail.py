@@ -147,7 +147,7 @@ def test_occurrences_append_rewrite_and_status(
             assert "Aucune information de requête disponible." in html
             assert "Aucune traceback structurée disponible." in html
             assert 'href="/debug" aria-current="page"' in html
-            assert "Retour au Debug Center" in html and "route-filters" not in html
+            assert "Retour au diagnostic" in html and "route-filters" not in html
             assert before == {
                 p: (p.read_bytes(), p.stat().st_size, p.stat().st_mtime_ns)
                 for p in tmp_path.rglob("*")

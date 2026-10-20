@@ -35,7 +35,7 @@ def build_entity_graphic_scene(layout: EntityGraphLayout) -> dict[str, Any]:
     for item in layout.nodes:
         node = item.node
         kind = KIND_LABELS[node.kind]
-        lines = [f"{kind} — {node.field_count} champs", item.label]
+        lines = [f"{kind} · {node.field_count} champs", item.label]
         if node.kind == "entity":
             lines.append(item.table)
         nodes.append(

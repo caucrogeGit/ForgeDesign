@@ -206,7 +206,7 @@ def _publication(
         published = snapshot_template(root, path)
     except (OSError, ValueError, TemplateSnapshotError) as error:
         raise TemplatePublishedError(
-            "Template publié mais illisible ; relire la cible avant toute "
+            "Template publié mais illisible. Relire la cible avant toute "
             "nouvelle tentative.",
             None,
         ) from error
@@ -218,7 +218,7 @@ def _publication(
         or (revision.device, revision.inode) != (prepared.st_dev, prepared.st_ino)
     ):
         raise TemplatePublishedError(
-            "Template publié puis modifié ou remplacé ; relire la cible avant "
+            "Template publié puis modifié ou remplacé. Relire la cible avant "
             "toute nouvelle tentative.",
             None,
         )
@@ -328,17 +328,17 @@ def write_generated_template(
     except FileExistsError as error:
         if published:
             raise TemplatePublishedError(
-                "Template publié ; état du temporaire incertain.", None
+                "Template publié, état du temporaire incertain.", None
             ) from error
         raise TemplateWriteConflictError("Cible apparue avant publication.") from error
     except OSError as error:
         if published:
             raise TemplatePublishedError(
-                "Template publié ; relire la cible avant toute nouvelle tentative.",
+                "Template publié. Relire la cible avant toute nouvelle tentative.",
                 None,
             ) from error
         raise TemplateWriteError(
-            "Écriture impossible ; relire la cible avant de réessayer."
+            "Écriture impossible. Relire la cible avant de réessayer."
         ) from error
 
     try:

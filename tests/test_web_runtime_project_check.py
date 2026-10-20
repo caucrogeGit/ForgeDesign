@@ -114,7 +114,7 @@ def test_each_post_runs_only_its_command(tmp_path: Path, runs: list[str]) -> Non
             state = "succeeded" if key == ran else "not-run"
             assert f'data-diagnostic-status="{state}"' in part(html, key), (ran, key)
     assert (
-        "Terminé avec le code 0 : aucun contrôle en échec (des avertissements "
+        "Terminé avec le code 0\u00a0: aucun contrôle en échec (des avertissements "
         "restent possibles)" in part(checked, "check")
     )
     for key in ("diagnostic", "audit", "check"):
@@ -126,10 +126,13 @@ def test_each_post_runs_only_its_command(tmp_path: Path, runs: list[str]) -> Non
 @pytest.mark.parametrize(
     ("mode", "label"),
     [
-        ("fail", "Terminé avec le code 1 : au moins un contrôle en échec, ou erreur"),
+        (
+            "fail",
+            "Terminé avec le code 1\u00a0: au moins un contrôle en échec, ou erreur",
+        ),
         (
             "code3",
-            "Terminé avec un autre code retour : le code importé du projet a pu "
+            "Terminé avec un autre code retour\u00a0: le code importé du projet a pu "
             "terminer le processus",
         ),
     ],
@@ -147,7 +150,7 @@ def test_guards_and_projects(tmp_path: Path, runs: list[str]) -> None:
     with serving(tmp_path, None) as app:
         status, html, _ = post(app, url=CHECK)
         assert status == 409
-        assert "Aucun projet sélectionné : vérification non lancée." in part(
+        assert "Aucun projet sélectionné\u00a0: vérification non lancée." in part(
             html, "check"
         )
         opened(app, root)
@@ -164,7 +167,8 @@ def test_guards_and_projects(tmp_path: Path, runs: list[str]) -> None:
             assert status == 400 and "aucun paramètre" in part(html, "check")
         (root / "app.py").unlink()
         status, html, _ = post(app, url=CHECK)
-        assert status == 409 and "Vérification non lancée : " in part(html, "check")
+        assert status == 409
+        assert "Vérification non lancée\u00a0: " in part(html, "check")
     assert runs == []
 
 
@@ -190,7 +194,7 @@ def test_secret_timeout_and_missing_interpreter(
         _, missing, _ = post(app, url=CHECK)
     for value in ("hunter", "k3y-777", "abc999", "t0ken-99"):
         assert value not in secret
-    assert "Vérification interrompue : délai dépassé." in part(slow, "check")
+    assert "Vérification interrompue\u00a0: délai dépassé." in part(slow, "check")
     assert 'data-diagnostic-status="launch-failed"' in part(missing, "check")
     assert "vérification non lancée." in part(missing, "check")
 

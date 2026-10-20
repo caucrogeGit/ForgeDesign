@@ -245,8 +245,8 @@ class RealPreviewRuntime:
         if status.state == "running":
             self._controller.stop()
             self._failure = (
-                "Le proxy de preview s'est arrêté de façon inattendue ; "
-                "la preview a été arrêtée."
+                "Le proxy de preview s'est arrêté de façon inattendue. "
+                "La preview a été arrêtée."
             )
 
     def stop(self) -> bool:
@@ -449,7 +449,7 @@ def real_preview_action(
         )
         if not selection.available:
             raise EditorHttpError(
-                409, f"Preview réelle indisponible : {selection.reason}"
+                409, f"Preview réelle indisponible. {selection.reason}"
             )
         assert context.root is not None
         try:
@@ -542,7 +542,7 @@ def route_real_preview_action(
         if not selection.available:
             code = 404 if selection.reason == REASON_UNKNOWN_ROUTE else 409
             raise EditorHttpError(
-                code, f"Preview réelle indisponible : {selection.reason}"
+                code, f"Preview réelle indisponible. {selection.reason}"
             )
         assert context.root is not None
         try:

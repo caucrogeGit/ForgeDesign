@@ -1,12 +1,12 @@
 {% extends "layout.html" %}
-{% block title %}Entity Explorer — Forge Design{% endblock %}
+{% block title %}Entités · Forge Design{% endblock %}
 {% macro boolean(value) %}{{ 'Oui' if value else 'Non' }}{% endmacro %}
 {% macro location(source) -%}
 {% if source %}{% if source_available(source) %}<a href="{{ source_url(source.path) }}">{{ source.path }}</a>{% else %}{{ source.path }}{% endif %}{% endif %}
 {%- endmacro %}
 {% block content %}
-<h1>Entity Explorer</h1>
-<p class="intro">Contrats JSON déclarés, en lecture seule. Les relations sont déclaratives ; la base de données n’est pas analysée.</p>
+<h1>Entités</h1>
+<p class="intro">Contrats JSON déclarés, en lecture seule. Les relations sont déclaratives. La base de données n’est pas analysée.</p>
 {% if result %}{% set kinds = namespace(one=0, many=0) %}{% for relation in result.relations %}{% if relation.type == "many_to_one" %}{% set kinds.one = kinds.one + 1 %}{% elif relation.type == "many_to_many" %}{% set kinds.many = kinds.many + 1 %}{% endif %}{% endfor %}
 <ul class="route-tally" aria-label="Contenu déclaré">
   <li><strong>{{ view.total_entities }}</strong> entité{% if view.total_entities > 1 %}s{% endif %}</li>
@@ -27,16 +27,16 @@
 <div class="filter-actions"><button type="submit">Filtrer</button> <a href="/entities">Réinitialiser</a></div>
 </form>
 {% if result %}
-<p>{{ view.entities|length }} entités affichées sur {{ view.total_entities }} — {{ view.relations|length }} relations affichées sur {{ view.total_relations }}</p>
+<p>{{ view.entities|length }} entités affichées sur {{ view.total_entities }} · {{ view.relations|length }} relations affichées sur {{ view.total_relations }}</p>
 <section aria-labelledby="entity-diagnostics"><h2 id="entity-diagnostics">Diagnostics</h2>
-<p>{{ diagnostics.error_count }} erreur(s) — {{ diagnostics.warning_count }} avertissement(s) — {{ diagnostics.info_count }} information(s)</p>
+<p>{{ diagnostics.error_count }} erreur(s) · {{ diagnostics.warning_count }} avertissement(s) · {{ diagnostics.info_count }} information(s)</p>
 {% if diagnostics.items %}
 <details class="diagnostics-list"><summary>Voir {% if diagnostics.items | length > 1 %}les {{ diagnostics.items | length }} diagnostics{% else %}le diagnostic{% endif %}</summary>
 <ul>
 {% for diagnostic in diagnostics.items %}
 <li data-diagnostic-code="{{ diagnostic.code }}" data-diagnostic-severity="{{ diagnostic.severity }}"{% if diagnostic.relation_index is not none %} data-diagnostic-relation-index="{{ diagnostic.relation_index }}"{% endif %}>
-<strong>{{ {'error': 'Erreur', 'warning': 'Avertissement', 'info': 'Information'}[diagnostic.severity] }}</strong> — <code>{{ diagnostic.code }}</code> — {{ diagnostic.message }}
-{% if diagnostic.source or diagnostic.subject %}<p>{% if diagnostic.source %}{{ location(diagnostic.source) }}{% endif %}{% if diagnostic.subject and (not diagnostic.source or diagnostic.subject != diagnostic.source.path) %}{% if diagnostic.source %} — {% endif %}{{ diagnostic.subject }}{% endif %}</p>{% endif %}
+<strong>{{ {'error': 'Erreur', 'warning': 'Avertissement', 'info': 'Information'}[diagnostic.severity] }}</strong> · <code>{{ diagnostic.code }}</code> · {{ diagnostic.message }}
+{% if diagnostic.source or diagnostic.subject %}<p>{% if diagnostic.source %}{{ location(diagnostic.source) }}{% endif %}{% if diagnostic.subject and (not diagnostic.source or diagnostic.subject != diagnostic.source.path) %}{% if diagnostic.source %} · {% endif %}{{ diagnostic.subject }}{% endif %}</p>{% endif %}
 </li>
 {% endfor %}
 </ul>
@@ -78,16 +78,16 @@
 {% if relation.many_to_one %}<p class="relation-key">Clé <code>{{ relation.many_to_one.foreign_key }}</code> · ON DELETE {{ relation.many_to_one.on_delete }}</p>{% endif %}
 {% if relation.many_to_many %}<p class="relation-key">Pivot <code>{{ relation.many_to_many.pivot_table }}</code> · ON DELETE {{ relation.many_to_many.on_delete }}</p>{% endif %}
 <details class="relation-more"><summary>Détails</summary>
-<p>{{ location(relation.source) }} — relations[{{ relation.source_index }}]</p>
+<p>{{ location(relation.source) }} · relations[{{ relation.source_index }}]</p>
 {% if relation.inverse_name is not none %}<p>Nom inverse : {{ relation.inverse_name }}</p>{% endif %}
 {% if relation.many_to_one %}{% set one = relation.many_to_one %}
-<p>Clé étrangère : {{ one.foreign_key }} — portée par {{ relation.from_entity }}</p>
-<p>Nullable : {{ boolean(one.nullable) }} — Index : {{ boolean(one.index) }} — ON DELETE : {{ one.on_delete }}</p>
+<p>Clé étrangère : {{ one.foreign_key }} · portée par {{ relation.from_entity }}</p>
+<p>Nullable : {{ boolean(one.nullable) }}<br>Index : {{ boolean(one.index) }}<br>ON DELETE : {{ one.on_delete }}</p>
 {% endif %}
 {% if relation.many_to_many %}{% set many = relation.many_to_many %}
 <p>Pivot : {{ many.pivot_table }}</p>
-<p>{{ many.from_key }} → {{ relation.from_entity }} ; {{ many.to_key }} → {{ relation.to_entity }}</p>
-<p>ON DELETE : {{ many.on_delete }} — id : {{ boolean(many.id) }} — unique_pair : {{ boolean(many.unique_pair) }}</p>
+<p>{{ many.from_key }} → {{ relation.from_entity }} · {{ many.to_key }} → {{ relation.to_entity }}</p>
+<p>ON DELETE : {{ many.on_delete }}<br>id : {{ boolean(many.id) }}<br>unique_pair : {{ boolean(many.unique_pair) }}</p>
 {% if many.pivot_fields %}
 <details><summary>Champs pivot</summary><table><thead><tr><th>Champ</th><th>Type</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead><tbody>
 {% for field in many.pivot_fields %}<tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
@@ -121,9 +121,9 @@
 {% endfor %}
 {% for item in entity_layout.nodes %}
 <g id="entity-node-{{ loop.index0 }}" class="entity-node entity-node-{{ item.node.kind }}">
-<title>{{ item.node.label }} — {{ item.node.table }} — {{ item.node.field_count }} champs</title>
+<title>{{ item.node.label }} · {{ item.node.table }} · {{ item.node.field_count }} champs</title>
 <rect x="{{ item.x }}" y="{{ item.y }}" width="{{ item.width }}" height="{{ item.height }}" rx="{{ 18 if item.node.kind == 'pivot' else 3 }}" />
-<text x="{{ item.x + 12 }}" y="{{ item.y + 20 }}">{{ 'Pivot' if item.node.kind == 'pivot' else 'Entité' }} — {{ item.node.field_count }} champs</text>
+<text x="{{ item.x + 12 }}" y="{{ item.y + 20 }}">{{ 'Pivot' if item.node.kind == 'pivot' else 'Entité' }} · {{ item.node.field_count }} champs</text>
 <text class="entity-node-name" x="{{ item.x + 12 }}" y="{{ item.y + 48 }}">{{ item.label }}</text>
 {% if item.node.kind == 'entity' %}<text x="{{ item.x + 12 }}" y="{{ item.y + 76 }}">{{ item.table }}</text>{% endif %}
 </g>

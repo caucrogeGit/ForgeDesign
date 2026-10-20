@@ -24,7 +24,7 @@ PRESENCE_LABELS: dict[TemplatePresenceStatus, str] = {
     "missing": "Absent",
     "invalid-path": "Chemin refusé",
     "unreadable": "Non vérifiable",
-    "not-applicable": "—",
+    "not-applicable": "–",
 }
 _VARIANTS: dict[GraphNodeKind, str] = {
     "route": "category-1",

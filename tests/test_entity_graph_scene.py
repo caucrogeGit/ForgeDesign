@@ -49,7 +49,7 @@ def test_single_entity() -> None:
     scene = build_entity_graphic_scene(layout_entity_graph(graph))
     assert [node["id"] for node in scene["nodes"]] == ["entity:0"]
     assert scene["edges"] == []
-    assert scene["nodes"][0]["lines"] == ["Entité — 0 champs", "Solo", "solo"]
+    assert scene["nodes"][0]["lines"] == ["Entité · 0 champs", "Solo", "solo"]
 
 
 def test_nodes_reuse_entity_graph_identities() -> None:
@@ -71,7 +71,7 @@ def test_pivot_is_an_ordinary_node() -> None:
     pivot = _scene()["nodes"][3]
     assert pivot["label"] == "Pivot article_tag"
     assert pivot["presentation"] == {"variant": "category-2"}
-    assert pivot["lines"] == ["Pivot — 1 champs", "article_tag"]
+    assert pivot["lines"] == ["Pivot · 1 champs", "article_tag"]
     assert pivot["data"]["field-label"] == "Champs supplémentaires"
 
 

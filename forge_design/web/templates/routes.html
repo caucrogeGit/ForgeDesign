@@ -1,10 +1,10 @@
 {% extends "layout.html" %}
-{% block title %}Route Explorer — Forge Design{% endblock %}
+{% block title %}Routes · Forge Design{% endblock %}
 {% macro location(source, available=true) -%}
 {% if source %}{% if available %}<a href="{{ source_url(source) }}">{% endif %}{{ source.path }}{% if source.line %}:{{ source.line }}{% endif %}{% if available %}</a>{% endif %}{% endif %}
 {%- endmacro %}
 {% block content %}
-<h1>Route Explorer</h1>
+<h1>Routes</h1>
 {% if result and linkage and chains %}{% set tally = namespace(complete=0, partial=0, problematic=0, previewable=0) %}{% for chain in chains %}{% if chain.state == "complete" %}{% set tally.complete = tally.complete + 1 %}{% elif chain.state == "partial" %}{% set tally.partial = tally.partial + 1 %}{% else %}{% set tally.problematic = tally.problematic + 1 %}{% endif %}{% if previews[chain.index].available %}{% set tally.previewable = tally.previewable + 1 %}{% endif %}{% endfor %}
 <ul class="route-tally" aria-label="Chaînes affichées">
   <li data-state="complete"><strong>{{ tally.complete }}</strong> complète{% if tally.complete > 1 %}s{% endif %}</li>
@@ -33,7 +33,7 @@
 <h2 id="diagnostics-title">Diagnostics</h2>
 <p>{{ diagnostics.error_count }} erreur(s), {{ diagnostics.warning_count }} avertissement(s), {{ diagnostics.info_count }} information(s).</p>
 {% if diagnostics.items %}<details class="diagnostics-list"><summary>Voir {% if diagnostics.items | length > 1 %}les {{ diagnostics.items | length }} diagnostics{% else %}le diagnostic{% endif %}</summary><ul>{% for item in diagnostics.items %}
-<li data-diagnostic-code="{{ item.code }}"><strong>{{ {'error': 'Erreur', 'warning': 'Avertissement', 'info': 'Information'}[item.severity] }}</strong> — {{ item.message }}{% if item.source %} — {{ location(item.source, item.source_available) }}{% endif %}</li>
+<li data-diagnostic-code="{{ item.code }}"><strong>{{ {'error': 'Erreur', 'warning': 'Avertissement', 'info': 'Information'}[item.severity] }}</strong> · {{ item.message }}{% if item.source %} · {{ location(item.source, item.source_available) }}{% endif %}</li>
 {% endfor %}</ul></details>{% else %}<p>Aucun diagnostic dans les informations disponibles.</p>{% endif %}
 </section>
 {% if not result.routes %}<p>Aucune route ne correspond aux filtres.</p>{% endif %}
@@ -49,22 +49,22 @@
 {% set severities = {"error": "Erreur", "warning": "Avertissement", "info": "Information"} %}
 <section aria-labelledby="chains-title" class="route-chains">
 <h2 id="chains-title">Chaînes des routes</h2>
-<p>Route → handler → contrôleur et méthode → template(s) → contrat(s) de vue, connus statiquement, sans exécution du projet. Une chaîne est complète si la méthode est résolue, le template exact et présent, sans erreur ; problématique si une erreur est démontrée ; partielle sinon.</p>
+<p>Route → handler → contrôleur et méthode → template(s) → contrat(s) de vue, connus statiquement, sans exécution du projet. Une chaîne est complète si la méthode est résolue, le template exact et présent, sans erreur. Elle est problématique si une erreur est démontrée, partielle sinon.</p>
 {% if chains %}<ul class="route-chain-list">{% for chain in chains %}{% set route = chain.route %}
 {% set preview = previews[chain.index] %}<li id="route-chain-{{ chain.index }}" data-chain-state="{{ chain.state }}" data-confidence="{{ chain.confidence }}" data-method="{{ route.method }}" data-real-preview="{{ 'available' if preview.available else 'unavailable' }}">
-<details><summary><span class="route-chain"><span class="route-method">{{ route.method }}</span> {{ route.path }} → {% if route.handler %}{{ route.handler.reference }}{% else %}{{ handler_kinds[chain.handler_kind] | lower }}{% endif %} → {% if chain.templates %}{% for template in chain.templates %}{{ template.path }}{% if not loop.last %} | {% endif %}{% endfor %}{% if chain.confidence == "partial" %} | ?{% endif %}{% elif chain.confidence == "unknown" %}template non déterminable{% elif chain.confidence == "none" %}aucun rendu détecté{% else %}—{% endif %} → {% if chain.templates %}{% for template in chain.templates %}{% if template.contracts %}{{ template.contracts | join(", ") }}{% elif template.contract_state == "without-contract" %}sans contrat{% else %}contrat ?{% endif %}{% if not loop.last %} | {% endif %}{% endfor %}{% else %}—{% endif %}</span> — <strong class="chain-state" data-state="{{ chain.state }}">{{ chain_states[chain.state] }}</strong>{% if preview.available %} — <span class="real-preview-badge">prévisualisable</span>{% endif %}</summary>
+<details><summary><span class="route-chain"><span class="route-method">{{ route.method }}</span> {{ route.path }} → {% if route.handler %}{{ route.handler.reference }}{% else %}{{ handler_kinds[chain.handler_kind] | lower }}{% endif %} → {% if chain.templates %}{% for template in chain.templates %}{{ template.path }}{% if not loop.last %} | {% endif %}{% endfor %}{% if chain.confidence == "partial" %} | ?{% endif %}{% elif chain.confidence == "unknown" %}template non déterminable{% elif chain.confidence == "none" %}aucun rendu détecté{% else %}–{% endif %} → {% if chain.templates %}{% for template in chain.templates %}{% if template.contracts %}{{ template.contracts | join(", ") }}{% elif template.contract_state == "without-contract" %}sans contrat{% else %}contrat ?{% endif %}{% if not loop.last %} | {% endif %}{% endfor %}{% else %}–{% endif %}</span> · <strong class="chain-state" data-state="{{ chain.state }}">{{ chain_states[chain.state] }}</strong>{% if preview.available %} · <span class="real-preview-badge">prévisualisable</span>{% endif %}</summary>
 <dl>
-<dt>Route</dt><dd>{{ route.method }} {{ route.path }}{% if route.name %} — nom {{ route.name }}{% endif %} — {{ 'publique' if route.public else 'protégée' }}{% if route.source %} — {{ location(route.source) }}{% endif %}</dd>
+<dt>Route</dt><dd>{{ route.method }} {{ route.path }}{% if route.name %} · nom {{ route.name }}{% endif %} · {{ 'publique' if route.public else 'protégée' }}{% if route.source %} · {{ location(route.source) }}{% endif %}</dd>
 <dt>Handler</dt><dd>{{ handler_kinds[chain.handler_kind] }}{% if route.handler %} : {{ route.handler.reference }}{% endif %}</dd>
-<dt>Contrôleur</dt><dd>{{ controller_states[chain.controller_state] }}{% if route.handler %}{% if route.handler.controller_file %} — <a href="{{ source_url(route.handler.controller_file) }}">{{ route.handler.controller_file }}</a>{% elif route.handler.missing_controller %} — {{ route.handler.missing_controller }}{% endif %}{% if route.handler.class_source %} — classe {{ location(route.handler.class_source) }}{% endif %}{% if route.handler.method_source %} — méthode {{ location(route.handler.method_source) }}{% endif %}{% endif %}</dd>
+<dt>Contrôleur</dt><dd>{{ controller_states[chain.controller_state] }}{% if route.handler %}{% if route.handler.controller_file %} · <a href="{{ source_url(route.handler.controller_file) }}">{{ route.handler.controller_file }}</a>{% elif route.handler.missing_controller %} · {{ route.handler.missing_controller }}{% endif %}{% if route.handler.class_source %} · classe {{ location(route.handler.class_source) }}{% endif %}{% if route.handler.method_source %} · méthode {{ location(route.handler.method_source) }}{% endif %}{% endif %}</dd>
 <dt>Template</dt><dd>{{ confidences[chain.confidence] }}
-{% if chain.templates %}<ul>{% for template in chain.templates %}<li data-template="{{ template.path }}">{% if template.presence == "present" %}<a href="{{ template_url(template.path) }}">{{ template.path }}</a>{% else %}{{ template.path }}{% endif %} — {{ presences[template.presence] }} — {{ contract_states[template.contract_state] }}{% for contract in template.contracts %}{% set url = contract_url(contract) %} — {% if url %}<a href="{{ url }}">{{ contract }}</a>{% else %}{{ contract }}{% endif %}{% endfor %}{% if template.contract_state == "without-contract" and linkage.contracts.invalid %} — des contrats invalides non associables existent (voir « Contrats de vue »){% endif %}</li>{% endfor %}</ul>{% endif %}</dd>
+{% if chain.templates %}<ul>{% for template in chain.templates %}<li data-template="{{ template.path }}">{% if template.presence == "present" %}<a href="{{ template_url(template.path) }}">{{ template.path }}</a>{% else %}{{ template.path }}{% endif %} · {{ presences[template.presence] }} · {{ contract_states[template.contract_state] }}{% for contract in template.contracts %}{% set url = contract_url(contract) %} · {% if url %}<a href="{{ url }}">{{ contract }}</a>{% else %}{{ contract }}{% endif %}{% endfor %}{% if template.contract_state == "without-contract" and linkage.contracts.invalid %} · des contrats invalides non associables existent (voir « Contrats de vue »){% endif %}</li>{% endfor %}</ul>{% endif %}</dd>
 </dl>
-{% if chain.diagnostics %}<ul class="chain-diagnostics">{% for item in chain.diagnostics %}<li data-origin="{{ item.origin }}" data-diagnostic-code="{{ item.code }}" data-severity="{{ item.severity }}">{{ origins[item.origin] }} · {{ severities[item.severity] }} — {{ item.message }} <code>{{ item.code }}</code>{% if item.source %} — {{ location(item.source, item.source_available) }}{% endif %}</li>{% endfor %}</ul>{% else %}<p>Aucun diagnostic pour cette route.</p>{% endif %}
-<div class="route-real-preview">{% if preview.available and real_preview_enabled %}<p class="real-preview-warning" role="note">{{ real_preview_warning }}</p>
-<form method="post" action="/routes/real-preview/start"><input type="hidden" name="route" value="{{ route.path }}"><button type="submit">Prévisualiser réellement</button></form>
+{% if chain.diagnostics %}<ul class="chain-diagnostics">{% for item in chain.diagnostics %}<li data-origin="{{ item.origin }}" data-diagnostic-code="{{ item.code }}" data-severity="{{ item.severity }}">{{ origins[item.origin] }} · {{ severities[item.severity] }} · {{ item.message }} <code>{{ item.code }}</code>{% if item.source %} · {{ location(item.source, item.source_available) }}{% endif %}</li>{% endfor %}</ul>{% else %}<p>Aucun diagnostic pour cette route.</p>{% endif %}
+<div class="route-real-preview">{% if preview.available and real_preview_enabled %}<form method="post" action="/routes/real-preview/start"><input type="hidden" name="route" value="{{ route.path }}"><button type="submit">Prévisualiser réellement</button></form>
+<p class="real-preview-warning help-text" role="note">{{ real_preview_warning }}</p>
 {% elif preview.available %}<p class="real-preview-reason">Preview réelle indisponible sur ce serveur.</p>
-{% else %}<p class="real-preview-reason">Preview réelle indisponible : {{ preview.reason }}</p>{% endif %}</div>
+{% else %}<p class="real-preview-reason">Preview réelle indisponible. {{ preview.reason }}</p>{% endif %}</div>
 </details></li>{% endfor %}</ul>{% else %}<p>Aucune route à afficher.</p>{% endif %}
 </section>
 <section aria-labelledby="route-contracts-title">
@@ -72,7 +72,7 @@
 {% if linkage.contracts.available %}
 <p>{{ linkage.contracts.total }} contrat(s) de vue, dont {{ linkage.contracts.invalid }} invalide(s).{% if not linkage.contracts.complete %} Liaison incomplète.{% endif %} Une route n’est reliée à un contrat que par un template qu’elle rend.</p>
 {% if linkage.contracts.invalid %}<p>Un contrat invalide n’a pas de cible lisible : il n’est rattaché à aucune route.</p>{% endif %}
-{% if linkage.contracts.diagnostics %}<ul>{% for item in linkage.contracts.diagnostics %}<li data-origin="{{ item.origin }}" data-diagnostic-code="{{ item.code }}">{{ origins[item.origin] }} · {{ severities[item.severity] }} — {{ item.message }} <code>{{ item.code }}</code>{% if item.source %} — {{ location(item.source, item.source_available) }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+{% if linkage.contracts.diagnostics %}<ul>{% for item in linkage.contracts.diagnostics %}<li data-origin="{{ item.origin }}" data-diagnostic-code="{{ item.code }}">{{ origins[item.origin] }} · {{ severities[item.severity] }} · {{ item.message }} <code>{{ item.code }}</code>{% if item.source %} · {{ location(item.source, item.source_available) }}{% endif %}</li>{% endfor %}</ul>{% endif %}
 {% else %}<p role="alert">{{ linkage.contracts.reason }}</p>{% endif %}
 </section>
 {% endif %}
@@ -81,7 +81,7 @@
 <summary>Tableau technique des routes (handlers, vérification, présence, Jinja, sources)</summary>
 <div class="table-scroll"><table>
   <thead><tr><th scope="col">Méthode</th><th scope="col">Chemin</th><th scope="col">Handler</th><th scope="col">Contrôleur</th><th scope="col">Vérification</th><th scope="col">Template</th><th scope="col">Présence</th><th scope="col">Jinja</th><th scope="col">Nom</th><th scope="col">Public</th><th scope="col">Sources</th></tr></thead>
-  <tbody>{% for route in result.routes %}<tr><td>{{ route.method }}</td><td>{{ route.path }}</td><td>{{ route.handler.reference if route.handler else '—' }}</td><td>{{ route.handler.controller_file if route.handler and route.handler.controller_file else '—' }}</td><td>{{ {'found': 'Trouvée', 'class-missing': 'Classe absente', 'method-missing': 'Méthode absente', 'unreadable': 'Non vérifiable', 'ambiguous': 'Ambiguë', 'not-applicable': '—'}[route.handler.verification] if route.handler else '—' }}</td><td>{% if route.handler and route.handler.template.status == 'found' %}{{ route.handler.template.path }}{% elif route.handler %}{{ {'none': '—', 'not-applicable': '—', 'dynamic': 'Dynamique', 'ambiguous': 'Plusieurs'}[route.handler.template.status] }}{% else %}—{% endif %}{% if route.handler and route.handler.template.dependencies %}<ul>{% for dependency in route.handler.template.dependencies %}<li>{{ dependency.kind }}: {{ 'dynamique' if dependency.dynamic else dependency.path }} — {{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[dependency.presence] }}{% if dependency.syntax != 'not-applicable' %} — {{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable'}[dependency.syntax] }}{% endif %}</li>{% endfor %}</ul>{% endif %}</td><td>{{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[route.handler.template.presence] if route.handler else '—' }}</td><td>{{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[route.handler.template.syntax] if route.handler else '—' }}</td><td>{{ route.name or '—' }}</td><td>{{ 'Oui' if route.public else 'Non' }}</td><td>
+  <tbody>{% for route in result.routes %}<tr><td>{{ route.method }}</td><td>{{ route.path }}</td><td>{{ route.handler.reference if route.handler else '–' }}</td><td>{{ route.handler.controller_file if route.handler and route.handler.controller_file else '–' }}</td><td>{{ {'found': 'Trouvée', 'class-missing': 'Classe absente', 'method-missing': 'Méthode absente', 'unreadable': 'Non vérifiable', 'ambiguous': 'Ambiguë', 'not-applicable': '–'}[route.handler.verification] if route.handler else '–' }}</td><td>{% if route.handler and route.handler.template.status == 'found' %}{{ route.handler.template.path }}{% elif route.handler %}{{ {'none': '–', 'not-applicable': '–', 'dynamic': 'Dynamique', 'ambiguous': 'Plusieurs'}[route.handler.template.status] }}{% else %}–{% endif %}{% if route.handler and route.handler.template.dependencies %}<ul>{% for dependency in route.handler.template.dependencies %}<li>{{ dependency.kind }}: {{ 'dynamique' if dependency.dynamic else dependency.path }} · {{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '–'}[dependency.presence] }}{% if dependency.syntax != 'not-applicable' %} · {{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable'}[dependency.syntax] }}{% endif %}</li>{% endfor %}</ul>{% endif %}</td><td>{{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '–'}[route.handler.template.presence] if route.handler else '–' }}</td><td>{{ {'valid': 'Valide', 'invalid': 'Invalide', 'unreadable': 'Non vérifiable', 'not-applicable': '–'}[route.handler.template.syntax] if route.handler else '–' }}</td><td>{{ route.name or '–' }}</td><td>{{ 'Oui' if route.public else 'Non' }}</td><td>
 <details><summary>Sources</summary><ul>
 {% if route.source %}<li>Route : {{ location(route.source) }}</li>{% endif %}
 {% if route.handler %}
@@ -107,7 +107,7 @@
   {% if template_cycles %}
   <ul>{% for cycle in template_cycles %}
     <li>{{ cycle.paths | join(' → ') }}
-      <ul>{% for edge in cycle.edges %}<li>{{ edge.source }}:{{ edge.line }} — {{ edge.kind }} → {{ edge.target }}</li>{% endfor %}</ul>
+      <ul>{% for edge in cycle.edges %}<li>{{ edge.source }}:{{ edge.line }} · {{ edge.kind }} → {{ edge.target }}</li>{% endfor %}</ul>
     </li>
   {% endfor %}</ul>
   {% else %}<p>Aucun cycle détecté dans l’analyse disponible.</p>{% endif %}
@@ -132,7 +132,7 @@
       <rect x="{{ item.x }}" y="{{ item.y }}" width="{{ item.width }}" height="{{ item.height }}" rx="6" />
       <text x="{{ item.x + 12 }}" y="{{ item.y + 24 }}">{{ {'route': 'Route', 'handler': 'Handler', 'controller': 'Contrôleur', 'template': 'Template'}[item.node.kind] }}</text>
       <text x="{{ item.x + 12 }}" y="{{ item.y + 50 }}">{{ item.label }}</text>
-      <text x="{{ item.x + 12 }}" y="{{ item.y + 78 }}">{{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '—'}[item.node.presence] }}</text>
+      <text x="{{ item.x + 12 }}" y="{{ item.y + 78 }}">{{ {'present': 'Présent', 'missing': 'Absent', 'invalid-path': 'Chemin refusé', 'unreadable': 'Non vérifiable', 'not-applicable': '–'}[item.node.presence] }}</text>
     </g>
     {% endfor %}
   </svg>

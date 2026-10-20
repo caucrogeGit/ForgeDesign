@@ -621,7 +621,7 @@ def test_mutation_right_after_publication(
         return original(root_path, path)
 
     monkeypatch.setattr(writer, "snapshot_template", raced)
-    with pytest.raises(TemplatePublishedError, match="relire") as error:
+    with pytest.raises(TemplatePublishedError, match="Relire") as error:
         write(root)
     assert not isinstance(error.value, TemplateWriteConflictError)
     assert error.value.publication is None

@@ -46,9 +46,9 @@ def test_nodes_reuse_route_graph_identities() -> None:
     assert [node["id"] for node in scene["nodes"]] == [n.id for n in graph.nodes]
     first = scene["nodes"][0]
     assert first["label"] == "GET /"
-    assert first["lines"] == ["Route", "GET /", "—"]
+    assert first["lines"] == ["Route", "GET /", "–"]
     assert first["presentation"] == {"variant": "category-1", "tone": "default"}
-    assert first["data"] == {"kind-label": "Route", "presence-label": "—"}
+    assert first["data"] == {"kind-label": "Route", "presence-label": "–"}
     assert set(first["rect"]) == {"x", "y", "width", "height"}
 
 

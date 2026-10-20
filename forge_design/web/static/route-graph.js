@@ -26,14 +26,14 @@ export function mountRouteGraph(container) {
         const node = state ? engine.node(state.nodeId) : null;
         details.hidden = node === null;
         clear.hidden = node === null;
-        kind.textContent = node ? node.data["kind-label"] ?? "—" : "";
+        kind.textContent = node ? node.data["kind-label"] ?? "–" : "";
         label.textContent = node ? node.label : "";
-        presence.textContent = node ? node.data["presence-label"] ?? "—" : "";
-        status.textContent = node ? `Élément sélectionné : ${node.label}` : IDLE;
+        presence.textContent = node ? node.data["presence-label"] ?? "–" : "";
+        status.textContent = node ? `Élément sélectionné\u00a0: ${node.label}` : IDLE;
       },
     });
   } catch (error) {
-    status.textContent = `Vue interactive indisponible (${error.message}) ; le graphe statique reste affiché.`;
+    status.textContent = `Vue interactive indisponible (${error.message}), le graphe statique reste affiché.`;
     return null;
   }
   if (fallback) fallback.hidden = true;

@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
-{% block title %}Ressource — {{ module_label }} — Forge Design{% endblock %}
+{% block title %}Ressource · {{ module_label }} · Forge Design{% endblock %}
 {% block head %}{% for href in styles %}<link rel="stylesheet" href="{{ href }}">{% endfor %}{% endblock %}
 {% block content %}
 <p class="eyebrow">Module spécialisé · consultation</p>
-<h1>Ressource — {{ module_label }}</h1>
+<h1>Ressource · {{ module_label }}</h1>
 <p><a href="{{ module.descriptor.base_url }}">Retour au module</a></p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if notice %}<p role="status" data-action-notice>{{ notice }}</p>{% endif %}

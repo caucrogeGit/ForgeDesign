@@ -205,7 +205,7 @@ def test_undetermined_forge_version_is_attention(tmp_path: Path) -> None:
     value = summary(root)
     forge = value.section("forge")
     assert forge.status == "attention" and value.status == "attention"
-    assert forge.summary == "Projet Forge reconnu ; version indéterminée."
+    assert forge.summary == "Projet Forge reconnu, version indéterminée."
     assert dict(forge.facts)["Version détectée"] == "indéterminée"
     assert [item.message for item in forge.diagnostics] == [
         "Version Forge absente ou indéterminable.",

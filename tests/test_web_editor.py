@@ -227,12 +227,12 @@ def test_tree_rendered_in_order(app: WSGIServer) -> None:
     assert html.count('<ul class="editor-nodes">') == html.count("</ul>") - html.count(
         "<ul>"
     )
-    assert "binding : page_title" in html
+    assert "binding\u00a0: page_title" in html
 
 
 def test_selected_node_and_choices(app: WSGIServer) -> None:
     html = get(app, design=DESIGN, node="0")[1]
-    assert "Bloc sélectionné : section" in html
+    assert "Bloc sélectionné\u00a0: section" in html
     # Enfants admissibles de section, triés ; pas de page ni de title.
     for kind in ("alert", "card", "container", "form", "grid", "table", "text"):
         assert f'<option value="{kind}">{kind}</option>' in html
@@ -247,7 +247,7 @@ def test_selected_node_and_choices(app: WSGIServer) -> None:
 
 def test_root_selected_by_default(app: WSGIServer) -> None:
     html = get(app, design=DESIGN)[1]
-    assert "Bloc sélectionné : page" in html
+    assert "Bloc sélectionné\u00a0: page" in html
     assert "Supprimer ce bloc" not in html and "Déplacer en dernier" not in html
 
 

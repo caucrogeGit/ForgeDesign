@@ -137,7 +137,7 @@ def test_timeout_and_truncation_are_rendered(
         (root / "fake-doctor-mode").write_text("big")
         _, big, _ = post(app)
     assert 'data-diagnostic-status="timed-out"' in section(html)
-    assert "Diagnostic interrompu : délai dépassé." in section(html)
+    assert "Diagnostic interrompu\u00a0: délai dépassé." in section(html)
     assert 'data-diagnostic-truncated="stdout"' in section(big)
     assert "786432 octets ignorés au-delà de 256 Kio" in section(big)
 
@@ -149,14 +149,14 @@ def test_no_project_and_invalid_projects_never_run(
     with serving(tmp_path, None) as app:
         status, html, _ = post(app)
         assert status == 409
-        assert "Aucun projet sélectionné : diagnostic non lancé." in html
+        assert "Aucun projet sélectionné\u00a0: diagnostic non lancé." in html
         opened(app, root)
         (root / "app.py").unlink()
         status, html, _ = post(app)
-        assert status == 409 and "Diagnostic non lancé : " in html
+        assert status == 409 and "Diagnostic non lancé\u00a0: " in html
         shutil.rmtree(root)
         status, html, _ = post(app)
-        assert status == 409 and "Diagnostic non lancé : " in html
+        assert status == 409 and "Diagnostic non lancé\u00a0: " in html
         assert "Traceback" not in html
     assert runs == []
 

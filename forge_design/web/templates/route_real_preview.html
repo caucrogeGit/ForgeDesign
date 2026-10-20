@@ -1,26 +1,26 @@
 {% extends "layout.html" %}
-{% block title %}Preview réelle d'une route — Forge Design{% endblock %}
+{% block title %}Preview réelle d'une route · Forge Design{% endblock %}
 {% block content %}
 <h1>Preview réelle d'une route</h1>
-<p><a href="/routes">Retour à Route Explorer</a></p>
+<p><a href="/routes">Retour aux routes</a></p>
 {% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
 {% if error %}<div class="message error" role="alert"><p>{{ error }}</p></div>{% endif %}
 {% if rp %}
 <section class="real-preview" aria-labelledby="real-preview-title">
 <h2 id="real-preview-title">Route <code>GET {{ route_path }}</code></h2>
-<p>Application Forge du projet réellement exécutée, sur une origine dédiée, sans Design ni contrat de vue : la route est choisie dans Route Explorer et revérifiée par le serveur.</p>
+<p>Application Forge du projet réellement exécutée, sur une origine dédiée, sans Design ni contrat de vue : la route est choisie dans la page Routes et revérifiée par le serveur.</p>
 {% if not rp.enabled %}<p>Preview réelle indisponible sur ce serveur.</p>
-{% elif not rp.route_available %}<p class="real-preview-reason">Preview réelle indisponible : {{ rp.route_reason }}</p>
+{% elif not rp.route_available %}<p class="real-preview-reason">Preview réelle indisponible. {{ rp.route_reason }}</p>
 {% endif %}
 <p>État : <span class="real-preview-state" data-state="{{ rp.state }}">{{ rp.state_label }}</span></p>
 {% if rp.error %}<div class="message error" role="alert"><p>{{ rp.error }}</p>
 {% if rp.logs %}<pre class="real-preview-logs">{{ rp.logs | join("\n") }}</pre>{% endif %}
 </div>{% endif %}
-{% if rp.can_start %}<p class="real-preview-warning" role="note">{{ rp.warning }}</p>
-<form method="post" action="/routes/real-preview/start">
+{% if rp.can_start %}<form method="post" action="/routes/real-preview/start">
   <input type="hidden" name="route" value="{{ route_path }}">
   <button type="submit">{% if rp.state == "failed" %}Démarrer à nouveau{% else %}Prévisualiser réellement{% endif %}</button>
-</form>{% endif %}
+</form>
+<p class="real-preview-warning help-text" role="note">{{ rp.warning }}</p>{% endif %}
 {% if rp.can_stop %}<form method="post" action="/routes/real-preview/stop">
   <input type="hidden" name="route" value="{{ route_path }}">
   <button type="submit">Arrêter la preview réelle</button>

@@ -246,8 +246,8 @@ def test_read_only_and_failing_config_pages(tmp_path: Path) -> None:
         status, html, _ = call(app, resource("witness", path))
         assert status == 200 and editor_block(html) is None
         assert "data-graphic-scene" in html
-        assert "Édition indisponible : Configuration d&#39;édition" in html or (
-            "Édition indisponible : Configuration d'édition" in unescape(html)
+        assert "Édition indisponible\u00a0: Configuration d&#39;édition" in html or (
+            "Édition indisponible\u00a0: Configuration d'édition" in unescape(html)
         )
 
 

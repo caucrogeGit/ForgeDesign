@@ -95,7 +95,7 @@ test("montage, relations parallèles et liste des relations directes", () => {
     view.relations.children.map((item) => item.textContent),
     [`${HOSTILE} → auteur → Tag`, `${HOSTILE} → relecteur → Tag`, `${HOSTILE} → tags → article_tag`],
   );
-  assert.equal(view.status.textContent, `Élément sélectionné : ${HOSTILE}`);
+  assert.equal(view.status.textContent, `Élément sélectionné\u00a0: ${HOSTILE}`);
   assert.equal(view.relations.hidden, false);
 });
 

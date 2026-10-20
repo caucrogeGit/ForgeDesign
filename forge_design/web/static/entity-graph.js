@@ -41,20 +41,20 @@ export function mountEntityGraph(container) {
     clear.hidden = node === null;
     relations.hidden = node === null;
     relations.textContent = "";
-    kind.textContent = node ? node.data["kind-label"] ?? "—" : "";
+    kind.textContent = node ? node.data["kind-label"] ?? "–" : "";
     label.textContent = node ? node.data.name ?? node.label : "";
     table.textContent = node ? node.data.table ?? "" : "";
     count.textContent = node ? node.data["field-count"] ?? "0" : "";
     countLabel.textContent = node ? node.data["field-label"] ?? "Champs" : "Champs";
     relationCount.textContent = node ? String(state.edgeIds.length) : "";
     if (node) relations.append(...state.edgeIds.map(describe));
-    status.textContent = node ? `Élément sélectionné : ${node.data.name ?? node.label}` : IDLE;
+    status.textContent = node ? `Élément sélectionné\u00a0: ${node.data.name ?? node.label}` : IDLE;
   }
 
   try {
     engine = createGraphicEngine(host, JSON.parse(source.textContent), { onSelectionChange: show });
   } catch (error) {
-    status.textContent = `Vue interactive indisponible (${error.message}) ; le graphe statique reste affiché.`;
+    status.textContent = `Vue interactive indisponible (${error.message}), le graphe statique reste affiché.`;
     return null;
   }
   if (fallback) fallback.hidden = true;

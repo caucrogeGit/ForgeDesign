@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}{{ module_label }} — Forge Design{% endblock %}
+{% block title %}{{ module_label }} · Forge Design{% endblock %}
 {% block head %}{% for href in styles %}<link rel="stylesheet" href="{{ href }}">{% endfor %}{% endblock %}
 {% block content %}
 <p class="eyebrow">Module spécialisé</p>
@@ -11,11 +11,11 @@
 <dt>Description</dt><dd>{{ module.descriptor.definition.description }}</dd>
 <dt>Version du module</dt><dd>{{ module.descriptor.version }}</dd>
 <dt>API hôte</dt><dd>{{ module.descriptor.api_version }}</dd>
-<dt>Capacités disponibles</dt><dd>{% if capabilities %}{{ capabilities | join(', ') }}{% else %}—{% endif %}</dd>
+<dt>Capacités disponibles</dt><dd>{% if capabilities %}{{ capabilities | join(', ') }}{% else %}–{% endif %}</dd>
 </dl>
 {% if unavailable %}
 <h3>Dépendances indisponibles</h3>
-<ul>{% for name, purpose in unavailable %}<li><code>{{ name }}</code> — {{ purpose }}</li>{% endfor %}</ul>
+<ul>{% for name, purpose in unavailable %}<li><code>{{ name }}</code> · {{ purpose }}</li>{% endfor %}</ul>
 {% endif %}
 </section>
 <section aria-labelledby="module-resources">

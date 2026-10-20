@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}Éditeur de Design — Forge Design{% endblock %}
+{% block title %}Éditeur de Design · Forge Design{% endblock %}
 {% block content %}
 <h1>Éditeur de Design</h1>
 {% if message %}<p class="message" role="status">{{ message }}</p>{% endif %}
@@ -24,7 +24,6 @@
 {% endif %}
 {% if rows %}
 {% set contract = contract_state.contract %}
-<p>Les modifications validées sont enregistrées immédiatement dans le fichier Design. Aucun template HTML n'est généré ni écrit.</p>
 <div class="editor-studio">
 <section class="editor-tree" aria-labelledby="tree-title">
 <h2 id="tree-title">Arbre</h2>
@@ -54,13 +53,13 @@
 </section>
 <section class="editor-preview" aria-labelledby="preview-title">
 <h2 id="preview-title">Prévisualisation indicative</h2>
-<p>Aperçu structurel avec données fictives : les classes Tailwind sont conservées mais non compilées, ce n'est pas le rendu final.</p>
 <nav class="preview-modes" aria-label="Largeur de l'aperçu">
 {% for mode, label in preview_modes %}<a href="{{ editor_url(design_path, selected.path if selected else (), preview=mode) }}"{% if mode == preview_mode %} aria-current="true"{% endif %}>{{ label }}</a>
 {% endfor %}</nav>
 <div class="preview-viewport">
 <iframe class="preview-frame preview-frame--{{ preview_mode }}" src="{{ preview_frame_url(design_path, preview_mode) }}" title="Prévisualisation du Design" sandbox></iframe>
 </div>
+<p class="help-text">Aperçu structurel avec données fictives. Les classes Tailwind sont conservées mais non compilées, ce n'est pas le rendu final.</p>
 </section>
 {% if selected %}
 <section class="editor-panel" aria-labelledby="panel-title">
@@ -71,7 +70,7 @@
   <dt>Condition</dt><dd>{{ selected.visible_if or "aucune" }}</dd>
   <dt>Props</dt><dd>{% if selected.props %}{% for key, value in selected.props %}<code>{{ key }}</code> = <code>{{ value }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}aucune{% endif %}</dd>
 </dl>
-<p>Contrat : {{ contract_state.path }}{% if not contract %} — indisponible : {{ contract_state.messages | join(" ") }} Binding, condition et colonnes sont désactivés.{% endif %}</p>
+<p>Contrat : {{ contract_state.path }}{% if not contract %} · indisponible : {{ contract_state.messages | join(" ") }} Binding, condition et colonnes sont désactivés.{% endif %}</p>
 {% if editable %}
 
 
@@ -132,7 +131,7 @@
   <input type="hidden" name="revision" value="{{ revision }}">
   <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
-  <label for="props">Props (objet JSON ; vide pour supprimer)</label>
+  <label for="props">Props (objet JSON, vide pour supprimer)</label>
   <textarea id="props" name="props" rows="3">{{ props_json }}</textarea>
   <button type="submit">Appliquer les props</button>
 </form>
@@ -142,7 +141,6 @@
 {% if not class_editable %}
 <p class="message error">props.class n'est pas une chaîne (valeur actuelle : <code>{{ class_raw }}</code>). L'assistant est désactivé : corrigez la valeur via le JSON des props.</p>
 {% else %}
-<p>Source réelle : <code>props.class</code>. Les classes sont conservées telles quelles ; Forge Design ne vérifie pas qu'elles existent dans le Tailwind du projet.</p>
 <form action="/editor/action" method="post">
   <input type="hidden" name="action" value="tailwind_set">
   <input type="hidden" name="design" value="{{ design_path }}">
@@ -175,7 +173,7 @@
   <input type="hidden" name="revision" value="{{ revision }}">
   <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
-  <label for="class-token">Ajouter une classe (libre : md:grid-cols-2, hover:bg-slate-100, w-[37px]…)</label>
+  <label for="class-token">Ajouter une classe (libre, par exemple <code>md:grid-cols-2</code>, <code>hover:bg-slate-100</code>, <code>w-[37px]</code>…)</label>
   <input id="class-token" name="class_token" list="tailwind-suggestions" autocomplete="off" spellcheck="false" required>
   <button type="submit">Ajouter</button>
 </form>
@@ -194,6 +192,7 @@
 </form>
 {% endfor %}
 </details>
+<p class="help-text">Source réelle : <code>props.class</code>. Les classes sont conservées telles quelles. Forge Design ne vérifie pas qu'elles existent dans le Tailwind du projet.</p>
 {% endif %}
 </section>
 
@@ -204,7 +203,7 @@
   <input type="hidden" name="revision" value="{{ revision }}">
   <input type="hidden" name="preview" value="{{ preview_mode }}">
   <input type="hidden" name="path" value="{{ selected.path_value }}">
-  <label for="columns">Colonnes (tableau JSON de {"label", "binding"} ; vide pour supprimer, [] pour aucune)</label>
+  <label for="columns">Colonnes (tableau JSON de {"label", "binding"}, vide pour supprimer, [] pour aucune)</label>
   <textarea id="columns" name="columns" rows="6"{% if not contract %} disabled{% endif %}>{{ columns_json }}</textarea>
   <button type="submit"{% if not contract %} disabled{% endif %}>Appliquer les colonnes</button>
 </form>
@@ -214,25 +213,26 @@
 </section>
 {% endif %}
 </div>
+<p class="help-text editor-note">Les modifications validées sont enregistrées immédiatement dans le fichier Design. Aucun template HTML n'est généré ni écrit.</p>
 {% if real_preview %}{% set rp = real_preview %}
 <section class="real-preview" aria-labelledby="real-preview-title">
 <h2 id="real-preview-title">Preview réelle</h2>
 <p>Application Forge du projet réellement exécutée, sur une origine dédiée : distincte de la prévisualisation indicative ci-dessus, elle rend le template enregistré sur disque.</p>
 {% if not rp.enabled %}<p>Preview réelle indisponible sur ce serveur.</p>
 {% elif rp.route_available %}<p>Route : <code>{{ rp.route_path }}</code></p>
-{% else %}<p class="real-preview-reason">Preview réelle indisponible : {{ rp.route_reason }}</p>
+{% else %}<p class="real-preview-reason">Preview réelle indisponible. {{ rp.route_reason }}</p>
 {% endif %}
 <p>État : <span class="real-preview-state" data-state="{{ rp.state }}">{{ rp.state_label }}</span></p>
 {% if rp.error %}<div class="message error" role="alert"><p>{{ rp.error }}</p>
 {% if rp.logs %}<pre class="real-preview-logs">{{ rp.logs | join("\n") }}</pre>{% endif %}
 </div>{% endif %}
-{% if rp.can_start %}<p class="real-preview-warning" role="note">{{ rp.warning }}</p>
-<form method="post" action="/editor/real-preview/start">
+{% if rp.can_start %}<form method="post" action="/editor/real-preview/start">
   <input type="hidden" name="design" value="{{ design_path }}">
   <input type="hidden" name="node" value="{{ selected.path_value if selected else '' }}">
   <input type="hidden" name="preview" value="{{ preview_mode }}">
   <button type="submit">{% if rp.state == "failed" %}Démarrer à nouveau{% else %}Démarrer la preview réelle{% endif %}</button>
-</form>{% endif %}
+</form>
+<p class="real-preview-warning help-text" role="note">{{ rp.warning }}</p>{% endif %}
 {% if rp.can_stop %}<form method="post" action="/editor/real-preview/stop">
   <input type="hidden" name="design" value="{{ design_path }}">
   <input type="hidden" name="node" value="{{ selected.path_value if selected else '' }}">

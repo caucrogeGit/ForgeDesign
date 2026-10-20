@@ -55,7 +55,7 @@ def test_without_project_nothing_is_analysed(tmp_path: Path) -> None:
     with serving(tmp_path, None) as app:
         status, html, headers = call(app, "/inspector")
     assert status == 200 and headers["Cache-Control"] == "no-store"
-    assert "Aucun projet sélectionné : aucune analyse." in html
+    assert "Aucun projet sélectionné\u00a0: aucune analyse." in html
     assert '<a href="/">ouvrez un projet récent depuis l’accueil</a>' in html
     assert "health-summary" not in html and "data-health-section" not in html
 
@@ -67,7 +67,7 @@ def test_refused_opening_analyses_nothing(tmp_path: Path) -> None:
         status, html, _ = call(app, "/inspector", method="POST", value=str(other))
     assert status == 200 and "Projet Forge non reconnu" in html
     assert "health-summary" not in html
-    assert "Aucun projet sélectionné : aucune analyse." in html
+    assert "Aucun projet sélectionné\u00a0: aucune analyse." in html
 
 
 def test_summary_after_opening_and_on_reload(tmp_path: Path) -> None:
@@ -114,7 +114,7 @@ def test_bounded_diagnostics_and_attention(tmp_path: Path) -> None:
     summary = health(html)
     assert 'data-health-status="attention"' in summary
     migrations = section(summary, "migrations")
-    assert "8 diagnostics ; 5 premiers affichés." in migrations
+    assert "8 diagnostics, 5 premiers affichés." in migrations
     assert migrations.count("<li data-severity=") == 5
     diagnostics = section(summary, "diagnostics")
     assert (
@@ -174,9 +174,9 @@ def test_inaccessible_project_is_a_controlled_diagnostic(tmp_path: Path) -> None
     assert status == 200 and "Traceback" not in html
     summary = health(html)
     assert 'data-health-status="indisponible"' in summary
-    assert "Projet inaccessible : " in summary
+    assert "Projet inaccessible\u00a0: " in summary
     # Le GET ne ferme pas le projet ; seule l'actualisation le fait.
-    assert f"Projet : {root}" in html
+    assert f"Projet\u00a0: {root}" in html
 
 
 def test_secondary_section_failure_keeps_the_page(

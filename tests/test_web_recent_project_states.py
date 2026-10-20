@@ -64,14 +64,14 @@ def test_states_actions_versions_and_nonwriting_get(tmp_path: Path) -> None:
         assert call(app, open_action, method="POST", value=str(known))[0] == 200
         before = snapshot(tmp_path)
         html = call(app)[1]
-        assert "— Ouvert" in html
+        assert "· Ouvert" in html
         assert RecentEntries(html).entries[0] == ("available", [remove])
         assert snapshot(tmp_path) == before
         # L'accueil constate la dégradation, sans fermer/actualiser le courant.
         (known / "app.py").unlink()
         before = snapshot(tmp_path)
         html = call(app)[1]
-        assert "Aucun projet ouvert." not in html and "— Ouvert" in html
+        assert "Aucun projet ouvert." not in html and "· Ouvert" in html
         assert RecentEntries(html).entries[0] == ("invalid", [remove])
         assert snapshot(tmp_path) == before
         for root in (missing, invalid, unknown):

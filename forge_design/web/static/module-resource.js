@@ -28,7 +28,7 @@ export function mountModuleResource(container, editor = null) {
     engine = createGraphicEngine(host, JSON.parse(source.textContent), {
       onSelectionChange(state) {
         const node = state ? engine.node(state.nodeId) : null;
-        status.textContent = node ? `Élément sélectionné : ${node.label}` : IDLE;
+        status.textContent = node ? `Élément sélectionné\u00a0: ${node.label}` : IDLE;
       },
       ...(editor && editor.nodeMove ? { nodeMove: editor.nodeMove } : {}),
       ...(editor && typeof editor.onViewChange === "function" ? { onViewChange: editor.onViewChange } : {}),
@@ -99,7 +99,7 @@ export async function bootModuleResource(container, { load = (url) => import(url
     }
   } catch (error) {
     editor = null;
-    announce(`Édition indisponible (${error.message}) : consultation seule.`);
+    announce(`Édition indisponible (${error.message})\u00a0: consultation seule.`);
   }
   if (editor === null) return mountModuleResource(container);
   let engine;
@@ -107,13 +107,13 @@ export async function bootModuleResource(container, { load = (url) => import(url
     engine = mountModuleResource(container, editor);
   } catch (error) {
     // Échec du module dans attach : remontage en consultation seule.
-    announce(`Édition indisponible (${error.message}) : consultation seule.`);
+    announce(`Édition indisponible (${error.message})\u00a0: consultation seule.`);
     return mountModuleResource(container);
   }
   if (engine !== null) return engine;
   // Option d'édition refusée par le moteur : la scène reste consultable sans elle.
   const readOnly = mountModuleResource(container);
-  if (readOnly !== null) announce("Édition indisponible (option refusée par le moteur) : consultation seule.");
+  if (readOnly !== null) announce("Édition indisponible (option refusée par le moteur)\u00a0: consultation seule.");
   return readOnly;
 }
 

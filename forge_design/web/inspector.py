@@ -114,7 +114,7 @@ def inspect_submission(
     selection = selector.open(Path(path))
     registry = selector.registry
     message = (
-        f"Projet ouvert ; avertissement : {selection.recent_warning}"
+        f"Projet ouvert. Avertissement : {selection.recent_warning}"
         if selection.recent_warning
         else None
     )
@@ -174,7 +174,7 @@ def refresh_project(
         return _render(
             context,
             result=result,
-            error="Le projet n’est plus reconnu ; il a été fermé.",
+            error="Le projet n’est plus reconnu. Il a été fermé.",
         )
     context.set_project(result)
     return _render(

@@ -104,7 +104,7 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
             )
         else:
             return
-        message = f"{label} : {detail} — {subject}."
+        message = f"{label} : {detail} · {subject}."
         if value.syntax == "invalid":
             if value.syntax_line is not None:
                 message += f" Ligne {value.syntax_line}."
@@ -180,7 +180,7 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
                 "warning",
                 "Template dynamique non résolu."
                 if template.status == "dynamic"
-                else "Plusieurs templates possibles ; résolution ambiguë.",
+                else "Plusieurs templates possibles, résolution ambiguë.",
                 declaration,
                 handler.reference,
             )
@@ -237,7 +237,7 @@ def build_route_diagnostics(result: RoutesResult) -> RouteDiagnostics:
         add(
             "route.partial",
             "warning",
-            "Le Bridge signale des limites ou anomalies ; consulter les "
+            "Le Bridge signale des limites ou anomalies. Consulter les "
             "avertissements détaillés conservés sur cette page.",
             None,
             result.source,

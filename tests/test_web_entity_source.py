@@ -63,11 +63,11 @@ def test_source_http(
         assert "evil.example" not in html and "<script>text" not in html
         if expected == 400:
             assert 'aria-current="page"' not in html
-            assert "Retour à" not in html and "secret" not in html
+            assert "Retour aux" not in html and "secret" not in html
         else:
             kind = "entities" if path.startswith("mvc/entities/") else "routes"
-            label = "Entity" if kind == "entities" else "Route"
-            assert f"Retour à {label} Explorer" in html
+            label = "entités" if kind == "entities" else "routes"
+            assert f"Retour aux {label}" in html
             assert f'<a href="/{kind}" aria-current="page">' in html
             if content is not None:
                 assert 'id="line-1"' in html

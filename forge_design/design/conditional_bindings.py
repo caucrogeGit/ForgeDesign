@@ -35,7 +35,7 @@ def _binding_error(
     if variable is None:
         return "unknown_variable", "Variable inconnue dans le contexte."
     if variable.type != "boolean":
-        return "type_mismatch", "Type de variable incompatible ; boolean attendu."
+        return "type_mismatch", "Type de variable incompatible, boolean attendu."
     return None
 
 

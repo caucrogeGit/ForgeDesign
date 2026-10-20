@@ -70,6 +70,8 @@ def _frame(
             **page,
         },
         status=status,
+        # Le cadre reproduit le Design du projet : aucune retouche typographique.
+        typography=False,
     )
     # Définis ici, ces en-têtes priment sur les défauts Forge (setdefault).
     response.headers["Content-Security-Policy"] = preview_frame_policy(
@@ -118,7 +120,7 @@ def show_editor_preview(request: Request, context: CurrentProjectContext) -> Res
         return _frame(
             request,
             context,
-            error="Prévisualisation indisponible : Design invalide.",
+            error="Prévisualisation indisponible\u00a0: Design invalide.",
             **page,
         )
     contract = load_contract(context, design).contract
@@ -126,7 +128,7 @@ def show_editor_preview(request: Request, context: CurrentProjectContext) -> Res
         return _frame(
             request,
             context,
-            error="Prévisualisation indisponible : contrat absent ou invalide.",
+            error="Prévisualisation indisponible\u00a0: contrat absent ou invalide.",
             **page,
         )
     data = generate_preview_data(contract)

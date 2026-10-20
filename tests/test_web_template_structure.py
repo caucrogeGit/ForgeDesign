@@ -72,7 +72,7 @@ def test_http_structure_one_read(
         assert "Template valide" not in html
         if "selected" in source:
             assert "Référence dynamique" in html and "from-import" in html
-            assert "content — ligne 1" in html and "section — ligne 1" in html
+            assert "content · ligne 1" in html and "section · ligne 1" in html
         if "{% if" in source or "unknown" in source:
             assert "Analyse partielle" in html and "template.syntax_invalid" in html
         if len(source) > 10000:
@@ -86,7 +86,7 @@ def test_http_structure_one_read(
         file.write_text('{% include "new" %}{% block updated %}<article>{% endblock %}')
         code, html, _ = call(app, "/templates/view?path=page")
         assert (
-            code == 200 and "updated — ligne 1" in html and "article — ligne 1" in html
+            code == 200 and "updated · ligne 1" in html and "article · ligne 1" in html
         )
         assert len(reads) == 2
         file.unlink()

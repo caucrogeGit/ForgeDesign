@@ -216,13 +216,13 @@ def test_current_project_lifecycle(server: WSGIServer, project: Path) -> None:
     assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
     assert request(server, str(project / "mvc/.."))[0] == 200
     home = request(server, method="GET", target="/")[1]
-    assert f"Projet : {project.resolve()}" in home and "Forge 1.0.0rc9" in home
+    assert f"Projet\u00a0: {project.resolve()}" in home and "Forge 1.0.0rc9" in home
     assert "Aucun projet ouvert." not in home
     assert "Fermer le projet" in home
     source = project / "requirements.txt"
     source.unlink()
     assert request(server, str(project))[0] == 200
-    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
     assert "Forge 1.0.0rc9" not in request(server, method="GET", target="/")[1]
     assert request(server, target="/project/close")[0] == 200
     assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
@@ -243,7 +243,7 @@ def test_bad_inspection_preserves_current(
     }
     assert request(server, paths[bad_path])[0] in (200, 400)
     home = request(server, method="GET", target="/")[1]
-    assert f"Projet : {project}" in home and "Forge 1.0.0rc9" in home
+    assert f"Projet\u00a0: {project}" in home and "Forge 1.0.0rc9" in home
 
 
 @pytest.mark.parametrize("origin", [None, "null", "https://evil.example"])
@@ -253,7 +253,7 @@ def test_foreign_mutation_preserves_current(
 ) -> None:
     assert request(server, str(project))[0] == 200
     assert request(server, str(project), origin=origin, target=target)[0] == 403
-    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
 
 
 def test_close_security_and_no_writes(server: WSGIServer, project: Path) -> None:
@@ -264,7 +264,7 @@ def test_close_security_and_no_writes(server: WSGIServer, project: Path) -> None
     }
     assert request(server, target="/project/close", fetch_site="cross-site")[0] == 403
     assert request(server, target="/project/close", method="GET")[0] != 200
-    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
     assert request(server, target="/project/close")[0] == 200
     assert before == {
         p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)
@@ -285,7 +285,7 @@ def test_application_isolation_and_restart(server: WSGIServer, project: Path) ->
                 )
                 assert request(other, target="/project/close")[0] == 200
                 assert (
-                    f"Projet : {project}"
+                    f"Projet\u00a0: {project}"
                     in request(server, method="GET", target="/")[1]
                 )
             finally:
@@ -313,8 +313,9 @@ def test_refresh_updates_diagnostic(server: WSGIServer, project: Path) -> None:
     status, html, headers = request(server, "ignored", target="/project/refresh")
     assert status == 200 and "Projet actualisé." in html
     assert "2.0.0" in html and "1.0.0rc9" not in html
-    assert "mvc/views : absent." not in html and "mvc/models : absent." in html
-    assert f"Projet : {project.resolve()}" in html
+    assert "mvc/views\u00a0: absent." not in html
+    assert "mvc/models\u00a0: absent." in html
+    assert f"Projet\u00a0: {project.resolve()}" in html
     assert "no-store" in headers.get("Cache-Control", "")
     assert before == {
         p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)
@@ -357,7 +358,7 @@ def test_refresh_security(
         == 403
     )
     assert request(server, target="/project/refresh", method="GET")[0] != 200
-    assert f"Projet : {project}" in request(server, method="GET", target="/")[1]
+    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
 
 
 def test_route_explorer_page(server: WSGIServer, project: Path) -> None:
@@ -380,7 +381,7 @@ router.add("POST", "/submit", handler)
     assert "Handler</th>" in html and "ContactController.list" in html
     assert "Contrôleur</th>" in html and "mvc/controllers/contact.py" in html
     assert "Vérification</th>" in html and "Non vérifiable" in html
-    assert "Oui" in html and "Non" in html and "—" in html
+    assert "Oui" in html and "Non" in html and "–" in html
     assert "&lt;script&gt;" in html and "<script>" not in html
     assert "no-store" in headers.get("Cache-Control", "")
     (project / "mvc/routes/__init__.py").unlink()
@@ -527,10 +528,10 @@ def test_web_template_dependencies(server: WSGIServer, project: Path) -> None:
     status, html, headers = request(server, method="GET", target="/routes")
     assert status == 200 and "extends: base.html" in html
     assert "include: contacts/&lt;script&gt;.html" in html
-    assert "include: dynamique — —" in html and "<script>" not in html
-    assert "extends: base.html — Présent" in html
-    assert "include: contacts/&lt;script&gt;.html — Absent" in html
-    assert "include: ../secret.html — Chemin refusé" in html
+    assert "include: dynamique · –" in html and "<script>" not in html
+    assert "extends: base.html · Présent" in html
+    assert "include: contacts/&lt;script&gt;.html · Absent" in html
+    assert "include: ../secret.html · Chemin refusé" in html
     graph_html = html.split('class="route-graph"', 1)[1]
     assert "Vue des relations" in graph_html and "GET /" in graph_html
     assert "HomeController.index" in graph_html
@@ -591,9 +592,9 @@ def test_web_dependency_syntax(
     (project / "mvc/views/part.html").write_text(content)
     assert request(server, str(project))[0] == 200
     status, html, headers = request(server, method="GET", target="/routes")
-    assert status == 200 and f"include: part.html — Présent — {label}" in html
-    assert "include: absent.html — Absent</li>" in html
-    assert "include: dynamique — —</li>" in html
+    assert status == 200 and f"include: part.html · Présent · {label}" in html
+    assert "include: absent.html · Absent</li>" in html
+    assert "include: dynamique · –</li>" in html
     assert "<script>" not in html and "Traceback" not in html
     if content == "injected-error":
         assert "&lt;script&gt;" in html
@@ -656,8 +657,8 @@ def test_web_template_cycles(
     assert "<script>" not in html
     if cyclic:
         assert "&lt;script&gt;.html → a.html → &lt;script&gt;.html" in section
-        assert section.count(" — include → ") == 2
-        assert html.count("Cycle de templates Jinja :") == 1
+        assert section.count(" · include → ") == 2
+        assert html.count("Cycle de templates Jinja\u00a0:") == 1
     else:
         assert "Aucun cycle détecté dans l’analyse disponible." in section
 
@@ -1181,13 +1182,13 @@ def test_project_without_bootstrap_is_opened(server: WSGIServer, project: Path) 
     (project / "bootstrap.py").unlink()
     status, html, _ = request(server, str(project))
     assert status == 200 and "Projet Forge reconnu" in html
-    assert "bootstrap.py : absent." not in html
+    assert "bootstrap.py\u00a0: absent." not in html
     _, page, _ = request(server, method="GET")
     assert 'data-health-section="structure" data-status="ok"' in page
     assert (
-        '<li data-severity="info">Information : Élément optionnel absent. '
+        '<li data-severity="info">Information · Élément optionnel absent. '
         "<code>bootstrap.py</code></li>"
     ) in page
     assert "<dt>Éléments requis trouvés</dt><dd>4 / 4</dd>" in page
     home = request(server, method="GET", target="/")[1]
-    assert f"Projet : {project.resolve()}" in home
+    assert f"Projet\u00a0: {project.resolve()}" in home

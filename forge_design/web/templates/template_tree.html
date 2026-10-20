@@ -1,12 +1,12 @@
 {% extends "layout.html" %}
-{% block title %}Arbre du template — Forge Design{% endblock %}
+{% block title %}Arbre du gabarit · Forge Design{% endblock %}
 {% block content %}
-<h1>Arbre du template</h1>
-<p><a href="/templates">Retour à Template Viewer</a></p>
+<h1>Arbre du gabarit</h1>
+<p><a href="/templates">Retour aux gabarits</a></p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if source and tree %}
 <div class="template-header">
-<h2 class="template-path">Template : {{ source.path }}</h2>
+<h2 class="template-path">Gabarit : {{ source.path }}</h2>
 <dl class="template-meta" data-size="{{ source.size }}" data-modified-ns="{{ source.modified_ns }}">
   <dt>Taille</dt><dd>{{ source.size }} octets</dd>
   <dt>Modification</dt><dd>{{ modified_date(source.modified_ns) }}</dd>
@@ -20,22 +20,22 @@
 <section aria-labelledby="dependencies-title">
 <h2 id="dependencies-title">Dépendances Jinja</h2>
 {% if tree.dependencies %}<ul class="template-tree">
-{% for item in navigation %}<li data-navigation-status="{{ item.status }}">{{ item.reference.kind }} — ligne {{ item.reference.line }}
+{% for item in navigation %}<li data-navigation-status="{{ item.status }}">{{ item.reference.kind }} · ligne {{ item.reference.line }}
 <ul><li>{% if item.status == 'dynamic' %}Référence dynamique{% else %}{{ item.reference.path }}{% endif %}
-— {{ navigation_labels[item.status] }}
+· {{ navigation_labels[item.status] }}
 {% if item.status == 'available' %}<a href="{{ template_url(item.target_path) }}" aria-label="Voir le template {{ item.target_path }}">Voir</a>{% endif %}</li></ul></li>{% endfor %}
 </ul>{% else %}<p>Aucune dépendance Jinja détectée.</p>{% endif %}
 </section>
 <section aria-labelledby="blocks-title">
 <h2 id="blocks-title">Blocks Jinja</h2>
-{% if tree.blocks %}<ul class="template-tree">{% for block in tree.blocks %}<li>{{ block.name }} — ligne {{ block.line }}</li>{% endfor %}</ul>
+{% if tree.blocks %}<ul class="template-tree">{% for block in tree.blocks %}<li>{{ block.name }} · ligne {{ block.line }}</li>{% endfor %}</ul>
 {% else %}<p>Aucun block Jinja détecté.</p>{% endif %}
 </section>
 <section aria-labelledby="html-title">
 <h2 id="html-title">Structure HTML</h2>
 {% if tree_rows %}<div class="template-tree-scroll"><ul class="template-tree">
 {% for row in tree_rows %}
-<li data-html-depth="{{ row.depth }}">{{ row.tag }} — ligne {{ row.line }}
+<li data-html-depth="{{ row.depth }}">{{ row.tag }} · ligne {{ row.line }}
 {% if row.has_children %}<ul>{% else %}</li>{% for level in range(row.close_levels) %}</ul></li>{% endfor %}{% endif %}
 {% endfor %}
 </ul></div>{% else %}<p>Aucune structure HTML détectée.</p>{% endif %}

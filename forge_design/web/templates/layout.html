@@ -14,7 +14,7 @@
 {% macro link(path, page, name, label) -%}
 <a href="{{ path }}"{% if active_page == page %} aria-current="page"{% endif %}>{{ icon(name) }}{{ label }}</a>
 {%- endmacro %}
-{% set page_labels = {"home": "Accueil", "inspector": "Project Inspector", "routes": "Route Explorer", "entities": "Entity Explorer", "templates": "Template Viewer", "editor": "Éditeur", "debug": "Debug Center"} %}
+{% set page_labels = {"home": "Accueil", "inspector": "Vue d’ensemble", "routes": "Routes", "entities": "Entités", "templates": "Gabarits", "editor": "Éditeur", "debug": "Diagnostic"} %}
 <body>
   <div class="app">
     <aside class="app-sidebar">
@@ -29,15 +29,15 @@
       </div>
       <nav aria-label="Navigation principale">
         {{ link("/", "home", "home", "Accueil") }}
-        {{ link("/inspector", "inspector", "inspector", "Project Inspector") }}
+        {{ link("/inspector", "inspector", "inspector", "Vue d’ensemble") }}
         <p class="app-nav-group">Explorer</p>
-        {{ link("/routes", "routes", "routes", "Route Explorer") }}
-        {{ link("/entities", "entities", "entities", "Entity Explorer") }}
-        {{ link("/templates", "templates", "templates", "Template Viewer") }}
+        {{ link("/routes", "routes", "routes", "Routes") }}
+        {{ link("/entities", "entities", "entities", "Entités") }}
+        {{ link("/templates", "templates", "templates", "Gabarits") }}
         <p class="app-nav-group">Concevoir</p>
         {{ link("/editor", "editor", "editor", "Éditeur") }}
         <p class="app-nav-group">Diagnostiquer</p>
-        {{ link("/debug", "debug", "debug", "Debug Center") }}
+        {{ link("/debug", "debug", "debug", "Diagnostic") }}
       </nav>
       {% if module_navigation %}
       <nav class="module-navigation" aria-label="Modules">

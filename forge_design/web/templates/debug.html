@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
-{% block title %}Debug Center — Forge Design{% endblock %}
+{% block title %}Diagnostic · Forge Design{% endblock %}
 {% block content %}
-<h1>Debug Center</h1>
+<h1>Diagnostic</h1>
 <p class="intro">Commandes officielles de Forge, lancées uniquement sur votre demande, puis journal des erreurs runtime du projet.</p>
 {% if result %}{% set levels_seen = namespace(errors=0, warnings=0) %}{% for event in view.events %}{% if event.level in ("ERROR", "CRITICAL") %}{% set levels_seen.errors = levels_seen.errors + 1 %}{% elif event.level == "WARNING" %}{% set levels_seen.warnings = levels_seen.warnings + 1 %}{% endif %}{% endfor %}
 <ul class="route-tally" aria-label="Journal runtime">
@@ -25,7 +25,7 @@
 {{ caller("warning") }}
 <details class="command-about"><summary>À propos de cette commande</summary>
 {{ caller("about") }}
-<p>Durée limitée à {{ diagnostic_timeout }} s ; sortie standard et sortie d’erreur limitées à {{ diagnostic_limit_kib }} Kio chacune.</p>
+<p>Durée limitée à {{ diagnostic_timeout }} s. Sortie standard et sortie d’erreur limitées à {{ diagnostic_limit_kib }} Kio chacune.</p>
 </details>
 {% if not current_project %}<p>Aucun projet sélectionné : ouvrez un projet pour lancer {{ noun }}.</p>{% endif %}
 {% if run_error %}<p class="message error" role="alert" data-diagnostic-error>{{ run_error }}</p>{% endif %}
@@ -33,7 +33,7 @@
 <div data-diagnostic-status="{{ run.status }}" role="status">
 <dl>
 <dt>État</dt><dd>{{ states[run.status] }}</dd>
-<dt>Code retour</dt><dd>{{ run.exit_code if run.exit_code is not none else '—' }}</dd>
+<dt>Code retour</dt><dd>{{ run.exit_code if run.exit_code is not none else '–' }}</dd>
 <dt>Durée</dt><dd>{{ '%.2f' | format(run.duration) }} s</dd>
 <dt>Interpréteur</dt><dd><code>{{ run.interpreter }}</code> du projet</dd>
 </dl>
@@ -51,17 +51,17 @@
 {% set diagnostic_states = {"succeeded": "Réussi (code 0)", "checks-failed": "Terminé avec le code 1 : au moins un contrôle en échec, ou erreur de la commande", "exit-code": "Terminé avec un autre code retour", "launch-failed": "Échec du lancement", "timed-out": "Diagnostic interrompu : délai dépassé"} %}
 {% set audit_states = {"succeeded": "Terminé avec le code 0 : aucun constat FAIL (des avertissements restent possibles)", "checks-failed": "Terminé avec le code 1 : au moins un constat FAIL, ou erreur de la commande", "exit-code": "Terminé avec un autre code retour", "launch-failed": "Échec du lancement", "timed-out": "Audit interrompu : délai dépassé"} %}
 {% call(part) forge_command("diagnostic", "Diagnostic Forge", "/debug/forge-diagnostic", "Exécuter le diagnostic Forge", "le diagnostic", diagnostic_states, diagnostic, diagnostic_error, "forge doctor", "config", "Configuration") %}{% if part == "about" %}
-<p>Lance la commande officielle <code>forge doctor</code> du projet, uniquement sur votre demande, et affiche son résultat sans l’interpréter ; les affectations sensibles reconnues (mot de passe, jeton, clé d’API…) sont masquées, sans garantie d’exhaustivité. Rien n’est enregistré : le résultat disparaît avec cette page.</p>{% else %}
-<p class="message" data-diagnostic-warning>Le diagnostic Forge est exécuté avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé. Il exécute la configuration du projet et peut donc exécuter son code ou accéder aux services qui y sont configurés, notamment la base de données.</p>{% endif %}
+<p>Lance la commande officielle <code>forge doctor</code> du projet, uniquement sur votre demande, et affiche son résultat sans l’interpréter. Les affectations sensibles reconnues (mot de passe, jeton, clé d’API…) sont masquées, sans garantie d’exhaustivité. Rien n’est enregistré : le résultat disparaît avec cette page.</p>{% else %}
+<p class="message help-text" data-diagnostic-warning>Le diagnostic Forge est exécuté avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé. Il exécute la configuration du projet et peut donc exécuter son code ou accéder aux services qui y sont configurés, notamment la base de données.</p>{% endif %}
 {% endcall %}
 {% call(part) forge_command("audit", "Audit du projet Forge", "/debug/forge-audit", "Exécuter l’audit Forge", "l’audit", audit_states, audit, audit_error, "forge project:audit", "read", "Lecture seule") %}{% if part == "about" %}
 <p>Lance la commande officielle <code>forge project:audit</code> : analyse de la structure, de la configuration, des entités, des routes (syntaxe seulement), des templates, des modules, des migrations, de la documentation et de la présence de tests, sans les exécuter. Résultat affiché sans interprétation, affectations sensibles reconnues masquées, rien n’est enregistré.</p>{% else %}
-<p class="message" data-diagnostic-warning>L’audit est exécuté avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé : le CLI Forge et les paquets installés dans <code>.venv</code> s’exécutent. Avec forge-mvc 1.0.0rc9, il lit les fichiers du projet, notamment <code>env/example</code> et <code>env/dev</code>, sans en afficher les valeurs ; il n’exécute ni <code>config.py</code>, ni l’application, ni les tests, et ne contacte aucune base de données.</p>{% endif %}
+<p class="message help-text" data-diagnostic-warning>L’audit est exécuté avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé : le CLI Forge et les paquets installés dans <code>.venv</code> s’exécutent. Avec forge-mvc 1.0.0rc9, il lit les fichiers du projet, notamment <code>env/example</code> et <code>env/dev</code>, sans en afficher les valeurs. Il n’exécute ni <code>config.py</code>, ni l’application, ni les tests, et ne contacte aucune base de données.</p>{% endif %}
 {% endcall %}
 {% set check_states = {"succeeded": "Terminé avec le code 0 : aucun contrôle en échec (des avertissements restent possibles)", "checks-failed": "Terminé avec le code 1 : au moins un contrôle en échec, ou erreur de la commande", "exit-code": "Terminé avec un autre code retour : le code importé du projet a pu terminer le processus", "launch-failed": "Échec du lancement", "timed-out": "Vérification interrompue : délai dépassé"} %}
 {% call(part) forge_command("check", "Vérification du projet Forge", "/debug/forge-project-check", "Exécuter la vérification Forge", "la vérification", check_states, check, check_error, "forge project:check", "code", "Exécute le projet") %}{% if part == "about" %}
 <p>Lance la commande officielle <code>forge project:check</code> : vérification de la structure, de la configuration, des entités, des routes (par import réel), des templates, des modules et des migrations. Résultat affiché sans interprétation, affectations sensibles reconnues masquées, rien n’est enregistré.</p>{% else %}
-<p class="message" data-diagnostic-warning>La vérification <code>forge project:check</code> est exécutée avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé. Elle importe réellement les routes du projet (<code>mvc/routes</code>) : ce code s’exécute, ainsi que les contrôleurs et modules qu’il importe (dans le squelette Forge : contrôleurs et registre <code>optins/</code>). Ce code peut lire ou écrire des fichiers, contacter des services ou lancer des processus avec les droits de votre compte ; <code>config.py</code> n’est pas chargé par la commande elle-même, mais peut l’être par le code importé. Forge Design n’exécute pas ce code dans son propre processus, limite la durée et arrête le groupe de processus qu’il a lancé, mais ce sous-processus n’est pas un bac à sable.</p>{% endif %}
+<p class="message help-text" data-diagnostic-warning>La vérification <code>forge project:check</code> est exécutée avec l’environnement Python du projet (<code>.venv/bin/python</code>) dans un processus séparé. Elle importe réellement les routes du projet (<code>mvc/routes</code>) : ce code s’exécute, ainsi que les contrôleurs et modules qu’il importe (dans le squelette Forge, contrôleurs et registre <code>optins/</code>). Ce code peut lire ou écrire des fichiers, contacter des services ou lancer des processus avec les droits de votre compte. Le fichier <code>config.py</code> n’est pas chargé par la commande elle-même, mais peut l’être par le code importé. Forge Design n’exécute pas ce code dans son propre processus, limite la durée et arrête le groupe de processus qu’il a lancé, mais ce sous-processus n’est pas un bac à sable.</p>{% endif %}
 {% endcall %}
 <section class="debug-journal" aria-labelledby="journal-title">
 <h2 id="journal-title">Journal des erreurs runtime</h2>
@@ -78,7 +78,7 @@
 {% if view.events %}
 <div class="table-scroll"><table>
   <thead><tr><th scope="col">Date</th><th scope="col">Niveau</th><th scope="col">Catégorie</th><th scope="col">Type</th><th scope="col">Route</th><th scope="col">Message</th><th scope="col">Détail</th></tr></thead>
-  <tbody>{% for event in view.events %}<tr data-event-id="{{ event.id }}" data-event-line="{{ event.line_number }}"><td>{{ event.timestamp }}</td><td><span class="level-pill" data-level="{{ event.level }}">{{ event.level }}</span></td><td>{{ event.category }}</td><td>{{ event.exception_type }}</td><td>{{ event.route or (event.request.path if event.request else none) or '—' }}</td><td>{{ event.message }}</td><td>{% set event_url = debug_event_url(event) %}{% if event_url %}<a href="{{ event_url }}" aria-label="Voir le détail de {{ event.exception_type }}">Voir</a>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+  <tbody>{% for event in view.events %}<tr data-event-id="{{ event.id }}" data-event-line="{{ event.line_number }}"><td>{{ event.timestamp }}</td><td><span class="level-pill" data-level="{{ event.level }}">{{ event.level }}</span></td><td>{{ event.category }}</td><td>{{ event.exception_type }}</td><td>{{ event.route or (event.request.path if event.request else none) or '–' }}</td><td>{{ event.message }}</td><td>{% set event_url = debug_event_url(event) %}{% if event_url %}<a href="{{ event_url }}" aria-label="Voir le détail de {{ event.exception_type }}">Voir</a>{% else %}–{% endif %}</td></tr>{% endfor %}</tbody>
 </table></div>
 {% elif view.total_events %}<p>Aucun événement ne correspond aux filtres.</p>
 {% elif not view.issues %}<p>Aucune erreur runtime enregistrée.</p>{% endif %}
@@ -87,7 +87,7 @@
 {% if result %}
 {% if view.issues %}
 <section aria-labelledby="debug-issues"><h2 id="debug-issues">Anomalies de lecture</h2>
-<ul>{% for issue in view.issues %}<li><code>{{ issue.code }}</code> — {{ issue.message }}{% if issue.line_number %} (ligne {{ issue.line_number }}){% endif %}</li>{% endfor %}</ul>
+<ul>{% for issue in view.issues %}<li><code>{{ issue.code }}</code> · {{ issue.message }}{% if issue.line_number %} (ligne {{ issue.line_number }}){% endif %}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% endif %}

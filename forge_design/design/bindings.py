@@ -57,7 +57,7 @@ def _binding_error(
     if variable is None:
         return "unknown_variable", "Variable inconnue dans le contexte."
     if variable.type != rule:
-        return "type_mismatch", f"Type de variable incompatible ; {rule} attendu."
+        return "type_mismatch", f"Type de variable incompatible, {rule} attendu."
     return None
 
 

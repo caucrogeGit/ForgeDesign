@@ -50,7 +50,7 @@ test("montage : moteur, repli masqué, sélection annoncée, texte hostile inert
   assert.equal(view.status.textContent, "Sélectionnez un élément du graphe.");
   const nodes = rendered(view.host).nodes;
   nodes[0].dispatch("click");
-  assert.equal(view.status.textContent, `Élément sélectionné : ${HOSTILE}`);
+  assert.equal(view.status.textContent, `Élément sélectionné\u00a0: ${HOSTILE}`);
   assert.deepEqual(engine.selection().neighbourIds, ["B"]);
   assert.ok(nodes[0].querySelectorAll("text").every((text) => text.children.length === 0));
   nodes[0].dispatch("keydown", { key: "Escape" });

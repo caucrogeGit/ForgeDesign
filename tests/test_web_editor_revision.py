@@ -39,6 +39,8 @@ STALE = (
     "Le design a été modifié depuis l’affichage de cette page. "
     "Rechargez l’éditeur avant de recommencer."
 )
+# À l’écran, une phrase par ligne (ADR-002) : le rendu ajoute le retour.
+SCREEN_STALE = STALE.replace(". R", ". <br>R")
 
 
 def test_message_matches_the_contract() -> None:
@@ -89,7 +91,7 @@ def test_acc_004_two_tabs_never_touch_the_wrong_block(tmp_path: Path) -> None:
         # Onglet A soumet sa vue périmée.
         status, html, _ = request(app, "/editor/action", stale)
     assert status == 409, "la vue périmée ne doit pas être acceptée"
-    assert STALE in unescape(html)
+    assert SCREEN_STALE in unescape(html)
     assert kinds(root) == ["table", "section"]
     assert digest(root) == after_b
 
@@ -169,7 +171,7 @@ def test_every_action_refuses_a_stale_view_without_writing(
         before = design_file(root).read_bytes()
         status, html = post(app, action, revision)
     assert status == 409, action
-    assert STALE in unescape(html)
+    assert SCREEN_STALE in unescape(html)
     assert design_file(root).read_bytes() == before
 
 
@@ -216,7 +218,7 @@ def test_conflict_page_shows_current_design_root_selection_and_reload(
         assert status == 409 and headers["Cache-Control"] == "no-store"
         assert "Location" not in headers
         text = unescape(html)
-        assert STALE in text and "Recharger l’éditeur" in text
+        assert SCREEN_STALE in text and "Recharger l’éditeur" in text
         assert f'href="/editor?design={DESIGN.replace("/", "%2F")}"' in html
         # Sélection racine, jamais le chemin soumis ; formulaires sur la révision
         # courante (celle que l'utilisateur voit désormais).
@@ -462,7 +464,7 @@ def test_stale_wins_before_action_validation_or_write(
         monkeypatch.setattr(web_editor, "_apply", forbidden)
         monkeypatch.setattr(web_editor, "write_design", forbidden)
         status, html, _ = request(app, "/editor/action", fields)
-        assert status == 409 and STALE in unescape(html)
+        assert status == 409 and SCREEN_STALE in unescape(html)
         assert design_file(root).read_bytes() == before
 
 

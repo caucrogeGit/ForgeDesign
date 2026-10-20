@@ -80,7 +80,7 @@ def test_restart_canonical_order_remove_and_isolation(tmp_path: Path) -> None:
         assert store.list()[0].path == str(first)
         assert call(app, "/inspector", method="POST", value=str(second))[0] == 200
         html = call(app)[1]
-        assert "— Ouvert" in html
+        assert "· Ouvert" in html
         assert html.index(str(second), html.index("Projets récents")) < html.index(
             str(first), html.index("Projets récents")
         )

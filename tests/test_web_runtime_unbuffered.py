@@ -21,19 +21,19 @@ CASES = [
         "diagnostic",
         "/debug/forge-diagnostic",
         "run_forge_diagnostic",
-        "Diagnostic interrompu : délai dépassé.",
+        "Diagnostic interrompu\u00a0: délai dépassé.",
     ),
     (
         "audit",
         "/debug/forge-audit",
         "run_forge_project_audit",
-        "Audit interrompu : délai dépassé.",
+        "Audit interrompu\u00a0: délai dépassé.",
     ),
     (
         "check",
         "/debug/forge-project-check",
         "run_forge_project_check",
-        "Vérification interrompue : délai dépassé.",
+        "Vérification interrompue\u00a0: délai dépassé.",
     ),
 ]
 

@@ -69,7 +69,7 @@ def test_http_diagnostics(
         assert status == 200 and headers["Cache-Control"] == "no-store"
         assert calls == [root]
         assert (
-            f"{errors} erreur(s) — {warnings} avertissement(s) — 0 information(s)"
+            f"{errors} erreur(s) · {warnings} avertissement(s) · 0 information(s)"
             in html
         )
         document = SvgDocument()

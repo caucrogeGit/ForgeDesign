@@ -324,7 +324,7 @@ def write_design(
                 canonical, design_path, design, expected_revision=expected_revision
             )
     except OSError as error:
-        raise DesignWriteError("Sauvegarde incertaine ; relire le design.") from error
+        raise DesignWriteError("Sauvegarde incertaine. Relire le design.") from error
 
 
 def _write_design_locked(
@@ -424,5 +424,5 @@ def _write_design_locked(
         raise DesignWriteConflictError("Cible ou temporaire déjà présent.") from error
     except (OSError, SourceReadError) as error:
         raise DesignWriteError(
-            "Sauvegarde impossible ; relire la cible avant de réessayer."
+            "Sauvegarde impossible. Relire la cible avant de réessayer."
         ) from error

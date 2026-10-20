@@ -317,7 +317,7 @@ def analyze_template_structure(source: str) -> TemplateStructure:
         issues.append(
             TemplateStructureIssue(
                 "template.html_partial",
-                "Structure HTML partielle ; aucun rendu effectué.",
+                "Structure HTML partielle, aucun rendu effectué.",
             )
         )
     if truncated:

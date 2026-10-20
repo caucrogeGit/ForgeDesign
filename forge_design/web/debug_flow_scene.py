@@ -40,7 +40,7 @@ SCENE_DESCRIPTION = (
 
 
 def _accessible(label: str, detail: str | None) -> str:
-    text = f"{label} — {detail}" if detail else label
+    text = f"{label} · {detail}" if detail else label
     if len(text) <= MAX_ACCESSIBLE_LABEL:
         return text
     return text[: MAX_ACCESSIBLE_LABEL - 1] + "…"

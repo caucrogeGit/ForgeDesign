@@ -104,7 +104,7 @@ def empty_optin_call(
     warning = (
         "Branchement opt-ins non résolu : vérifier l'import, l'appel "
         "register_optins(router) et le registre. Seul le registre vide "
-        "conventionnel est reconnu ; les opt-ins ne sont pas exécutés."
+        "conventionnel est reconnu. Les opt-ins ne sont pas exécutés."
     )
     # Nœuds syntaxiques uniquement : aucun routeur Forge n'est instancié ici.
     expected: tuple[ast.stmt, ...] = (

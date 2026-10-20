@@ -74,7 +74,8 @@ def test_nominal_render_with_fake_data(app: WSGIServer) -> None:
     # Liste : trois lignes fictives.
     tbody = html.split("<tbody>")[1].split("</tbody>")[0]
     assert tbody.count("<tr>") == 3
-    assert "Données fictives : complètes" in html and "Rendu : complet" in html
+    assert "Données fictives\u00a0: complètes" in html
+    assert "Rendu\u00a0: complet" in html
     assert "Aperçu structurel" in html and "rendu final" not in html
     assert html.startswith("<!doctype html>") and '<html lang="fr">' in html
     assert '<link rel="stylesheet" href="/editor-preview.css">' in html
@@ -156,7 +157,7 @@ def test_design_invalid_unavailable(app: WSGIServer, root: Path) -> None:
     (root / "mvc/views" / DESIGN).write_text('{"version": "9"}')
     status, html, _ = nominal(app)
     assert status == 200
-    assert "Prévisualisation indisponible : Design invalide." in html
+    assert "Prévisualisation indisponible\u00a0: Design invalide." in html
     assert "data-forge-design-preview" not in html
 
 
@@ -169,7 +170,7 @@ def test_contract_unavailable(app: WSGIServer, root: Path, content: str | None) 
         contract.write_text(content)
     status, html, _ = nominal(app)
     assert status == 200
-    assert "Prévisualisation indisponible : contrat absent ou invalide." in html
+    assert "Prévisualisation indisponible\u00a0: contrat absent ou invalide." in html
     assert "data-forge-design-preview" not in html
     # L'éditeur reste utilisable pour la structure.
     assert 'name="block_type"' in get(app, design=DESIGN)[1]
@@ -184,7 +185,8 @@ def test_partial_preview_diagnostics(app: WSGIServer, root: Path) -> None:
     contract["context"]["contacts"]["fields"]["nom"] = "uuid"
     (root / CONTRACT_FILE).write_text(json.dumps(contract))
     html = nominal(app)[1]
-    assert "Données fictives : partielles" in html and "Rendu : partiel" in html
+    assert "Données fictives\u00a0: partielles" in html
+    assert "Rendu\u00a0: partiel" in html
     assert "Prévisualisation partielle." in html
     assert "<code>preview.unsupported_prop</code>" in html
     assert "<code>preview.unsupported_field_type</code>" in html

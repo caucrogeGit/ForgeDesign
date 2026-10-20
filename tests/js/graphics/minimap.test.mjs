@@ -168,6 +168,6 @@ test("navigation : point de minicarte → centre monde attendu", () => {
 test("description textuelle de la zone visible", () => {
   assert.equal(
     describeVisible({ width: 1000, height: 500 }, { x: 250, y: -10, width: 500, height: 600 }),
-    "Mini-carte de la scène. Zone visible : de 25 à 75 % de la largeur, de 0 à 100 % de la hauteur.",
+    "Mini-carte de la scène. Zone visible\u00a0: de 25 à 75\u00a0% de la largeur, de 0 à 100\u00a0% de la hauteur.",
   );
 });

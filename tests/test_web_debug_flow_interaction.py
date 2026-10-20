@@ -49,7 +49,7 @@ def test_script_contract() -> None:
         'import { createGraphicEngine } from "./graphics/engine.js";',
         "JSON.parse(source.textContent)",
         "data-debug-flow",
-        "Étape sélectionnée : ",
+        "Étape sélectionnée\\u00a0: ",
     ):
         assert expected in script
 
@@ -121,7 +121,7 @@ def test_http_scene_fallback_and_asset(tmp_path: Path) -> None:
                 "debug-node-template",
             ]
         )
-        assert scene["nodes"][1]["label"] == "Route — " + HOSTILE
+        assert scene["nodes"][1]["label"] == "Route · " + HOSTILE
         # La requête SQL complète reste dans sa section, jamais dans la scène.
         assert "sql-only-value" not in payload and "SELECT" not in payload
         assert "sql-only-value" in html

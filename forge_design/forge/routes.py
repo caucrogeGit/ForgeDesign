@@ -224,13 +224,13 @@ def _controller(
         if not S_ISREG((root / relative).lstat().st_mode):
             raise ValueError("fichier non ordinaire ou lien symbolique")
     except FileNotFoundError:
-        warnings.append(f"Ligne {line} : contrôleur importé introuvable : {relative}.")
+        warnings.append(f"Ligne {line} : contrôleur importé introuvable ({relative}).")
         return HandlerInfo(
             handler.reference, verification="unreadable", missing_controller=relative
         )
     except (OSError, ValueError):
         warnings.append(
-            f"Ligne {line} : contrôleur refusé (accès/lien/type) : {relative}."
+            f"Ligne {line} : contrôleur refusé, accès, lien ou type ({relative})."
         )
         return HandlerInfo(handler.reference, verification="unreadable")
     status, template, class_source, method_source = _verify(
@@ -408,7 +408,7 @@ def _with_template_presence(
                 if not limit_reported:
                     warnings.append(
                         f"Limite globale de {MAX_VISITED_TEMPLATES} templates "
-                        "atteinte ; "
+                        "atteinte, "
                         "analyse partielle."
                     )
                     limit_reported = True
@@ -425,7 +425,7 @@ def _with_template_presence(
             parsed_cache[reference] = checked, tree
             if checked.syntax == "invalid":
                 warnings.append(
-                    f"mvc/views/{reference}:{checked.syntax_line} : "
+                    f"mvc/views/{reference}:{checked.syntax_line} · "
                     f"syntaxe Jinja invalide : {checked.syntax_message}"
                 )
             elif checked.syntax == "unreadable":
@@ -501,7 +501,7 @@ def _with_template_presence(
                     truncated = True
                     if not depth_reported:
                         warnings.append(
-                            f"Profondeur maximale de {MAX_TEMPLATE_DEPTH} atteinte ; "
+                            f"Profondeur maximale de {MAX_TEMPLATE_DEPTH} atteinte, "
                             "analyse partielle."
                         )
                         depth_reported = True
@@ -591,8 +591,8 @@ def _parse(
     controller_imports = _controller_imports(tree) if imports is None else imports
     routes: list[RouteInfo] = []
     warnings = [
-        "Lecture statique des routes explicitement branchées ; "
-        "configuration, imports dynamiques "
+        "Lecture statique des routes explicitement branchées. "
+        "Configuration, imports dynamiques "
         "et opt-ins non exécutés. La liste peut être partielle."
     ]
 
@@ -822,13 +822,13 @@ def read_routes(root: str | PathLike[str]) -> RoutesResult:
             )
             routes.extend(parsed.routes)
             warnings.extend(
-                f"{filename} : {warning}" for warning in parsed.warnings[1:]
+                f"{filename} · {warning}" for warning in parsed.warnings[1:]
             )
         except (RoutesSourceMissingError, RoutesSourceUnreadableError) as error:
             warnings.append(f"{filename} : branchement non résolu ({error}).")
     if len(branches) > MAX_ROUTE_BRANCHES:
         warnings.append(
-            f"Limite de {MAX_ROUTE_BRANCHES} branchements atteinte ; liste partielle."
+            f"Limite de {MAX_ROUTE_BRANCHES} branchements atteinte, liste partielle."
         )
     return RoutesResult(
         _with_template_presence(canonical, routes, warnings), tuple(warnings)

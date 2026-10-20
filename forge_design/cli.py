@@ -53,7 +53,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 opened = False
             if not opened:
                 print(
-                    "Navigateur indisponible ; ouvrez l’URL manuellement.",
+                    "Navigateur indisponible. Ouvrez l’URL manuellement.",
                     file=sys.stderr,
                 )
 

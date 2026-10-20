@@ -350,7 +350,7 @@ def test_page_shows_compact_chains_and_details(tmp_path: Path, project: Path) ->
     summary = summary_of(show)
     assert summary == (
         "GET /users/{id} → Users.show → users/show.html → users/show.view.json"
-        " — ✓ Complète"
+        " · ✓ Complète"
     )
     assert (
         '<a href="/templates/view?path=users%2Fshow.html">users/show.html</a>' in show
@@ -363,12 +363,12 @@ def test_page_shows_compact_chains_and_details(tmp_path: Path, project: Path) ->
     edit = summary_of(chain_item(html, EDIT))
     assert edit == (
         "GET /users/{id}/edit → Users.edit → users/edit.html | users/error.html → "
-        "users/edit-bis.view.json, users/edit.view.json | sans contrat — ◐ Partielle"
+        "users/edit-bis.view.json, users/edit.view.json | sans contrat · ◐ Partielle"
     )
     assert "template non déterminable" in text(chain_item(html, DYN))
     assert "Non déterminable statiquement" in text(chain_item(html, DYN))
     assert "users/show.html | users/ghost.html | ?" in text(chain_item(html, MIXED))
-    assert "users/ghost.html — Absent" in text(chain_item(html, MIXED))
+    assert "users/ghost.html · Absent" in text(chain_item(html, MIXED))
     assert "aucun rendu détecté" in text(chain_item(html, JSON))
     gone = chain_item(html, GONE)
     assert 'data-chain-state="problematic"' in gone and "✕ Problématique" in gone
@@ -459,7 +459,7 @@ def test_unavailable_contracts_keep_the_routes(
         monkeypatch.setattr(TemplateViewerTool, "run", refused)
         status, html, _ = call(app, "/routes")
     assert status == 200
-    assert "Analyse des contrats de vue indisponible : inventaire refusé" in html
+    assert "Analyse des contrats de vue indisponible\u00a0: inventaire refusé" in html
     assert len(re.findall(r'<li id="route-chain-', html)) == 12
     assert "Liaison inconnue" in chain_item(html, SHOW)
 

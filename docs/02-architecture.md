@@ -107,8 +107,9 @@ Le layout est un shell d'application, sans changer les routes ni les pages :
 
 - une **barre latérale** contient la marque et la version, le projet courant
   (`Projet : <racine>` et la version Forge) et la navigation
-  `Navigation principale`, regroupée en Projet, Explorer (Route, Entity,
-  Template), Concevoir (Éditeur) et Diagnostiquer (Debug Center) ; la zone
+  `Navigation principale`, regroupée en Projet (Vue d’ensemble), Explorer
+  (Routes, Entités, Gabarits), Concevoir (Éditeur) et Diagnostiquer
+  (Diagnostic) ; la zone
   `Modules` reste distincte ; sur un écran étroit, la barre passe au-dessus du
   contenu ;
 - une **barre du haut** porte le fil de la page et les actions du projet
@@ -148,6 +149,37 @@ Aucun `config.py`, `bootstrap.py` ou module `mvc` du répertoire courant n'est c
 par la composition Web. Les POST explicites Inspector, ouverture d’un récent et
 actualisation exécutent le Tool Inspector.
 La CLI reste inchangée ; aucun navigateur n'est ouvert automatiquement.
+
+#### Rédaction de l'interface selon l'ADR-002 (FD-UX-008)
+
+L'interface suit la partie « écran » de l'ADR-002 de style de SéquenCiel. Le
+code, ses identifiants et ses docstrings ne sont pas concernés.
+
+- Les outils portent à l'écran des noms courts : Accueil, Vue d’ensemble,
+  Routes, Entités, Gabarits, Éditeur, Diagnostic. Les noms techniques (Project
+  Inspector, Route Explorer…) restent ceux du code et de cette documentation.
+- Aucun tiret cadratin ni point-virgule n'est affiché. Le séparateur est « · »,
+  une valeur absente s'écrit « – ».
+- Une phrase compte au plus un deux-points. Un préfixe (gravité, fichier et
+  ligne) se sépare du message par « · », et « Preview réelle indisponible. »
+  forme sa propre phrase avant la raison.
+- `render_page` passe chaque page dans `french_typography`
+  (`web/typography.py`). Les espaces devant `: ; ? !` et dans les guillemets
+  deviennent insécables. Une phrase suivie d'une autre commençant par une
+  majuscule passe à la ligne (`<br>`). Les éléments `pre`, `code`, `kbd`,
+  `samp`, `script`, `style`, `textarea`, `title`, `option` et les attributs ne
+  sont jamais modifiés. Les boutons et `summary` gardent leurs phrases sur une
+  ligne. Le cadre d'aperçu de l'éditeur (`typography=False`) rend le Design tel
+  quel. Son propre texte, comme celui que posent les scripts (statut des
+  graphes, annonces des modules, nom de la minicarte), porte lui-même ses
+  espaces insécables (`&nbsp;`, ` `).
+- Les textes d'aide portent la classe `.help-text`, en noir (`--ink`) et en
+  italique, et suivent le formulaire qu'ils commentent.
+
+Le test `tests/test_adr_002_interface.py` sert de cliquet : templates, messages
+Python, textes des scripts, cadre d'aperçu et pages réellement rendues. Le kit
+d'acceptance vérifie dans le navigateur le style calculé des aides et les
+deux-points sur des projets riches.
 
 ### Contrôle de l'en-tête Host (FD-WEB-003)
 

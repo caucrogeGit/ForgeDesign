@@ -545,7 +545,7 @@ def test_editor_offers_start_with_warning(
     page = unescape(html)
     assert '<h2 id="preview-title">Prévisualisation indicative</h2>' in html
     assert '<h2 id="real-preview-title">Preview réelle</h2>' in html
-    assert "Route : <code>/contacts</code>" in page
+    assert "Route\u00a0: <code>/contacts</code>" in page
     assert REAL_PREVIEW_WARNING in page
     assert 'action="/editor/real-preview/start"' in html
     assert iframe(html) is None
@@ -1088,7 +1088,7 @@ def test_real_end_to_end(tmp_path: Path, no_survivors: None) -> None:
     before = tree_snapshot(root)
     with serving() as server:
         assert open_project(server, root)[0] == 200
-        assert "Route : <code>/</code>" in real_editor(server)[1]
+        assert "Route\u00a0: <code>/</code>" in real_editor(server)[1]
         assert real_start(server)[0] == 303
         _, html, headers = real_editor(server)
         frame = iframe(html)
@@ -1410,7 +1410,7 @@ def test_routes_unavailable_routes_show_reason_without_action(
     open_project(server, root)
     found = chains(http(server, "GET", "/routes")[1])
     expected = {
-        ("POST", "/contacts/delete"): "Méthode POST : seule une route GET",
+        ("POST", "/contacts/delete"): "Méthode POST\u00a0: seule une route GET",
         ("GET", "/contacts/{id}"): "Route dynamique",
         ("GET", "/prive"): "Route protégée par authentification.",
         ("GET", "/dynamique"): "Template dynamique",
@@ -1418,7 +1418,7 @@ def test_routes_unavailable_routes_show_reason_without_action(
     for key, reason in expected.items():
         state, body = found[key]
         assert state == "unavailable", key
-        assert f"Preview réelle indisponible : {reason}" in unescape(body), key
+        assert f"Preview réelle indisponible. <br>{reason}" in unescape(body), key
         assert ROUTE_START not in body and "Prévisualiser réellement" not in body
     # Une route GET incertaine ailleurs ne bloque pas la route désignée.
     assert found[("GET", "/contacts")][0] == "available"
@@ -1734,7 +1734,7 @@ def test_route_page_unknown_route_shows_reason(
 ) -> None:
     open_project(server, bare_root)
     html = unescape(route_page(server, "/inconnue")[1])
-    assert "Preview réelle indisponible : Route GET absente" in html
+    assert "Preview réelle indisponible. <br>Route GET absente" in html
     assert ROUTE_START not in html
 
 

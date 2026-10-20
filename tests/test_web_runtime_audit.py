@@ -65,7 +65,7 @@ def test_get_never_runs_and_shows_both_commands(
     assert f'<form method="post" action="{AUDIT}">' in audit
     assert "Exécuter l’audit Forge" in audit and "Exécuter le diagnostic Forge" in html
     warning = unescape(audit)
-    assert "il n’exécute ni config.py, ni l’application, ni les tests" in re.sub(
+    assert "Il n’exécute ni config.py, ni l’application, ni les tests" in re.sub(
         r"</?code>", "", warning
     )
     assert "exécute la configuration du projet" not in warning
@@ -88,8 +88,8 @@ def test_each_post_runs_only_its_command(tmp_path: Path, runs: list[str]) -> Non
     assert 'data-diagnostic-status="checks-failed"' in part(audited, "audit")
     assert 'data-diagnostic-status="not-run"' in part(audited, "diagnostic")
     assert (
-        "Terminé avec le code 1 : au moins un constat FAIL, ou erreur de la commande"
-        in part(audited, "audit")
+        "Terminé avec le code 1\u00a0: au moins un constat FAIL, "
+        "ou erreur de la commande" in part(audited, "audit")
     )
     assert 'data-diagnostic-status="checks-failed"' in part(doctored, "diagnostic")
     assert 'data-diagnostic-status="not-run"' in part(doctored, "audit")
@@ -107,7 +107,7 @@ def test_code_zero_label_mentions_possible_warnings(tmp_path: Path) -> None:
         opened(app, root)
         _, html, _ = post(app, url=AUDIT)
     assert (
-        "Terminé avec le code 0 : aucun constat FAIL (des avertissements restent "
+        "Terminé avec le code 0\u00a0: aucun constat FAIL (des avertissements restent "
         "possibles)" in part(html, "audit")
     )
 
@@ -117,7 +117,7 @@ def test_guards_and_projects(tmp_path: Path, runs: list[str]) -> None:
     with serving(tmp_path, None) as app:
         status, html, _ = post(app, url=AUDIT)
         assert status == 409
-        assert "Aucun projet sélectionné : audit non lancé." in part(html, "audit")
+        assert "Aucun projet sélectionné\u00a0: audit non lancé." in part(html, "audit")
         assert "data-diagnostic-error" not in part(html, "diagnostic")
         opened(app, root)
         assert post(app, url=AUDIT, origin="http://evil.test")[0] == 403
@@ -133,7 +133,7 @@ def test_guards_and_projects(tmp_path: Path, runs: list[str]) -> None:
             assert status == 400 and "aucun paramètre" in part(html, "audit")
         (root / "app.py").unlink()
         status, html, _ = post(app, url=AUDIT)
-        assert status == 409 and "Audit non lancé : " in part(html, "audit")
+        assert status == 409 and "Audit non lancé\u00a0: " in part(html, "audit")
     assert runs == []
 
 
@@ -162,7 +162,7 @@ def test_hostile_secret_timeout_and_truncation(
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in part(hostile, "audit")
     for value in ("hunter", "k3y-777", "abc999", "t0ken-99"):
         assert value not in secret
-    assert "Audit interrompu : délai dépassé." in part(slow, "audit")
+    assert "Audit interrompu\u00a0: délai dépassé." in part(slow, "audit")
     assert 'data-diagnostic-status="timed-out"' in part(slow, "audit")
     assert "786432 octets ignorés au-delà de 256 Kio" in part(big, "audit")
 
