@@ -6,7 +6,17 @@
 {%- endmacro %}
 {% block content %}
 <h1>Entity Explorer</h1>
-<p>Contrats JSON déclarés, en lecture seule. Les relations sont déclaratives ; la base de données n’est pas analysée.</p>
+<p class="intro">Contrats JSON déclarés, en lecture seule. Les relations sont déclaratives ; la base de données n’est pas analysée.</p>
+{% if result %}{% set kinds = namespace(one=0, many=0) %}{% for relation in result.relations %}{% if relation.type == "many_to_one" %}{% set kinds.one = kinds.one + 1 %}{% elif relation.type == "many_to_many" %}{% set kinds.many = kinds.many + 1 %}{% endif %}{% endfor %}
+<ul class="route-tally" aria-label="Contenu déclaré">
+  <li><strong>{{ view.total_entities }}</strong> entité{% if view.total_entities > 1 %}s{% endif %}</li>
+  <li><strong>{{ view.total_relations }}</strong> relation{% if view.total_relations > 1 %}s{% endif %}</li>
+  <li data-state="relation"><strong>{{ kinds.one }}</strong> many_to_one</li>
+  <li data-state="relation"><strong>{{ kinds.many }}</strong> many_to_many</li>
+  {% if diagnostics.error_count %}<li data-state="problematic"><strong>{{ diagnostics.error_count }}</strong> erreur{% if diagnostics.error_count > 1 %}s{% endif %}</li>{% endif %}
+  {% if diagnostics.warning_count %}<li data-state="partial"><strong>{{ diagnostics.warning_count }}</strong> avertissement{% if diagnostics.warning_count > 1 %}s{% endif %}</li>{% endif %}
+</ul>
+{% endif %}
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 <form method="get" action="/entities" class="route-filters" aria-label="Filtres des entités">
 <div><label for="entity-query">Recherche</label><input type="search" id="entity-query" name="q" maxlength="256" value="{{ filters.query or '' }}"></div>
@@ -21,6 +31,7 @@
 <section aria-labelledby="entity-diagnostics"><h2 id="entity-diagnostics">Diagnostics</h2>
 <p>{{ diagnostics.error_count }} erreur(s) — {{ diagnostics.warning_count }} avertissement(s) — {{ diagnostics.info_count }} information(s)</p>
 {% if diagnostics.items %}
+<details class="diagnostics-list"><summary>Voir {% if diagnostics.items | length > 1 %}les {{ diagnostics.items | length }} diagnostics{% else %}le diagnostic{% endif %}</summary>
 <ul>
 {% for diagnostic in diagnostics.items %}
 <li data-diagnostic-code="{{ diagnostic.code }}" data-diagnostic-severity="{{ diagnostic.severity }}"{% if diagnostic.relation_index is not none %} data-diagnostic-relation-index="{{ diagnostic.relation_index }}"{% endif %}>
@@ -29,8 +40,72 @@
 </li>
 {% endfor %}
 </ul>
+</details>
 {% else %}<p>Aucun diagnostic dans les informations disponibles.</p>{% endif %}
 </section>
+{% if filters.item_type != 'relation' %}
+<section aria-labelledby="entities-title" class="entity-list">
+<h2 id="entities-title">Entités</h2>
+{% if view.entities %}
+<div class="table-scroll"><table>
+<thead><tr><th>Entité</th><th>Table</th><th>Champs</th><th>Relations</th><th>Timestamps</th><th>Soft delete</th></tr></thead>
+<tbody>{% for entity in view.entities %}{% set linked = namespace(count=0) %}{% for relation in result.relations %}{% if relation.from_entity == entity.name or relation.to_entity == entity.name %}{% set linked.count = linked.count + 1 %}{% endif %}{% endfor %}
+<tr><td class="entity-name">{{ entity.name }}</td><td><code>{{ entity.table }}</code></td><td>
+<details><summary>{{ entity.fields|length }} champ{% if entity.fields|length > 1 %}s{% endif %}</summary>
+<p>Source : {{ location(entity.source) }}</p>
+<div class="table-scroll"><table><thead><tr><th>Champ</th><th>Type</th><th>Requis</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead>
+<tbody>{% for field in entity.fields %}
+<tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.required) }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
+{% if field.max_length is not none %}max_length={{ field.max_length }} {% endif %}
+{% if field.precision is not none %}precision={{ field.precision }} {% endif %}
+{% if field.scale is not none %}scale={{ field.scale }} {% endif %}
+{% if field.default_json is not none %}default={{ field.default_json }} {% endif %}
+{% if field.references is not none %}references={{ field.references }}{% endif %}
+</td></tr>{% endfor %}</tbody></table></div>
+</details></td><td>{{ linked.count }}</td><td>{{ boolean(entity.timestamps) }}</td><td>{{ boolean(entity.soft_delete) }}</td></tr>
+{% endfor %}</tbody>
+</table></div>
+{% else %}<p>{{ 'Aucune entité ne correspond aux filtres.' if result.entities else 'Aucune entité interprétable.' }}</p>{% endif %}
+</section>
+{% endif %}
+{% if filters.item_type != 'entity' %}
+<section aria-labelledby="relations-title">
+<h2 id="relations-title">Relations</h2>
+{% if view.relations %}
+<div class="table-scroll"><table><thead><tr><th>Type</th><th>Source</th><th>Relation</th><th>Cible</th><th>Détails</th></tr></thead><tbody>
+{% for relation in view.relations %}
+<tr><td><span class="relation-type" data-type="{{ relation.type }}">{{ relation.type }}</span></td><td>{{ relation.from_entity }}</td><td>{{ relation.name }}</td><td>{{ relation.to_entity }}</td><td>
+{% if relation.many_to_one %}<p class="relation-key">Clé <code>{{ relation.many_to_one.foreign_key }}</code> · ON DELETE {{ relation.many_to_one.on_delete }}</p>{% endif %}
+{% if relation.many_to_many %}<p class="relation-key">Pivot <code>{{ relation.many_to_many.pivot_table }}</code> · ON DELETE {{ relation.many_to_many.on_delete }}</p>{% endif %}
+<details class="relation-more"><summary>Détails</summary>
+<p>{{ location(relation.source) }} — relations[{{ relation.source_index }}]</p>
+{% if relation.inverse_name is not none %}<p>Nom inverse : {{ relation.inverse_name }}</p>{% endif %}
+{% if relation.many_to_one %}{% set one = relation.many_to_one %}
+<p>Clé étrangère : {{ one.foreign_key }} — portée par {{ relation.from_entity }}</p>
+<p>Nullable : {{ boolean(one.nullable) }} — Index : {{ boolean(one.index) }} — ON DELETE : {{ one.on_delete }}</p>
+{% endif %}
+{% if relation.many_to_many %}{% set many = relation.many_to_many %}
+<p>Pivot : {{ many.pivot_table }}</p>
+<p>{{ many.from_key }} → {{ relation.from_entity }} ; {{ many.to_key }} → {{ relation.to_entity }}</p>
+<p>ON DELETE : {{ many.on_delete }} — id : {{ boolean(many.id) }} — unique_pair : {{ boolean(many.unique_pair) }}</p>
+{% if many.pivot_fields %}
+<details><summary>Champs pivot</summary><table><thead><tr><th>Champ</th><th>Type</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead><tbody>
+{% for field in many.pivot_fields %}<tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
+{% if field.max_length is not none %}max_length={{ field.max_length }} {% endif %}
+{% if field.precision is not none %}precision={{ field.precision }} {% endif %}
+{% if field.scale is not none %}scale={{ field.scale }} {% endif %}
+{% if field.default_json is not none %}default={{ field.default_json }} {% endif %}
+{% if field.references is not none %}references={{ field.references }}{% endif %}
+</td></tr>{% endfor %}</tbody></table></details>
+{% endif %}{% endif %}
+</details></td></tr>{% endfor %}</tbody></table></div>
+{% else %}
+{% set state = namespace(invalid=false) %}
+{% for issue in result.errors %}{% if issue.code.startswith('relation.') %}{% set state.invalid = true %}{% endif %}{% endfor %}
+<p>{{ 'Aucune relation ne correspond aux filtres.' if result.relations else ('Aucune relation interprétable.' if state.invalid else 'Aucune relation déclarée.') }}</p>
+{% endif %}
+</section>
+{% endif %}
 {% if entity_layout and entity_layout.nodes %}
 <section aria-labelledby="entity-graph-heading" data-entity-graph>
 <h2 id="entity-graph-heading">Graphe des entités</h2>
@@ -70,65 +145,6 @@
 </div>
 </section>
 <script type="module" src="/entity-graph.js"></script>
-{% endif %}
-{% if filters.item_type != 'relation' %}
-{% if view.entities %}
-<div class="table-scroll"><table>
-<thead><tr><th>Entité</th><th>Table</th><th>Champs</th><th>Timestamps</th><th>Soft delete</th></tr></thead>
-<tbody>{% for entity in view.entities %}
-<tr><td>{{ entity.name }}</td><td>{{ entity.table }}</td><td>{{ entity.fields|length }}</td><td>{{ boolean(entity.timestamps) }}</td><td>{{ boolean(entity.soft_delete) }}</td></tr>
-{% endfor %}</tbody>
-</table></div>
-{% for entity in view.entities %}
-<details><summary>{{ entity.name }} — Champs</summary>
-<p>Source : {{ location(entity.source) }}</p>
-<div class="table-scroll"><table><thead><tr><th>Champ</th><th>Type</th><th>Requis</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead>
-<tbody>{% for field in entity.fields %}
-<tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.required) }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
-{% if field.max_length is not none %}max_length={{ field.max_length }} {% endif %}
-{% if field.precision is not none %}precision={{ field.precision }} {% endif %}
-{% if field.scale is not none %}scale={{ field.scale }} {% endif %}
-{% if field.default_json is not none %}default={{ field.default_json }} {% endif %}
-{% if field.references is not none %}references={{ field.references }}{% endif %}
-</td></tr>{% endfor %}</tbody></table></div>
-</details>
-{% endfor %}
-{% else %}<p>{{ 'Aucune entité ne correspond aux filtres.' if result.entities else 'Aucune entité interprétable.' }}</p>{% endif %}
-{% endif %}
-{% if filters.item_type != 'entity' %}
-<section aria-labelledby="relations-title">
-<h2 id="relations-title">Relations</h2>
-{% if view.relations %}
-<div class="table-scroll"><table><thead><tr><th>Type</th><th>Source</th><th>Relation</th><th>Cible</th><th>Détails</th></tr></thead><tbody>
-{% for relation in view.relations %}
-<tr><td>{{ relation.type }}</td><td>{{ relation.from_entity }}</td><td>{{ relation.name }}</td><td>{{ relation.to_entity }}</td><td>
-<p>{{ location(relation.source) }} — relations[{{ relation.source_index }}]</p>
-{% if relation.inverse_name is not none %}<p>Nom inverse : {{ relation.inverse_name }}</p>{% endif %}
-{% if relation.many_to_one %}{% set one = relation.many_to_one %}
-<p>Clé étrangère : {{ one.foreign_key }} — portée par {{ relation.from_entity }}</p>
-<p>Nullable : {{ boolean(one.nullable) }} — Index : {{ boolean(one.index) }} — ON DELETE : {{ one.on_delete }}</p>
-{% endif %}
-{% if relation.many_to_many %}{% set many = relation.many_to_many %}
-<p>Pivot : {{ many.pivot_table }}</p>
-<p>{{ many.from_key }} → {{ relation.from_entity }} ; {{ many.to_key }} → {{ relation.to_entity }}</p>
-<p>ON DELETE : {{ many.on_delete }} — id : {{ boolean(many.id) }} — unique_pair : {{ boolean(many.unique_pair) }}</p>
-{% if many.pivot_fields %}
-<details><summary>Champs pivot</summary><table><thead><tr><th>Champ</th><th>Type</th><th>Nullable</th><th>Unique</th><th>Détails</th></tr></thead><tbody>
-{% for field in many.pivot_fields %}<tr><td>{{ field.name }}</td><td>{{ field.type }}</td><td>{{ boolean(field.nullable) }}</td><td>{{ boolean(field.unique) }}</td><td>
-{% if field.max_length is not none %}max_length={{ field.max_length }} {% endif %}
-{% if field.precision is not none %}precision={{ field.precision }} {% endif %}
-{% if field.scale is not none %}scale={{ field.scale }} {% endif %}
-{% if field.default_json is not none %}default={{ field.default_json }} {% endif %}
-{% if field.references is not none %}references={{ field.references }}{% endif %}
-</td></tr>{% endfor %}</tbody></table></details>
-{% endif %}{% endif %}
-</td></tr>{% endfor %}</tbody></table></div>
-{% else %}
-{% set state = namespace(invalid=false) %}
-{% for issue in result.errors %}{% if issue.code.startswith('relation.') %}{% set state.invalid = true %}{% endif %}{% endfor %}
-<p>{{ 'Aucune relation ne correspond aux filtres.' if result.relations else ('Aucune relation interprétable.' if state.invalid else 'Aucune relation déclarée.') }}</p>
-{% endif %}
-</section>
 {% endif %}
 {% endif %}
 {% endblock %}

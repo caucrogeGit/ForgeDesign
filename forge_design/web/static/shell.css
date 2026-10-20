@@ -46,6 +46,8 @@ a:focus-visible, input:focus-visible, button:focus-visible, select:focus-visible
 .app { display: flex; flex-wrap: wrap; min-height: 100vh; }
 .app-sidebar { flex: 1 1 15rem; max-width: 15rem; display: flex; flex-direction: column; gap: 1.1rem; padding: 1.1rem .85rem; background: var(--side); color: var(--side-ink); }
 .app-content { flex: 999 1 35rem; min-width: 0; display: flex; flex-direction: column; }
+/* Sur écran large, la navigation reste visible au défilement des longues pages. */
+@media (min-width: 52.01rem) { .app-sidebar { position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto; } }
 @media (max-width: 52rem) { .app-sidebar { max-width: none; flex-basis: 100%; } }
 .app-brand { display: flex; align-items: center; gap: .6rem; padding: .2rem .4rem; color: #fff; text-decoration: none; }
 .app-brand:hover { color: #fff; }
@@ -309,6 +311,20 @@ li[data-method="DELETE"] .route-method { color: var(--err); background: var(--er
 .graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .graph-details dd { margin-bottom: .75rem; }
 
+/* Entity Explorer (FD-UX-005) : tableau des entités principal, champs dépliés
+   dans leur cellule, type de relation en pastille. */
+.route-tally li[data-state="relation"] { color: var(--info); background: var(--info-soft); border-color: transparent; }
+.entity-name { font-weight: 600; }
+.entity-list td > details > summary { width: fit-content; color: var(--accent-ink); cursor: pointer; white-space: nowrap; }
+.entity-list td > details[open] { min-width: 28rem; }
+.entity-list td > details > p { margin: .4rem 0; color: var(--muted); font-size: .8rem; }
+.entity-list td > details .table-scroll { margin: .25rem 0 0; }
+.entity-list td > details th, .entity-list td > details td { padding: .3rem .5rem; font-size: .8rem; }
+.relation-type { display: inline-block; padding: 0 .45rem; border-radius: 4px; font-family: var(--font-mono); font-size: .75rem; font-weight: 500; color: var(--info); background: var(--info-soft); }
+.relation-type[data-type="many_to_many"] { color: #6b2e8f; background: #f2e9f8; }
+.relation-key { margin: 0; }
+.relation-more > summary { width: fit-content; color: var(--muted); font-size: .8rem; cursor: pointer; }
+.relation-more p { margin: .3rem 0 0; font-size: .8rem; }
 /* Entity Explorer : SVG serveur de repli (sans JavaScript). */
 .entity-graph-scroll { overflow: auto; max-height: 45rem; }
 .entity-graph-scroll:focus-visible { outline: 2px solid currentColor; }

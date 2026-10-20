@@ -41,6 +41,24 @@ Aucun import du projet, lecture Python/SQL, commande Forge, connexion à une bas
 de fichiers supplémentaires. Aucun champ système implicite n’est inventé. Le chemin source est affiché en lien lorsque la politique `/source` l’autorise
 (voir Navigation source).
 
+## Organisation de la page (FD-UX-005)
+
+Les mêmes informations sont réorganisées :
+
+1. sous le titre, des **compteurs** : entités, relations, `many_to_one`,
+   `many_to_many`, et les erreurs ou avertissements quand il y en a ;
+2. les **filtres** en barre d'outils, puis la ligne « N entités affichées sur M —
+   N relations affichées sur M » ;
+3. la section **Diagnostics** : son total reste visible, sa liste se déplie ;
+4. la section **Entités**, un seul tableau : nom, table, champs, relations, timestamps,
+   soft delete. Le nombre de champs se déplie dans sa cellule, avec la source
+   et le tableau des champs. La colonne Relations compte les relations déclarées
+   dont l'entité est source ou cible, avant tout filtre ;
+5. la section **Relations** : le type est en pastille, la clé étrangère ou le pivot
+   et la règle ON DELETE sont sur une ligne, et le reste (source, nom inverse,
+   nullable, index, clés, champs pivot) se déplie sous « Détails » ;
+6. le **graphe des entités**, en dernier.
+
 ## Relations déclarées
 
 La section Relations présente many_to_one (la source porte la FK) et many_to_many
