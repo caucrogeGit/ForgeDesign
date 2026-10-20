@@ -71,12 +71,18 @@ def request(
 
 
 def test_get_form(server: WSGIServer) -> None:
+    # L'accueil est le seul formulaire d'ouverture (FD-UX-010) ; la Vue
+    # d'ensemble sans projet y renvoie.
     status, html, headers = request(server, method="GET")
     assert status == 200
-    assert '<form action="/inspector" method="post">' in html
-    assert 'name="path"' in html and "Inspecter" in html
+    assert 'action="/inspector"' not in html and 'name="path"' not in html
+    assert '<a href="/">Ouvrez un projet depuis l’accueil</a>' in html
     assert "Set-Cookie" not in headers
     assert "no-store" in headers.get("Cache-Control", "")
+    status, home, _ = request(server, method="GET", target="/")
+    assert status == 200
+    assert 'action="/inspector" method="post"' in home
+    assert 'id="home-project-path" name="path"' in home and ">Ouvrir</button>" in home
 
 
 def test_valid_project(server: WSGIServer, project: Path) -> None:
@@ -89,7 +95,8 @@ def test_valid_project(server: WSGIServer, project: Path) -> None:
     assert "no-store" in headers.get("Cache-Control", "")
     _, fresh, _ = request(server, method="GET")
     assert str(project) in fresh
-    assert 'name="path" type="text" value=""' in fresh
+    _, home, _ = request(server, method="GET", target="/")
+    assert 'id="home-project-path" name="path" type="text" value=""' in home
 
 
 def test_invalid_structure(server: WSGIServer, tmp_path: Path) -> None:
@@ -213,19 +220,23 @@ def test_registry_delegation_and_escaping(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_current_project_lifecycle(server: WSGIServer, project: Path) -> None:
-    assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
+    assert 'data-current-project=""' in request(server, method="GET", target="/")[1]
     assert request(server, str(project / "mvc/.."))[0] == 200
     home = request(server, method="GET", target="/")[1]
-    assert f"Projet\u00a0: {project.resolve()}" in home and "Forge 1.0.0rc9" in home
-    assert "Aucun projet ouvert." not in home
-    assert "Fermer le projet" in home
+    assert f'data-current-project="{project.resolve()}"' in home
+    assert "Forge 1.0.0rc9" in home and 'data-current-project=""' not in home
+    # Fermer : depuis la barre du haut de l'atelier, pas sur le lanceur.
+    assert "Fermer le projet" in request(server, method="GET", target="/inspector")[1]
     source = project / "requirements.txt"
     source.unlink()
     assert request(server, str(project))[0] == 200
-    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
+    assert (
+        f'data-current-project="{project}"'
+        in request(server, method="GET", target="/")[1]
+    )
     assert "Forge 1.0.0rc9" not in request(server, method="GET", target="/")[1]
     assert request(server, target="/project/close")[0] == 200
-    assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
+    assert 'data-current-project=""' in request(server, method="GET", target="/")[1]
 
 
 @pytest.mark.parametrize("bad_path", ["invalid", "missing", "file", "nul"])
@@ -243,7 +254,7 @@ def test_bad_inspection_preserves_current(
     }
     assert request(server, paths[bad_path])[0] in (200, 400)
     home = request(server, method="GET", target="/")[1]
-    assert f"Projet\u00a0: {project}" in home and "Forge 1.0.0rc9" in home
+    assert f'data-current-project="{project}"' in home and "Forge 1.0.0rc9" in home
 
 
 @pytest.mark.parametrize("origin", [None, "null", "https://evil.example"])
@@ -253,7 +264,10 @@ def test_foreign_mutation_preserves_current(
 ) -> None:
     assert request(server, str(project))[0] == 200
     assert request(server, str(project), origin=origin, target=target)[0] == 403
-    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
+    assert (
+        f'data-current-project="{project}"'
+        in request(server, method="GET", target="/")[1]
+    )
 
 
 def test_close_security_and_no_writes(server: WSGIServer, project: Path) -> None:
@@ -264,7 +278,10 @@ def test_close_security_and_no_writes(server: WSGIServer, project: Path) -> None
     }
     assert request(server, target="/project/close", fetch_site="cross-site")[0] == 403
     assert request(server, target="/project/close", method="GET")[0] != 200
-    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
+    assert (
+        f'data-current-project="{project}"'
+        in request(server, method="GET", target="/")[1]
+    )
     assert request(server, target="/project/close")[0] == 200
     assert before == {
         p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)
@@ -280,12 +297,12 @@ def test_application_isolation_and_restart(server: WSGIServer, project: Path) ->
             thread.start()
             try:
                 assert (
-                    "Aucun projet ouvert."
+                    'data-current-project=""'
                     in request(other, method="GET", target="/")[1]
                 )
                 assert request(other, target="/project/close")[0] == 200
                 assert (
-                    f"Projet\u00a0: {project}"
+                    f'data-current-project="{project}"'
                     in request(server, method="GET", target="/")[1]
                 )
             finally:
@@ -341,7 +358,7 @@ def test_refresh_invalidates_current(
     status, html, _ = request(server, target="/project/refresh")
     assert status == (200 if change == "structure" else 400)
     assert "fermé" in html and "Traceback" not in html
-    assert "Aucun projet ouvert." in request(server, method="GET", target="/")[1]
+    assert 'data-current-project=""' in request(server, method="GET", target="/")[1]
 
 
 @pytest.mark.parametrize(
@@ -358,7 +375,10 @@ def test_refresh_security(
         == 403
     )
     assert request(server, target="/project/refresh", method="GET")[0] != 200
-    assert f"Projet\u00a0: {project}" in request(server, method="GET", target="/")[1]
+    assert (
+        f'data-current-project="{project}"'
+        in request(server, method="GET", target="/")[1]
+    )
 
 
 def test_route_explorer_page(server: WSGIServer, project: Path) -> None:
@@ -1191,4 +1211,4 @@ def test_project_without_bootstrap_is_opened(server: WSGIServer, project: Path) 
     ) in page
     assert "<dt>Éléments requis trouvés</dt><dd>4 / 4</dd>" in page
     home = request(server, method="GET", target="/")[1]
-    assert f"Projet\u00a0: {project.resolve()}" in home
+    assert f'data-current-project="{project.resolve()}"' in home

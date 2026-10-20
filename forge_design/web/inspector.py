@@ -83,35 +83,50 @@ def show_inspector(
     return _render(context, registry=registry)
 
 
+OpenFailure = Callable[[str, str, int], Response]
+
+
 def inspect_submission(
     request: Request,
     selector: ProjectSelector,
     context: CurrentProjectContext,
+    *,
+    failure: OpenFailure | None = None,
 ) -> Response:
     """Valider les données HTTP puis déléguer au service de sélection.
 
     Route POST activant le projet en mémoire, sans session : l'origine HTTP locale
     exacte est obligatoire à la place du CSRF Forge fondé sur une session.
     Aucun chemin n'est résolu ou lu ici ; Path adapte uniquement le type d'entrée.
+
+    L'accueil est le seul formulaire d'ouverture (FD-UX-010) : un échec
+    d'ouverture lui est rendu par ``failure``, avec le chemin saisi. Un projet
+    inspecté mais non reconnu reste affiché ici, avec ses constats.
     """
+
+    def fail(error: str, path: str, status: int) -> Response:
+        if failure is not None:
+            return failure(error, path, status)
+        return _render(context, path, error=error, status=status)
+
     if not is_local_action(request):
-        return _render(
-            context, error="Origine de la requête non autorisée.", status=403
-        )
+        return fail("Origine de la requête non autorisée.", "", 403)
     if request.header("Content-Type", "").split(";", 1)[0] != (
         "application/x-www-form-urlencoded"
     ):
-        return _render(
-            context, error="Format de formulaire non pris en charge.", status=415
-        )
+        return fail("Format de formulaire non pris en charge.", "", 415)
     path = request.form("path")
     if path is None or not path or path.isspace():
-        return _render(context, error="Saisissez le chemin du projet.", status=400)
+        return fail("Saisissez le chemin du projet.", "", 400)
     if len(path) > MAX_PATH_LENGTH:
-        return _render(
-            context, error="Le chemin dépasse la limite de 4096 caractères.", status=400
-        )
+        return fail("Le chemin dépasse la limite de 4096 caractères.", "", 400)
     selection = selector.open(Path(path))
+    if selection.status not in {"selected", "invalid"}:
+        return fail(
+            selection.error or "Ouverture impossible.",
+            path,
+            409 if selection.status == "busy" else 400,
+        )
     registry = selector.registry
     message = (
         f"Projet ouvert. Avertissement : {selection.recent_warning}"
@@ -125,11 +140,6 @@ def inspect_submission(
         result=selection.inspection,
         error=selection.error,
         message=message,
-        status=200
-        if selection.status in {"selected", "invalid"}
-        else 409
-        if selection.status == "busy"
-        else 400,
     )
 
 

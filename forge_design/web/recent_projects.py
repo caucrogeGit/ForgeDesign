@@ -15,6 +15,11 @@ from forge_design.web.rendering import render_page
 from forge_design.web.security import is_local_action
 
 
+def project_hue(path: object) -> int:
+    """Teinte décorative du dossier (0 à 5), stable pour un même chemin."""
+    return sum(str(path).encode()) % 6
+
+
 def show_home(
     request: Request,
     context: CurrentProjectContext,
@@ -24,6 +29,8 @@ def show_home(
     error: str | None = None,
     message: str | None = None,
     selection_warning: str | None = None,
+    open_error: str | None = None,
+    path: str = "",
     status: int = 200,
 ) -> Response:
     recent = store.list()
@@ -31,6 +38,8 @@ def show_home(
         "index.html",
         {
             "active_page": "home",
+            "launcher": True,
+            "project_hue": project_hue,
             "current_project": context.inspection,
             "recent_projects": inspect_recent_projects(recent, registry, context.root),
             "recent_warning": store.warning,
@@ -38,6 +47,8 @@ def show_home(
             "message": message,
             "selection_warning": selection_warning,
             "max_path_length": MAX_PATH_LENGTH,
+            "open_error": open_error,
+            "path": path,
         },
         status=status,
     )

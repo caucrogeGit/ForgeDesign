@@ -237,7 +237,18 @@ def create_application(
         return index(request)
 
     def inspect(request: Request) -> Response:
-        return inspect_submission(request, selector, context)
+        def failure(error: str, path: str, status: int) -> Response:
+            return show_home(
+                request,
+                context,
+                store,
+                registry,
+                open_error=error,
+                path=path,
+                status=status,
+            )
+
+        return inspect_submission(request, selector, context, failure=failure)
 
     def refresh(request: Request) -> Response:
         return refresh_project(request, registry, context, release=runtime.stop)

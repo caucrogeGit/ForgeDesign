@@ -181,21 +181,36 @@ Python, textes des scripts, cadre d'aperçu et pages réellement rendues. Le kit
 d'acceptance vérifie dans le navigateur le style calculé des aides et les
 deux-points sur des projets riches.
 
-#### Accueil, espace de travail (FD-UX-009)
+#### Accueil en lanceur (FD-UX-009, FD-UX-010)
 
-L'accueil (`/`) est un espace de travail épuré, sans nouvelle analyse : il
-affiche le même contexte qu'avant (projet courant, projets récents et leurs
-états, diagnostics de modules).
+L'accueil (`/`) est un lanceur plein écran : ni barre latérale ni barre du
+haut (`launcher` dans le contexte, `main.launcher`), tout est centré. C'est
+**le seul endroit où l'on ouvre un projet**, sans nouvelle analyse : il reçoit
+le même contexte qu'avant (projet courant, projets récents et leurs états,
+diagnostics de modules).
 
-- Avec un projet ouvert, l'en-tête porte son nom (`h1`), sa racine et sa
-  version Forge. Une grille de six liens mène aux outils, chacun avec une ligne
-  de description.
-- Sans projet, le `h1` reste « Forge Design ». Un formulaire « Ouvrir un
-  projet » poste directement vers `/inspector`, comme celui de la Vue
-  d'ensemble.
-- Les projets récents sont des lignes : initiale, nom, chemin, état et version,
-  puis les actions « Ouvrir » et « Retirer ». Le projet courant porte la
-  pastille « Ouvert ».
+- Le formulaire « Ouvrir un projet » vient toujours en premier (il poste vers
+  `/inspector`), puis les projets récents. Le `h1` « Forge Design » est
+  réservé aux lecteurs d'écran.
+- Les projets récents sont des cartes en forme de dossier, centrées : initiale
+  et une teinte sur six, stable par chemin (`project_hue`). Toute la carte
+  ouvre le projet (POST `/project/open-recent`). Une croix nommée
+  « Retirer … » le retire. Un projet introuvable ou non reconnu est grisé, sans
+  ouverture. La carte du projet courant, bordée d'orange, est un lien vers la
+  Vue d'ensemble (« Ouvert · Continuer ») : elle reprend le travail sans
+  nouvelle inspection, et affiche la version de l'instantané pris à
+  l'ouverture. « Fermer le projet » reste dans la barre du haut de l'atelier.
+- `main.launcher` porte `data-current-project` : la racine du projet courant,
+  ou une valeur vide. Les tests et le kit d'acceptance lisent l'état par ce
+  marqueur.
+
+La Vue d'ensemble n'a plus de formulaire : sans projet, elle renvoie vers
+l'accueil, comme le lien « Ouvrir un projet » de la barre latérale. Un échec
+d'ouverture (origine, format, chemin vide ou trop long, racine absente,
+preview impossible à arrêter) rend l'accueil, avec l'erreur et le chemin
+saisi, au même code HTTP qu'avant. Un projet inspecté mais non reconnu reste
+affiché sur la Vue d'ensemble, avec ses constats et un lien vers l'accueil. Le
+menu de l'atelier (outils, modules) reste sur toutes les autres pages.
 
 ### Contrôle de l'en-tête Host (FD-WEB-003)
 
@@ -211,7 +226,8 @@ du transport.
 
 ### Project Inspector Web disponible (FD-UI-002)
 
-`GET /inspector` affiche un formulaire vierge ; `POST /inspector` inspecte le
+`GET /inspector` affiche la synthèse du projet courant (le formulaire
+d'ouverture est sur l'accueil depuis FD-UX-010) ; `POST /inspector` inspecte le
 chemin soumis et affiche racine canonique, validité, version, source et diagnostics.
 Chaque application construit son registre via `create_tool_registry()` ; le POST
 appelle `registry.get("project-inspector").run(Path(path))`.

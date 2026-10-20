@@ -57,8 +57,8 @@ def test_local_binding_and_response(running_server: WSGIServer) -> None:
         assert html.startswith("<!doctype html>")
         assert '<html lang="fr">' in html
         assert "<title>Forge Design</title>" in html
-        assert "<h1>Forge Design</h1>" in html
-        assert "Aucun projet ouvert." in html
+        assert '<h1 class="visually-hidden">Forge Design</h1>' in html
+        assert 'data-current-project=""' in html
     finally:
         connection.close()
 
@@ -345,7 +345,7 @@ def test_fonts_are_served_from_a_closed_list(running_server: WSGIServer) -> None
 def test_shell_sidebar_and_no_inline_style(running_server: WSGIServer) -> None:
     import forge_design
 
-    status, _, body = _get(running_server, "/")
+    status, _, body = _get(running_server, "/inspector")
     html = body.decode("utf-8")
     assert status == 200
     shell, content = html.split("<main>", 1)
@@ -353,7 +353,12 @@ def test_shell_sidebar_and_no_inline_style(running_server: WSGIServer) -> None:
     assert f'<span class="app-version">{forge_design.__version__}</span>' in shell
     assert "Aucun projet ouvert." in shell
     assert '<header class="app-topbar">' in shell
-    assert "<h1>Forge Design</h1>" in content
+    assert "<h1>Vue d’ensemble</h1>" in content
+    # L'accueil est un lanceur : ni menu ni barre du haut (FD-UX-010).
+    home = _get(running_server, "/")[2].decode("utf-8")
+    assert "app-sidebar" not in home and "app-topbar" not in home
+    assert '<main class="launcher" data-current-project="">' in home
+    assert "style=" not in home and "<style" not in home
     # CSP style-src 'self' : aucun attribut style, aucune balise style.
     assert "style=" not in html and "<style" not in html
 
@@ -391,7 +396,7 @@ def test_target_version_independent_of_runtime(tmp_path: Path) -> None:
     assert project_version.read_forge_version(tmp_path).version == "99.0.0"
 
 
-@pytest.mark.parametrize("path", ["/", "/inspector"])
+@pytest.mark.parametrize("path", ["/inspector", "/debug"])
 def test_shared_navigation(
     running_server: WSGIServer, path: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -809,7 +809,7 @@ def test_close_stops_before_clear(
     names = harness.names()
     assert names.index("runner-stop") < names.index("context-clear")
     assert names[:2] == ["proxy-shutdown", "proxy-close"]
-    assert "Aucun projet ouvert." in http(server, "GET", "/")[1]
+    assert 'data-current-project=""' in http(server, "GET", "/")[1]
 
 
 def test_close_keeps_project_if_stop_fails(

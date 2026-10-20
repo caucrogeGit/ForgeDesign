@@ -143,8 +143,8 @@ const step = async (name, fn) => {
 const open = async (project) => {
   await go("/inspector");
   if ((await count('form[action="/project/close"] button')) > 0) await click('form[action="/project/close"] button');
-  await go("/inspector");
-  await fill("#project-path", project);
+  await go("/");
+  await fill("#home-project-path", project);
   assert.ok(await hasText(`Synthèse du projet ${project.split("/").pop()}`), `projet ${project} non ouvert`);
 };
 
@@ -217,7 +217,7 @@ await step("sans JS : doctor, audit, check par POST natif, chacun dans sa sectio
 // lisibles, message explicite, aucun rendu SVG serveur.
 await step("sans JS : modules (navigation, métadonnées et message des ressources)", async () => {
   await open(P("B-write"));
-  await go("/");
+  await go("/inspector");
   assert.equal(await count('nav[aria-label="Modules"] a'), 2);
   for (const url of [
     "/modules/flowchart/resource?type=flowchart&path=mvc%2Fflowchart%2Fsimple.flow.json",

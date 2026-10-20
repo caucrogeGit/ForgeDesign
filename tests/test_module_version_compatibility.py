@@ -221,7 +221,8 @@ def test_incompatible_module_exposes_nothing(tmp_path: Path) -> None:
         opened(app, root)
         status, html, _ = call(app, "/")
         assert status == 200
-        assert [href for href, _ in navigation(html)[1]] == ["/modules/flow/"]
+        workshop = call(app, "/inspector")[1]
+        assert [href for href, _ in navigation(workshop)[1]] == ["/modules/flow/"]
         # Diagnostic visible avec les autres diagnostics d'activation.
         assert "Modules non chargés" in html
         assert "pkg_new" in html and "core-version-incompatible" in html

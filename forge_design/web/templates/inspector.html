@@ -57,22 +57,14 @@
       </section>
     </div>
     {% else %}
-    <p class="health-empty" role="status">Aucun projet sélectionné : aucune analyse. Saisissez le chemin d’un projet Forge ci-dessous, ou <a href="/">ouvrez un projet récent depuis l’accueil</a>.</p>
+    <p class="health-empty" role="status">Aucun projet sélectionné : aucune analyse. <a href="/">Ouvrez un projet depuis l’accueil</a>.</p>
     {% endif %}
-    <h2>Ouvrir un projet</h2>
-    <form action="/inspector" method="post">
-      <label for="project-path">Chemin du projet</label>
-      <input id="project-path" name="path" type="text" value="{{ path }}"
-             maxlength="{{ max_path_length }}" required autocomplete="off"
-             spellcheck="false" aria-describedby="path-help">
-      <button type="submit">Inspecter</button>
-      <p id="path-help" class="help-text">Chemin local. L’inspection ne modifie aucun fichier.</p>
-    </form>
     {% if message %}<p role="status">{{ message }}</p>{% endif %}
     {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
     {% if details %}
     <section id="inspection-details" aria-labelledby="inspection-title">
       <h2 id="inspection-title">{% if details.valid %}Projet Forge reconnu{% else %}Projet Forge non reconnu{% endif %}</h2>
+      {% if not details.valid %}<p><a href="/">Ouvrir un autre projet depuis l’accueil</a></p>{% endif %}
       <dl>
         <dt>Racine</dt><dd>{{ details.root }}</dd>
         <dt>Version Forge</dt><dd>{{ details.forge_version or 'indéterminée' }}</dd>

@@ -79,7 +79,7 @@ def resource(module_id: str, path: str, **extra: str) -> str:
 def test_without_modules_nothing_is_exposed(tmp_path: Path) -> None:
     with serving(tmp_path, None) as app:
         status, html, _ = call(app, "/")
-        core, modules = navigation(html)
+        core, modules = navigation(call(app, "/inspector")[1])
         assert status == 200 and core == CORE_NAV and modules == []
         assert 'aria-label="Modules"' not in html
         assert "Modules non chargés" not in html
@@ -97,7 +97,7 @@ def test_absent_and_incompatible_modules_are_diagnosed_not_fatal(
     modules = activation(("fd_absent", None), ("pkg_future", future))
     with serving(tmp_path, modules) as app:
         status, html, _ = call(app, "/")
-        assert status == 200 and navigation(html)[1] == []
+        assert status == 200 and navigation(call(app, "/inspector")[1])[1] == []
         assert "Modules non chargés" in html
         assert "fd_absent" in html and "module-missing" in html
         assert "pkg_future" in html and "api-incompatible" in html

@@ -56,7 +56,7 @@ def test_without_project_nothing_is_analysed(tmp_path: Path) -> None:
         status, html, headers = call(app, "/inspector")
     assert status == 200 and headers["Cache-Control"] == "no-store"
     assert "Aucun projet sélectionné\u00a0: aucune analyse." in html
-    assert '<a href="/">ouvrez un projet récent depuis l’accueil</a>' in html
+    assert '<a href="/">Ouvrez un projet depuis l’accueil</a>' in html
     assert "health-summary" not in html and "data-health-section" not in html
 
 

@@ -112,9 +112,9 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     await audit();
   };
   const open = (project) =>
-    submit(`(document.querySelector("#project-path").value = ${JSON.stringify(project)}, document.querySelector('form[action="/inspector"]').requestSubmit())`, `ouverture ${project}`);
+    submit(`(document.querySelector("#home-project-path").value = ${JSON.stringify(project)}, document.querySelector('form[action="/inspector"]').requestSubmit())`, `ouverture ${project}`);
   const openProject = async (project) => {
-    await page.goto(`${base}/inspector`);
+    await page.goto(`${base}/`);
     await open(project);
   };
   const clickAt = async (selector, what = selector) => {
@@ -157,7 +157,7 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
   // ── 1. Démarrage sans projet ───────────────────────────────────────────────
   await step("sans projet : aucune analyse, invitations, aucune commande proposée", async () => {
     await go("/");
-    assert.match(await text(), /Aucun projet/);
+    assert.equal(await page.eval(`document.querySelector("main.launcher")?.dataset.currentProject ?? null`), "", "aucun projet ouvert");
     for (const url of ["/routes", "/entities", "/templates", "/debug", "/inspector"]) {
       await go(url);
       const body = await text();
@@ -239,7 +239,7 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
     await go("/debug");
     for (const key of ["diagnostic", "audit", "check"]) assert.equal((await section(key)).status, "not-run", key);
     await clickAt('form[action="/project/close"] button', "Fermer");
-    assert.match(await text(), /Aucun projet/);
+    assert.equal(await page.eval(`document.querySelector("main.launcher")?.dataset.currentProject ?? null`), "", "aucun projet ouvert");
   });
 
   // ── 4. Projets récents ─────────────────────────────────────────────────────
@@ -643,7 +643,7 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
   // ── 12. Modules ────────────────────────────────────────────────────────────
   await step("modules : navigation, ressources, actions, isolation des assets", async () => {
     await openProject(P("B-write"));
-    await go("/");
+    await go("/inspector");
     const nav = await page.eval(`[...document.querySelector('nav[aria-label="Modules"]').querySelectorAll("a")].map((a) => a.getAttribute("href"))`);
     assert.deepEqual(nav, ["/modules/circuit/", "/modules/flowchart/"]);
     const flowFile = join(P("B-write"), FLOW);
@@ -711,7 +711,7 @@ export async function runScenario(page, { base, projects, work, browser, log }) 
 
   // ── 13. Clavier et focus ───────────────────────────────────────────────────
   await step("clavier : navigation principale atteinte par Tab, focus visible", async () => {
-    await go("/");
+    await go("/inspector");
     let reached = null;
     for (let i = 0; i < 15 && !reached; i += 1) {
       await page.key("Tab");

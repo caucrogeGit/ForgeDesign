@@ -80,7 +80,7 @@ def test_restart_canonical_order_remove_and_isolation(tmp_path: Path) -> None:
         assert store.list()[0].path == str(first)
         assert call(app, "/inspector", method="POST", value=str(second))[0] == 200
         html = call(app)[1]
-        assert '<span class="recent-open">Ouvert</span>' in html
+        assert '<span class="project-continue">Ouvert · Continuer' in html
         assert html.index(str(second), html.index("Projets récents")) < html.index(
             str(first), html.index("Projets récents")
         )
@@ -89,7 +89,7 @@ def test_restart_canonical_order_remove_and_isolation(tmp_path: Path) -> None:
         running(RecentProjects(tmp_path / "other/recent.json")) as isolated,
     ):
         status, html, headers = call(restarted)
-        assert status == 200 and "Aucun projet ouvert." in html
+        assert status == 200 and 'data-current-project=""' in html
         assert str(first) in html and headers["Cache-Control"] == "no-store"
         assert "Aucun projet récent." in call(isolated)[1]
         status, html, _ = call(
@@ -100,10 +100,10 @@ def test_restart_canonical_order_remove_and_isolation(tmp_path: Path) -> None:
         status, html, _ = call(
             restarted, "/project/recent/remove", method="POST", value=str(first)
         )
-        assert status == 200 and "Aucun projet ouvert." not in html
+        assert status == 200 and 'data-current-project=""' not in html
         assert all(p.path != str(first) for p in store.list())
         assert first.exists() and str(first) in html  # Le bandeau reste ouvert.
-        assert "Aucun projet ouvert." in call(isolated)[1]
+        assert 'data-current-project=""' in call(isolated)[1]
 
 
 @pytest.mark.parametrize("failure", ["missing", "invalid"])
@@ -125,7 +125,7 @@ def test_reopen_failure_keeps_current_and_history(tmp_path: Path, failure: str) 
         )
         assert status == (400 if failure == "missing" else 200)
         assert "Traceback" not in html
-        assert str(current) in html and "Aucun projet ouvert." not in html
+        assert str(current) in html and 'data-current-project=""' not in html
         if failure == "invalid":
             assert "Le projet récent n’est plus disponible." in html
         assert store.path.read_bytes() == before
@@ -157,7 +157,7 @@ def test_origin_rejected_without_mutation(
             ]
             == 403
         )
-        assert "Aucun projet ouvert." in call(app)[1]
+        assert 'data-current-project=""' in call(app)[1]
     assert before == (store.path.read_bytes(), store.path.stat().st_mtime_ns)
 
 
@@ -174,7 +174,7 @@ def test_fabricated_entry_get_and_format_rejected(tmp_path: Path, action: str) -
             == 415
         )
         assert call(app, action)[0] == 405
-        assert "Aucun projet ouvert." in call(app)[1]
+        assert 'data-current-project=""' in call(app)[1]
     assert not store.path.exists()
 
 
@@ -192,7 +192,7 @@ def test_write_failure_does_not_undo_open(
         status, html, _ = call(app, "/inspector", method="POST", value=str(root))
         assert status == 200 and "Projet Forge reconnu" in html
         assert "avertissement" in html and "Enregistrement" in html
-        assert "Aucun projet ouvert." not in call(app)[1]
+        assert 'data-current-project=""' not in call(app)[1]
     assert not store.path.exists() and not list(store.path.parent.glob("*.tmp"))
 
 
@@ -238,5 +238,5 @@ def test_invalid_inspection_does_not_add_recent(tmp_path: Path) -> None:
     with running(store) as app:
         status, html, _ = call(app, "/inspector", method="POST", value=str(root))
         assert status == 200 and "Projet Forge non reconnu" in html
-        assert "Aucun projet ouvert." in call(app)[1]
+        assert 'data-current-project=""' in call(app)[1]
         assert store.list() == () and not store.path.exists()

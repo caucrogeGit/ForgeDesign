@@ -366,7 +366,8 @@ def test_three_modules_with_editors_stay_isolated(tmp_path: Path) -> None:
     )
     with serving(tmp_path, modules) as app:
         opened(app, root)
-        status, html, _ = call(app, "/")
+        # Navigation de l'atelier : l'accueil est un lanceur sans menu.
+        status, html, _ = call(app, "/inspector")
         core, listed = navigation(html)
         # Les modules ne deviennent pas des outils : navigation du cœur inchangée.
         assert core == CORE_NAV

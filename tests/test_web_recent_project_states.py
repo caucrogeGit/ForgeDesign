@@ -51,7 +51,7 @@ def test_states_actions_versions_and_nonwriting_get(tmp_path: Path) -> None:
         before = snapshot(tmp_path)
         status, html, headers = call(app)
         assert status == 200 and headers["Cache-Control"] == "no-store"
-        assert "Aucun projet ouvert." in html
+        assert 'data-current-project=""' in html
         assert "Forge 1.0.0rc9" in html and "Version Forge indéterminée" in html
         assert "Projet introuvable" in html and "Projet non reconnu" in html
         assert RecentEntries(html).entries == [
@@ -64,20 +64,20 @@ def test_states_actions_versions_and_nonwriting_get(tmp_path: Path) -> None:
         assert call(app, open_action, method="POST", value=str(known))[0] == 200
         before = snapshot(tmp_path)
         html = call(app)[1]
-        assert '<span class="recent-open">Ouvert</span>' in html
+        assert '<span class="project-continue">Ouvert · Continuer' in html
         assert RecentEntries(html).entries[0] == ("available", [remove])
         assert snapshot(tmp_path) == before
         # L'accueil constate la dégradation, sans fermer/actualiser le courant.
         (known / "app.py").unlink()
         before = snapshot(tmp_path)
         html = call(app)[1]
-        assert "Aucun projet ouvert." not in html
-        assert '<span class="recent-open">Ouvert</span>' in html
+        assert 'data-current-project=""' not in html
+        assert '<span class="project-continue">Ouvert · Continuer' in html
         assert RecentEntries(html).entries[0] == ("invalid", [remove])
         assert snapshot(tmp_path) == before
         for root in (missing, invalid, unknown):
             status, html, _ = call(app, remove, method="POST", value=str(root))
-            assert status == 200 and "Aucun projet ouvert." not in html
+            assert status == 200 and 'data-current-project=""' not in html
         assert [p.path for p in store.list()] == [str(known)]
 
 
@@ -102,7 +102,7 @@ def test_get_uses_composed_registry_ten_calls_and_isolated_apps(
         assert call(other)[0] == 200 and inspector.calls == []
         assert call(app)[0] == 200 and inspector.calls == roots
         assert call(app)[0] == 200 and inspector.calls == roots * 2
-        assert "Aucun projet ouvert." in call(other)[1]
+        assert 'data-current-project=""' in call(other)[1]
         assert inspector.calls == roots * 2
 
 

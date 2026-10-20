@@ -16,6 +16,8 @@
 {%- endmacro %}
 {% set page_labels = {"home": "Accueil", "inspector": "Vue d’ensemble", "routes": "Routes", "entities": "Entités", "templates": "Gabarits", "editor": "Éditeur", "debug": "Diagnostic"} %}
 <body>
+  {#- Lanceur (accueil, FD-UX-010) : ni menu ni barre du haut, la page choisit le projet. #}
+  {% if not launcher %}
   <div class="app">
     <aside class="app-sidebar">
       <a class="app-brand" href="/"><span class="app-brand-mark" aria-hidden="true"></span><span class="app-brand-name">Forge Design</span>{% if app_version %}<span class="app-version">{{ app_version }}</span>{% endif %}</a>
@@ -25,7 +27,7 @@
         <p class="app-project-path" title="{{ current_project.root }}">Projet : {{ current_project.root }}</p>
         {% if current_project.forge_version %}<p class="app-project-meta">Forge {{ current_project.forge_version }}</p>{% endif %}
         {% else %}<p class="app-project-empty">Aucun projet ouvert.</p>
-        <p class="app-project-meta"><a href="/inspector">Ouvrir un projet</a></p>{% endif %}
+        <p class="app-project-meta"><a href="/">Ouvrir un projet</a></p>{% endif %}
       </div>
       <nav aria-label="Navigation principale">
         {{ link("/", "home", "home", "Accueil") }}
@@ -61,10 +63,13 @@
         </div>
         {% endif %}
       </header>
-      <main>
+      {% endif %}
+      <main{% if launcher %} class="launcher" data-current-project="{{ current_project.root if current_project else '' }}"{% endif %}>
 {% block content %}{% endblock %}
       </main>
+  {% if not launcher %}
     </div>
   </div>
+  {% endif %}
 </body>
 </html>
