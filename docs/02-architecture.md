@@ -192,6 +192,11 @@ diagnostics de modules).
 - Le formulaire « Ouvrir un projet » vient toujours en premier (il poste vers
   `/inspector`), puis les projets récents. Le `h1` « Forge Design » est
   réservé aux lecteurs d'écran.
+- Le fond de l'accueil est un plan de travail (FD-UX-014) : une trame de points
+  qui s'efface sous le contenu. Le contenu est centré verticalement, un peu
+  au-dessus du milieu (espaces 2/5 et 3/5).
+  Le contenu ne change pas, seule sa taille augmente : champ de 46 rem, cartes de
+  15,5 rem, quatre par ligne au plus.
 - Les projets récents sont des cartes en forme de dossier, centrées : initiale
   et une teinte sur six, stable par chemin (`project_hue`). Toute la carte
   ouvre le projet (POST `/project/open-recent`). Une croix nommée

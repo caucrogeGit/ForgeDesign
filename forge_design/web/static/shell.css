@@ -470,16 +470,26 @@ main:has(> .editor-studio) > h2:not([id]) + p { margin: .1rem 0 0; color: var(--
    Projet ouvert en grande carte, champ d'ouverture, projets récents en
    dossiers. Dossier : initiale et une teinte sur six, stable par projet. */
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-main.launcher { max-width: none; box-sizing: border-box; padding: 3.5rem 1.5rem 4rem; display: flex; flex-direction: column; align-items: center; }
-.folder { position: relative; display: block; flex: none; width: 7.25rem; height: 5.5rem; --tint: #c2410c; --tint-dark: #8a2d07; }
+main.launcher { flex: 1; max-width: none; box-sizing: border-box; padding: 3.5rem 1.5rem 4rem; display: flex; flex-direction: column; align-items: center; }
+/* Plan de travail (FD-UX-014) : même contenu, posé sur une trame de points qui
+   s'efface sous le contenu, et centré un peu au-dessus du milieu (2/5, 3/5). */
+main.launcher {
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 42%, var(--bg) 40%, rgba(244, 245, 247, 0) 100%),
+    radial-gradient(circle, #bfc5ce 1.1px, transparent 1.6px) 0 0 / 24px 24px,
+    var(--bg);
+}
+main.launcher::before, main.launcher::after { content: ""; flex: 2 1 0; }
+main.launcher::after { flex-grow: 3; }
+.folder { position: relative; display: block; flex: none; width: 8.5rem; height: 6.45rem; --tint: #c2410c; --tint-dark: #8a2d07; }
 .folder[data-hue="1"] { --tint: #1a4f8b; --tint-dark: #12385f; }
 .folder[data-hue="2"] { --tint: #146c3a; --tint-dark: #0d4a26; }
 .folder[data-hue="3"] { --tint: #6b2e8f; --tint-dark: #4a2163; }
 .folder[data-hue="4"] { --tint: #0f6e78; --tint-dark: #0a4b52; }
 .folder[data-hue="5"] { --tint: #3d4550; --tint-dark: #20252c; }
 .folder-tab { position: absolute; left: 0; top: 0; width: 41%; height: 20%; border-radius: 8px 8px 0 0; background: var(--tint-dark); }
-.folder-body { position: absolute; inset: 11% 0 0 0; display: grid; place-items: center; border-radius: 4px 12px 12px 12px; background: var(--tint); color: #fff; font-size: 2.35rem; font-weight: 600; }
-.launch-open { width: 100%; max-width: 40rem; margin: 0; }
+.folder-body { position: absolute; inset: 11% 0 0 0; display: grid; place-items: center; border-radius: 4px 12px 12px 12px; background: var(--tint); color: #fff; font-size: 2.75rem; font-weight: 600; }
+.launch-open { width: 100%; max-width: 46rem; margin: 0; }
 .launch-open label { font-size: .95rem; }
 .launch-open-row { display: flex; gap: .5rem; }
 .launch-open-row input { flex: 1; min-width: 0; min-height: 3rem; padding: 0 1rem; border-radius: 10px; background: var(--surface); font-family: var(--font-mono); font-size: .875rem; }
@@ -487,18 +497,19 @@ main.launcher { max-width: none; box-sizing: border-box; padding: 3.5rem 1.5rem 
 .launch-open .help-text { margin: .5rem 0 0; font-size: .8rem; }
 .launch-open .message { margin: .75rem 0 0; }
 section.launch-section { width: 100%; max-width: 47.5rem; box-sizing: border-box; margin-top: 2.5rem; }
-section.launch-recent { width: 100%; max-width: 61.25rem; margin-top: 4rem; padding: 0; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; }
+section.launch-recent { width: 100%; max-width: 70rem; margin-top: 4rem; padding: 0; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 1.75rem; }
 .launch-recent > h2 { display: flex; align-items: center; gap: .6rem; margin: 0; color: var(--muted); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
 .launch-count { display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.4rem; padding: 0 .35rem; box-sizing: border-box; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .75rem; letter-spacing: 0; }
 .launch-recent > p { margin: 0; }
 .launch-empty { color: var(--muted); }
 .project-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; margin: 0; padding: 0; list-style: none; }
-.project-item { position: relative; width: 13.5rem; margin: 0; }
+.project-item { position: relative; width: 15.5rem; margin: 0; }
 .project-item > form:not(.project-remove) { margin: 0; }
-.project-card { width: 100%; box-sizing: border-box; min-height: 13rem; padding: 1.6rem 1rem 1.25rem; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: .85rem; text-align: center; font: inherit; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.project-card { width: 100%; box-sizing: border-box; min-height: 14.5rem; padding: 1.75rem 1rem 1.4rem; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: .85rem; text-align: center; font: inherit; transition: border-color .15s, box-shadow .15s, transform .15s; }
 button.project-card { cursor: pointer; }
+.project-card { box-shadow: 0 1px 2px rgba(21, 24, 28, .04), 0 10px 24px -18px rgba(21, 24, 28, .35); }
 button.project-card:hover { border-color: var(--border-strong); background: var(--surface); box-shadow: 0 14px 30px -22px rgba(21, 24, 28, .5); transform: translateY(-2px); }
-.project-name { margin-top: .1rem; font-size: .95rem; font-weight: 600; overflow-wrap: anywhere; }
+.project-name { margin-top: .1rem; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
 .project-meta { margin-top: -.6rem; color: var(--muted); font-size: .75rem; white-space: nowrap; }
 .project-item[data-current] .project-card { border: 2px solid var(--accent); }
 a.project-card { text-decoration: none; }
