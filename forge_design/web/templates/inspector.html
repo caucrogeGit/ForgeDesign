@@ -10,6 +10,10 @@
     {#- Titre lu par les lecteurs d'écran seulement ; le sommaire ouvre la page (FD-UX-016). #}
     <h1 class="visually-hidden">Vue d’ensemble</h1>
     {% if health %}
+    {#- Priorités : diagnostics visibles des sections, erreurs puis avertissements. #}
+    {% set found = namespace(errors=[], warnings=[]) %}
+    {% for section in health.sections %}{% for item in section.diagnostics %}{% if item.severity == "error" %}{% set found.errors = found.errors + [(section, item)] %}{% elif item.severity == "warning" %}{% set found.warnings = found.warnings + [(section, item)] %}{% endif %}{% endfor %}{% endfor %}
+    {% set priorities = found.errors + found.warnings %}
     {#- Sommaire (FD-UX-015) : une entrée par carte, avec son état ; l'infobulle
         reprend le résumé. Liens internes seulement : les outils restent dans les
         cartes et dans la barre latérale. #}
@@ -22,12 +26,21 @@
           <span class="health-nav-tip" role="tooltip" id="health-tip-{{ section.key }}"><strong>{{ section.title }} · {{ status_labels[section.status] }}</strong> {{ section.summary }}</span>
         </li>
         {% endfor %}
+        {#- Panneaux devenus rubriques du menu (FD-UX-020). #}
+        {% set errors, warnings = found.errors | length, found.warnings | length %}
+        <li data-status="{{ 'erreur' if errors else ('attention' if warnings else 'ok') }}">
+          <a href="#priorities-title" aria-describedby="health-tip-priorities"><span class="icon icon-flag" aria-hidden="true"></span><span class="health-nav-label">À traiter en priorité</span><span class="health-nav-mark" aria-hidden="true">{{ priorities | length if priorities else "✓" }}</span></a>
+          <span class="health-nav-tip" role="tooltip" id="health-tip-priorities"><strong>À traiter en priorité</strong> {% if priorities %}{{ errors }} erreur{{ "s" if errors > 1 else "" }} et {{ warnings }} avertissement{{ "s" if warnings > 1 else "" }}, les erreurs d’abord.{% else %}Aucune erreur ni aucun avertissement.{% endif %}</span>
+        </li>
+        <li>
+          <a href="#commands-title" aria-describedby="health-tip-commands"><span class="icon icon-terminal" aria-hidden="true"></span><span class="health-nav-label">Commandes Forge</span></a>
+          <span class="health-nav-tip" role="tooltip" id="health-tip-commands"><strong>Commandes Forge</strong> project:audit, doctor et project:check, lancées depuis la page Diagnostic, sur votre demande.</span>
+        </li>
       </ul>
     </nav>
     {#- Cartes sans cadre de synthèse (FD-UX-017) : une seule s'affiche, celle
-        que vise le menu (:target, sans JavaScript) ; aucune avant un choix. #}
+        que vise le menu (:target, sans JavaScript) ; rien avant un choix (FD-UX-020). #}
     <div class="health-summary" data-health-status="{{ health.status }}">
-      <p class="health-hint help-text">Choisissez une rubrique dans le menu pour afficher son détail.</p>
       {% for section in health.sections %}
       <section class="health-section" aria-labelledby="health-{{ section.key }}" data-health-section="{{ section.key }}" data-status="{{ section.status }}">
         <h2 id="health-{{ section.key }}">{{ section.title }} · {{ health_status(section.status) }}</h2>
@@ -46,10 +59,6 @@
       </section>
       {% endfor %}
     </div>
-    {#- Priorités : diagnostics visibles des sections, erreurs puis avertissements. #}
-    {% set found = namespace(errors=[], warnings=[]) %}
-    {% for section in health.sections %}{% for item in section.diagnostics %}{% if item.severity == "error" %}{% set found.errors = found.errors + [(section, item)] %}{% elif item.severity == "warning" %}{% set found.warnings = found.warnings + [(section, item)] %}{% endif %}{% endfor %}{% endfor %}
-    {% set priorities = found.errors + found.warnings %}
     <div class="inspector-panels">
       <section class="inspector-priorities" aria-labelledby="priorities-title">
         <h2 id="priorities-title">À traiter en priorité</h2>
@@ -57,7 +66,7 @@
         <ul class="priority-list">{% for section, item in priorities[:6] %}
           <li data-severity="{{ item.severity }}"><span class="priority-dot" aria-hidden="true"></span><span class="priority-text"><a href="#health-{{ section.key }}">{{ item.message }}</a><span class="priority-origin">{{ severity_labels[item.severity] }} · {{ section.title }}{% if item.subject %} · <code>{{ item.subject }}</code>{% endif %}</span></span></li>{% endfor %}
         </ul>
-        {% if priorities | length > 6 %}<p class="panel-note">{{ priorities | length - 6 }} autre{% if priorities | length - 6 > 1 %}s{% endif %} dans les tuiles ci-dessus.</p>{% endif %}
+        {% if priorities | length > 6 %}<p class="panel-note">{{ priorities | length - 6 }} autre{% if priorities | length - 6 > 1 %}s{% endif %} dans les rubriques du menu.</p>{% endif %}
         {% else %}<p class="panel-note">Aucune erreur ni aucun avertissement dans la synthèse.</p>{% endif %}
       </section>
       <section class="inspector-commands" aria-labelledby="commands-title">
@@ -73,9 +82,13 @@
     {% else %}
     <p class="health-empty" role="status">Aucun projet sélectionné : aucune analyse. <a href="/">Ouvrez un projet depuis l’accueil</a>.</p>
     {% endif %}
-    {% if message %}<p role="status">{{ message }}</p>{% endif %}
+    {#- Avec la synthèse, rien ne s'affiche hors rubrique : le message de réussite
+        reste annoncé aux lecteurs d'écran ; les erreurs restent visibles. #}
+    {% if message %}<p role="status"{% if health %} class="visually-hidden"{% endif %}>{{ message }}</p>{% endif %}
     {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
-    {% if details %}
+    {#- « Projet Forge reconnu » n'est plus affiché : ses informations sont dans les
+        tuiles Forge et Structure (FD-UX-020). Un projet non reconnu garde le sien. #}
+    {% if details and not (details.valid and health) %}
     <section id="inspection-details" aria-labelledby="inspection-title">
       <h2 id="inspection-title">{% if details.valid %}Projet Forge reconnu{% else %}Projet Forge non reconnu{% endif %}</h2>
       {% if not details.valid %}<p><a href="/">Ouvrir un autre projet depuis l’accueil</a></p>{% endif %}

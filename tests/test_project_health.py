@@ -529,11 +529,8 @@ def test_navigation_targets_existing_tools(tmp_path: Path) -> None:
     }
     assert actions == {
         "project": None,
-        "forge": ("Voir le détail de l’inspection", "/inspector#inspection-details"),
-        "structure": (
-            "Voir le détail de l’inspection",
-            "/inspector#inspection-details",
-        ),
+        "forge": None,
+        "structure": None,
         "routes": ("Voir les routes", "/routes"),
         "entities": ("Voir les entités", "/entities"),
         "templates": ("Voir les templates", "/templates"),

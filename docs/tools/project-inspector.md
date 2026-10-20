@@ -88,7 +88,8 @@ mêmes calculs :
 - les faits clés restent visibles : une tuile en Attention montre sa raison,
   par exemple « Invalides 3 » ;
 - la liste des diagnostics se déplie sous leur nombre (« 8 diagnostics ») ;
-- l'action vers l'outil reste en pied de tuile.
+- l'action vers l'outil reste en pied de tuile (Forge et Structure n'en ont
+  plus depuis FD-UX-020).
 
 Au-dessus des tuiles, un **sommaire** (FD-UX-015) reste collé en haut de la
 page pendant le défilement. Il compte une entrée par tuile, dans le même ordre :
@@ -107,7 +108,18 @@ noms, seules les icônes restent visibles ; le nom reste lu par les lecteurs
 d'écran et repris par l'infobulle. Le sommaire ne mène qu'aux tuiles : les
 outils restent dans les tuiles et dans la barre latérale. Sans JavaScript.
 
-Sous la synthèse, deux panneaux :
+Depuis FD-UX-020, la page occupe tout le plan de travail : le menu et la
+rubrique choisie sont centrés sur toute sa largeur, et rien d'autre ne
+s'affiche avant un choix (pas d'invite ; le message de réussite reste annoncé
+aux lecteurs d'écran, les erreurs restent visibles). Les deux panneaux
+ci-dessous sont devenus les deux dernières rubriques du menu : « À traiter en
+priorité » (marque : nombre de points, couleur de la gravité la plus haute) et
+« Commandes Forge ». Le bloc « Projet Forge reconnu » n'est plus affiché, et les
+tuiles Forge et Structure n'ont plus de lien vers lui : elles portent déjà la
+version, sa source et les diagnostics. Un projet non reconnu garde son bloc
+« Projet Forge non reconnu ».
+
+Les deux panneaux :
 
 - **À traiter en priorité** reprend les diagnostics déjà visibles dans les tuiles,
   les erreurs puis les avertissements, six au plus. Chacun renvoie à sa tuile,

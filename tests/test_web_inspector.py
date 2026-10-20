@@ -334,8 +334,14 @@ def test_refresh_updates_diagnostic(server: WSGIServer, project: Path) -> None:
     status, html, headers = request(server, "ignored", target="/project/refresh")
     assert status == 200 and "Projet actualisé." in html
     assert "2.0.0" in html and "1.0.0rc9" not in html
-    assert "mvc/views\u00a0: absent." not in html
-    assert "mvc/models\u00a0: absent." in html
+    # Les absences se lisent dans la tuile Structure, le bloc « Projet Forge
+    # reconnu » n'étant plus affiché (FD-UX-020).
+    structure = html.split('data-health-section="structure"', 1)[1].split(
+        "</section>", 1
+    )[0]
+    assert "Élément optionnel absent. <code>mvc/models</code>" in structure
+    assert "<code>mvc/views</code>" not in structure
+    assert 'id="inspection-details"' not in html
     # Barre latérale : le nom seul, le chemin au survol (FD-UX-019).
     current = project.resolve()
     assert f'title="{current}">Projet\u00a0: <span>{current.name}</span>' in html

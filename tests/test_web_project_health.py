@@ -83,7 +83,10 @@ def test_summary_after_opening_and_on_reload(tmp_path: Path) -> None:
     # Sans cadre de synthèse ni état global écrit (FD-UX-017) ; une invite tient
     # lieu de contenu tant qu'aucune rubrique n'est choisie.
     assert "Synthèse du projet" not in html and "État global" not in html
-    assert "Choisissez une rubrique dans le menu" in summary
+    # Rien d'affiché hors rubrique choisie (FD-UX-020) : ni invite, ni détail
+    # « Projet Forge reconnu ».
+    assert "Choisissez une rubrique" not in html
+    assert 'id="inspection-details"' not in html
     assert re.findall(r'data-health-section="([a-z]+)"', summary) == SECTIONS
     # Chaque état est écrit et marqué, jamais transmis par la seule couleur.
     assert (
@@ -91,15 +94,12 @@ def test_summary_after_opening_and_on_reload(tmp_path: Path) -> None:
     )
     links = re.findall(r'<a href="([^"]+)">([^<]+)</a>', summary)
     assert links == [
-        ("/inspector#inspection-details", "Voir le détail de l’inspection"),
-        ("/inspector#inspection-details", "Voir le détail de l’inspection"),
         ("/routes", "Voir les routes"),
         ("/entities", "Voir les entités"),
         ("/templates", "Voir les templates"),
         ("/debug", "Voir les diagnostics"),
         ("/templates", "Voir les templates et leurs contrats"),
     ]
-    assert 'id="inspection-details"' in html
     # Hiérarchie : h1 (masqué), puis un h2 par carte.
     headings = re.findall(r"<h([1-3])", html)
     assert headings[:2] == ["1", "2"] and headings.count("2") >= len(SECTIONS)
@@ -119,9 +119,17 @@ def test_summary_navigation_with_tooltips(tmp_path: Path) -> None:
     assert 'aria-label="Sommaire de la synthèse"' in nav
     links = re.findall(r'<a href="#health-([a-z]+)" aria-describedby="([^"]+)">', nav)
     assert links == [(key, f"health-tip-{key}") for key in SECTIONS]
-    assert "/routes" not in nav and nav.count('data-status="ok"') == len(SECTIONS)
+    # Tuiles, puis les deux panneaux devenus rubriques (FD-UX-020).
+    assert "/routes" not in nav and nav.count('data-status="ok"') == len(SECTIONS) + 1
     tips = re.findall(r'<span class="health-nav-tip" role="tooltip" id="([^"]+)">', nav)
-    assert tips == [f"health-tip-{key}" for key in SECTIONS]
+    extra = ["health-tip-priorities", "health-tip-commands"]
+    assert tips == [f"health-tip-{key}" for key in SECTIONS] + extra
+    assert (
+        '<a href="#priorities-title" aria-describedby="health-tip-priorities">' in nav
+    )
+    assert '<a href="#commands-title" aria-describedby="health-tip-commands">' in nav
+    assert "Aucune erreur ni aucun avertissement." in nav
+    assert 'id="priorities-title"' in html and 'id="commands-title"' in html
     # Chaque cible existe, et l'infobulle reprend nom, état et résumé.
     for key in SECTIONS:
         assert f'<h2 id="health-{key}">' in html

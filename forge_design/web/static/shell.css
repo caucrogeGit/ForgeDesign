@@ -42,6 +42,8 @@ body { margin: 0; min-height: 100vh; font-size: .875rem; line-height: 1.5; backg
 .icon-structure { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3h6v5H9z'/%3E%3Cpath d='M3 16h6v5H3z'/%3E%3Cpath d='M15 16h6v5h-6z'/%3E%3Cpath d='M12 8v4'/%3E%3Cpath d='M6 16v-4h12v4'/%3E%3C/svg%3E"); }
 .icon-migrations { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 20V4'/%3E%3Cpath d='M3 8l4-4 4 4'/%3E%3Cpath d='M17 4v16'/%3E%3Cpath d='M13 16l4 4 4-4'/%3E%3C/svg%3E"); }
 .icon-contract { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3Cpath d='M9 15l2 2 4-4'/%3E%3C/svg%3E"); }
+.icon-flag { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 21V4'/%3E%3Cpath d='M5 4h12l-2.5 4 2.5 4H5'/%3E%3C/svg%3E"); }
+.icon-terminal { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7l5 5-5 5'/%3E%3Cpath d='M12 18h8'/%3E%3C/svg%3E"); }
 a { color: var(--accent-ink); text-underline-offset: .2em; }
 a:hover { color: var(--accent-hover); }
 code, pre, kbd, samp { font-family: var(--font-mono); font-size: .9em; }
@@ -130,8 +132,10 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
 
 /* Synthèse de santé de Project Inspector (FD-PROJECT-006) : l'état est toujours
    écrit et marqué ; la couleur ne fait que le souligner. */
-.health-summary { max-width: 52rem; margin: 0 auto; }
-.health-hint { margin: 1.5rem 0 0; text-align: center; }
+/* Vue d'ensemble (FD-UX-020) : la page occupe tout le plan de travail ; menu et
+   rubrique choisie sont centrés sur toute sa largeur. */
+main:has(> .health-nav) { max-width: none; }
+.health-summary, .inspector-panels { max-width: 52rem; margin: 0 auto; }
 .health-summary > .health-section { margin: 0; padding: 1rem 1.1rem; background: var(--surface); }
 .health-section[data-status="attention"] { border-color: var(--warn-line); }
 .health-section[data-status="erreur"] { border-color: #f3c2bd; }
@@ -175,7 +179,7 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
 /* Pont invisible : le pointeur peut passer du lien à l'infobulle sans la perdre. */
 .health-nav li::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: .45rem; }
 .health-nav li:hover .health-nav-tip, .health-nav a:focus-visible + .health-nav-tip { display: block; }
-@container health-nav (max-width: 72rem) {
+@container health-nav (max-width: 92rem) {
   .health-nav-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 }
 /* Une seule carte, celle que vise le menu (ou « À traiter en priorité ») ;
@@ -192,7 +196,11 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
 .health-summary > .health-section dd { text-align: left; }
 .health-summary > .health-section .health-details { display: flex; flex-direction: column; align-items: center; }
 .health-summary > .health-section .health-diagnostics { width: fit-content; max-width: 100%; box-sizing: border-box; text-align: left; }
-.health-summary:has(.health-section > h2:target) > .health-hint { display: none; }
+.inspector-panels > section { display: none; }
+.inspector-panels > section > h2 { scroll-margin-top: 9rem; }
+.inspector-panels > section:has(> h2:target) { display: block; }
+/* Titre et note centrés comme les tuiles ; les listes restent en colonne. */
+.inspector-panels > section > h2, .inspector-panels > section > .panel-note { text-align: center; }
 main:has(#health-project:target) .health-nav a[href="#health-project"],
 main:has(#health-forge:target) .health-nav a[href="#health-forge"],
 main:has(#health-structure:target) .health-nav a[href="#health-structure"],
@@ -201,12 +209,14 @@ main:has(#health-entities:target) .health-nav a[href="#health-entities"],
 main:has(#health-templates:target) .health-nav a[href="#health-templates"],
 main:has(#health-migrations:target) .health-nav a[href="#health-migrations"],
 main:has(#health-diagnostics:target) .health-nav a[href="#health-diagnostics"],
-main:has(#health-contracts:target) .health-nav a[href="#health-contracts"] { background: var(--accent-soft); color: var(--accent-ink); }
+main:has(#health-contracts:target) .health-nav a[href="#health-contracts"],
+main:has(#priorities-title:target) .health-nav a[href="#priorities-title"],
+main:has(#commands-title:target) .health-nav a[href="#commands-title"] { background: var(--accent-soft); color: var(--accent-ink); }
 .health-details[open] > summary { margin-bottom: .35rem; }
 .health-details dl { margin-top: .25rem; }
 .health-details p { margin: .5rem 0 .2rem; }
 .health-action { margin: auto 0 0; padding-top: .35rem; }
-.inspector-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: .9rem; margin-top: .9rem; }
+.inspector-panels { display: block; }
 .inspector-panels > section { margin: 0; }
 .panel-note { color: var(--muted); font-size: .8rem; }
 .priority-list, .command-list { margin: .25rem 0 0; padding: 0; list-style: none; }

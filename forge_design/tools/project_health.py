@@ -78,8 +78,6 @@ _ROUTE_ERRORS = (
 _OPTIONAL_ABSENCE_CODES = frozenset({"entity.source_missing"})
 _DEBUG_ERRORS = frozenset({"ERROR", "CRITICAL"})
 
-DETAILS_URL = "/inspector#inspection-details"
-
 
 @dataclass(frozen=True)
 class HealthDiagnostic:
@@ -125,8 +123,11 @@ class ProjectHealthSummary:
 
 _ACTIONS = {
     "project": None,
-    "forge": HealthAction("Voir le détail de l’inspection", DETAILS_URL),
-    "structure": HealthAction("Voir le détail de l’inspection", DETAILS_URL),
+    # Plus de lien vers le détail de l'inspection : la tuile porte déjà version,
+    # source et diagnostics, et le bloc « Projet Forge reconnu » n'existe plus
+    # (FD-UX-020).
+    "forge": None,
+    "structure": None,
     "routes": HealthAction("Voir les routes", "/routes"),
     "entities": HealthAction("Voir les entités", "/entities"),
     "templates": HealthAction("Voir les templates", "/templates"),
