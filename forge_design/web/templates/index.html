@@ -19,11 +19,7 @@
 <span class="folder" data-hue="{{ hue }}" aria-hidden="true"><span class="folder-tab"></span><span class="folder-body">{{ name[:1] | upper }}</span></span>
 {%- endmacro %}
 {% block content %}
-<h1>Accueil</h1>
-<p class="intro">Ouvrez un projet Forge pour l’inspecter et concevoir ses vues.</p>
-{# Deux colonnes sur toute la largeur (FD-UX-013) : projets à gauche, outils à droite. #}
-<div class="launch-layout">
-<div class="launch-main">
+<h1 class="visually-hidden">Forge Design</h1>
 {# Le champ d'ouverture vient toujours en premier, projet ouvert ou non. #}
 {{ open_form("Ouvrir un projet") }}
 
@@ -41,27 +37,26 @@
   {% if recent_warning %}<p class="message error" role="alert">{{ recent_warning }}</p>{% endif %}
   {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
   {% if recent_projects %}
-  <ul class="project-list">
+  <ul class="project-grid">
     {% for state in recent_projects %}
     {% set project = state.project %}
     {% set name = project.path.rstrip("/").split("/") | last %}
     {% set hue = project_hue(project.path) %}
     {# Projet courant : l'instantané pris à l'ouverture (comme la barre latérale), relu par « Actualiser ». #}
-    {% set inspected = (state.is_current and current_project) or (state.status == "available" and state.inspection) %}
-    {% set version = (current_project.forge_version if state.is_current and current_project else state.inspection.forge_version) if inspected else none %}
-    {% set meta %}{% if not inspected %}{{ status_labels[state.status] }}{% elif version %}Forge {{ version }}{% else %}Version Forge indéterminée{% endif %}{% endset %}
-    {% set body %}{{ folder(name, hue) }}<span class="project-text"><span class="project-name">{{ name }}</span><span class="project-path">{{ project.path }}</span></span><span class="project-meta"><span class="recent-dot" aria-hidden="true"></span>{{ meta }}</span>{% endset %}
-    <li class="project-item" data-recent-status="{{ state.status }}"{% if inspected and not version %} data-version="unknown"{% endif %}{% if state.is_current %} data-current{% endif %} title="{{ project.path }}">
+    {% set meta %}{% if state.is_current and current_project %}{% if current_project.forge_version %}Forge {{ current_project.forge_version }}{% else %}Version Forge indéterminée{% endif %}{% elif state.status == "available" and state.inspection %}{% if state.inspection.forge_version %}Forge {{ state.inspection.forge_version }}{% else %}Version Forge indéterminée{% endif %}{% else %}{{ status_labels[state.status] }}{% endif %}{% endset %}
+    <li class="project-item" data-recent-status="{{ state.status }}"{% if state.is_current %} data-current{% endif %} title="{{ project.path }}">
       {% if state.status == "available" and not state.is_current %}
       <form action="/project/open-recent" method="post">
         <input type="hidden" name="recent" value="{{ project.path }}">
-        <button type="submit" class="project-card">{{ body }}<span class="project-open">Ouvrir<span class="icon icon-arrow" aria-hidden="true"></span></span></button>
+        <button type="submit" class="project-card">{{ folder(name, hue) }}<span class="project-name">{{ name }}</span><span class="project-meta"><span class="recent-dot" aria-hidden="true"></span>{{ meta }}</span></button>
       </form>
-      {% elif state.is_current %}
-      {# Déjà ouvert : la ligne reprend le travail, sans nouvelle inspection. #}
-      <a class="project-card" href="/inspector">{{ body }}<span class="project-continue">Ouvert · Continuer<span class="icon icon-arrow" aria-hidden="true"></span></span></a>
       {% else %}
-      <div class="project-card">{{ body }}</div>
+      {% if state.is_current %}
+      {# Déjà ouvert : la carte reprend le travail, sans nouvelle inspection. #}
+      <a class="project-card" href="/inspector">{{ folder(name, hue) }}<span class="project-name">{{ name }}</span><span class="project-meta"><span class="recent-dot" aria-hidden="true"></span>{{ meta }}</span><span class="project-continue">Ouvert · Continuer<span class="icon icon-arrow" aria-hidden="true"></span></span></a>
+      {% else %}
+      <div class="project-card">{{ folder(name, hue) }}<span class="project-name">{{ name }}</span><span class="project-meta"><span class="recent-dot" aria-hidden="true"></span>{{ meta }}</span></div>
+      {% endif %}
       {% endif %}
       <form class="project-remove" action="/project/recent/remove" method="post">
         <input type="hidden" name="recent" value="{{ project.path }}">
@@ -72,24 +67,4 @@
   </ul>
   {% else %}<p class="launch-empty">Aucun projet récent.</p>{% endif %}
 </section>
-</div>
-
-{# Outils de l'atelier : des liens avec un projet ouvert, sinon grisés. #}
-<aside class="launch-tools" aria-labelledby="launch-tools-title">
-  <h2 id="launch-tools-title">Outils</h2>
-  <ul>
-    {% for path, name, label, text in [
-      ("/inspector", "inspector", "Vue d’ensemble", "Santé du projet : structure, version, diagnostics."),
-      ("/routes", "routes", "Routes", "Chaîne de chaque route, du handler au gabarit."),
-      ("/entities", "entities", "Entités", "Contrats JSON déclarés et leurs relations."),
-      ("/templates", "templates", "Gabarits", "Gabarits de mvc/views/, en lecture seule."),
-      ("/editor", "editor", "Éditeur", "Conception des vues, avec aperçu."),
-      ("/debug", "debug", "Diagnostic", "Commandes de Forge et erreurs runtime."),
-    ] %}
-    <li>{% if current_project %}<a class="launch-tool" href="{{ path }}">{% else %}<span class="launch-tool" aria-disabled="true">{% endif %}<span class="icon icon-{{ name }}" aria-hidden="true"></span><span><span class="launch-tool-name">{{ label }}</span><span class="launch-tool-text">{{ text }}</span></span>{% if current_project %}</a>{% else %}</span>{% endif %}</li>
-    {% endfor %}
-  </ul>
-  {% if not current_project %}<p class="help-text">Ouvrez un projet pour utiliser ces outils.</p>{% endif %}
-</aside>
-</div>
 {% endblock %}
