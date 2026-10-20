@@ -147,14 +147,14 @@ def test_unknown_core_version_fails_closed_only_for_constrained_modules(
 
 
 def test_production_version_is_the_authoritative_core_version() -> None:
-    assert forge_design.__version__ == "0.4.9"
+    assert forge_design.__version__ == "0.4.10"
     result = activate(
         ("pkg_ok", flow("ok", requires=">=0.2.0,<1")),
         ("pkg_future", flow("future", requires=">=9999")),
     )
     assert [module.descriptor.id for module in result.modules] == ["ok"]
     assert result.diagnostics[0].message == (
-        "Le module « future » nécessite forge-design >=9999, version installée : 0.4.9."
+        "Le module « future » nécessite forge-design >=9999, version installée : 0.4.10."
     )
 
 
