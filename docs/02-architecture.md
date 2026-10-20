@@ -106,14 +106,13 @@ Les liens fixes Accueil et Project Inspector utilisent un état actif explicite
 Le layout est un shell d'application, sans changer les routes ni les pages :
 
 - une **barre latérale** contient la marque et la version, le projet courant
-  (`Projet : <racine>` et la version Forge) et la navigation
+  (`Projet : <racine>` et la version Forge), ses actions « Actualiser » et
+  « Fermer » (nom accessible « Fermer le projet »), et la navigation
   `Navigation principale`, regroupée en Projet (Vue d’ensemble), Explorer
   (Routes, Entités, Gabarits), Concevoir (Éditeur) et Diagnostiquer
   (Diagnostic) ; la zone
   `Modules` reste distincte ; sur un écran étroit, la barre passe au-dessus du
   contenu ;
-- une **barre du haut** porte le fil de la page et les actions du projet
-  (Actualiser, Fermer le projet) ;
 - le **contenu** occupe toute la largeur disponible (`main` borné à 82 rem), avec
   des titres à l'échelle d'un outil.
 
@@ -200,7 +199,7 @@ diagnostics de modules).
   ouverture. La carte du projet courant, bordée d'orange, est un lien vers la
   Vue d'ensemble (« Ouvert · Continuer ») : elle reprend le travail sans
   nouvelle inspection, et affiche la version de l'instantané pris à
-  l'ouverture. « Fermer le projet » reste dans la barre du haut de l'atelier.
+  l'ouverture. « Fermer » reste dans la barre latérale, sous le nom du projet.
 - `main.launcher` porte `data-current-project` : la racine du projet courant,
   ou une valeur vide. Les tests et le kit d'acceptance lisent l'état par ce
   marqueur.
@@ -214,9 +213,9 @@ affiché sur la Vue d'ensemble, avec ses constats et un lien vers l'accueil.
 
 Depuis FD-UX-011, ouvrir un projet, par le champ ou par la carte d'un projet
 récent, affiche directement sa Vue d'ensemble (« Projet ouvert. »), en
-réutilisant l'inspection de l'ouverture. La barre du haut n'a plus de fil
-d'Ariane : elle ne porte que « Actualiser » et « Fermer le projet », et
-n'apparaît qu'avec un projet ouvert. Le
+réutilisant l'inspection de l'ouverture. Le fil d'Ariane a disparu. Depuis
+FD-UX-012, la barre du haut aussi : « Actualiser » et « Fermer » sont dans la
+barre latérale, sous le nom du projet ouvert, sur toutes les pages. Le
 menu de l'atelier (outils, modules) reste sur toutes les pages.
 
 ### Contrôle de l'en-tête Host (FD-WEB-003)

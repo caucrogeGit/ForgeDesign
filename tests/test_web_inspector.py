@@ -225,8 +225,12 @@ def test_current_project_lifecycle(server: WSGIServer, project: Path) -> None:
     home = request(server, method="GET", target="/")[1]
     assert f'data-current-project="{project.resolve()}"' in home
     assert "Forge 1.0.0rc9" in home and 'data-current-project=""' not in home
-    # Fermer : depuis la barre du haut de l'atelier, pas sur le lanceur.
-    assert "Fermer le projet" in request(server, method="GET", target="/inspector")[1]
+    # Actualiser et Fermer : dans la barre latérale, sous le nom du projet (FD-UX-012).
+    shell = request(server, method="GET", target="/inspector")[1].split("<main>", 1)[0]
+    actions = shell.split('class="app-project-actions">', 1)[1].split("</div>", 1)[0]
+    assert 'action="/project/refresh"' in actions
+    assert 'action="/project/close"' in actions
+    assert 'aria-label="Fermer le projet"' in actions and "app-topbar" not in shell
     source = project / "requirements.txt"
     source.unlink()
     assert request(server, str(project))[0] == 200

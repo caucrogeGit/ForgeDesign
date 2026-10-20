@@ -62,6 +62,11 @@ a:focus-visible, input:focus-visible, button:focus-visible, select:focus-visible
 .app-project-path { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .app-project-empty { color: #fff; }
 .current-project a { color: var(--focus); }
+.app-project-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+.app-project-actions form { margin: 0; }
+.app-project-actions button { min-height: 1.9rem; padding: .2rem .55rem; gap: .35rem; border-color: var(--side-active); background: transparent; color: var(--side-ink); font-size: .75rem; }
+.app-project-actions button:hover { border-color: var(--side-muted); background: var(--side-active); color: #fff; }
+.app-project-actions .icon { width: .85rem; height: .85rem; }
 .app-sidebar nav { display: flex; flex-direction: column; gap: 2px; margin: 0; }
 .app-sidebar nav a { display: flex; align-items: center; gap: .6rem; padding: .45rem .65rem; border-radius: var(--radius-s); color: var(--side-ink); text-decoration: none; }
 .app-sidebar nav a:hover { background: var(--side-2); color: #fff; }
@@ -72,9 +77,6 @@ a:focus-visible, input:focus-visible, button:focus-visible, select:focus-visible
 .module-navigation { padding-top: .4rem; border-top: 1px solid var(--side-active); }
 .module-navigation-title { margin-top: .4rem; }
 .app-sidebar-footer { margin: auto 0 0; padding: 0 .65rem; font-family: var(--font-mono); font-size: .7rem; color: var(--side-muted); }
-.app-topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .75rem; min-height: 3.5rem; padding: .6rem 1.75rem; background: var(--surface); border-bottom: 1px solid var(--border); }
-.app-topbar-actions { display: flex; gap: .5rem; margin-left: auto; }
-.app-topbar form { margin: 0; }
 main { width: 100%; max-width: 82rem; padding: 1.75rem; }
 
 /* Titres et texte : un outil, pas une affiche. */

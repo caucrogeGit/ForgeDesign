@@ -352,8 +352,9 @@ def test_shell_sidebar_and_no_inline_style(running_server: WSGIServer) -> None:
     assert '<aside class="app-sidebar">' in shell
     assert f'<span class="app-version">{forge_design.__version__}</span>' in shell
     assert "Aucun projet ouvert." in shell
-    # Barre du haut : actions du projet ouvert seulement, sans fil d'Ariane.
-    assert '<header class="app-topbar">' not in shell and "app-crumb" not in html
+    # Plus de barre du haut ni de fil d'Ariane ; sans projet, aucune action (FD-UX-012).
+    assert "app-topbar" not in html and "app-crumb" not in html
+    assert "app-project-actions" not in html
     assert "<h1>Vue d’ensemble</h1>" in content
     # L'accueil garde le menu de l'atelier ; son contenu est le lanceur (FD-UX-010).
     home = _get(running_server, "/")[2].decode("utf-8")

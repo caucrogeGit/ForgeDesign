@@ -23,6 +23,15 @@
         <p class="app-project-name">{{ current_project.root.name }}</p>
         <p class="app-project-path" title="{{ current_project.root }}">Projet : {{ current_project.root }}</p>
         {% if current_project.forge_version %}<p class="app-project-meta">Forge {{ current_project.forge_version }}</p>{% endif %}
+        {#- Actions du projet ouvert, à côté de son nom : la barre du haut n'existe plus (FD-UX-012). #}
+        <div class="app-project-actions">
+          <form action="/project/refresh" method="post">
+            <button type="submit">{{ icon("refresh") }}Actualiser</button>
+          </form>
+          <form action="/project/close" method="post">
+            <button type="submit" aria-label="Fermer le projet" title="Fermer le projet">{{ icon("close") }}Fermer</button>
+          </form>
+        </div>
         {% else %}<p class="app-project-empty">Aucun projet ouvert.</p>
         <p class="app-project-meta"><a href="/">Ouvrir un projet</a></p>{% endif %}
       </div>
@@ -47,19 +56,6 @@
       <p class="app-sidebar-footer">Serveur local · 127.0.0.1</p>
     </aside>
     <div class="app-content">
-      {#- Barre du haut : actions du projet ouvert seulement, sans fil d'Ariane (FD-UX-011). #}
-      {% if current_project %}
-      <header class="app-topbar">
-        <div class="app-topbar-actions">
-          <form action="/project/refresh" method="post">
-            <button type="submit">{{ icon("refresh") }}Actualiser</button>
-          </form>
-          <form action="/project/close" method="post">
-            <button type="submit">{{ icon("close") }}Fermer le projet</button>
-          </form>
-        </div>
-      </header>
-      {% endif %}
       <main{% if launcher %} class="launcher" data-current-project="{{ current_project.root if current_project else '' }}"{% endif %}>
 {% block content %}{% endblock %}
       </main>
