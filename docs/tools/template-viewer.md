@@ -16,8 +16,27 @@ Les deux pages gardent la navigation active et `Cache-Control: no-store`.
 POST est refusé (405). Sans projet, la liste affiche « Aucun projet ouvert. » et
 ne lance aucun Tool ; le détail retourne 409.
 
-Le tableau est trié lexicalement selon les chemins Unicode. Tous les suffixes
-sont admis, y compris `.html`, `.xml`, `.jinja` et les noms sans extension. Un fichier
+L'inventaire est trié lexicalement selon les chemins Unicode. Tous les suffixes
+sont admis, y compris `.html`, `.xml`, `.jinja` et les noms sans extension.
+
+La liste (FD-UX-006) commence par des **compteurs** : fichiers, templates,
+contrats de vue, designs et autres. Elle forme un seul tableau, découpé en un
+groupe par dossier (`<tbody>` dont l'en-tête donne le dossier et son nombre de
+fichiers). Les dossiers sont triés, la racine de `mvc/views/` en premier, et
+l'ordre de l'inventaire est conservé dans chaque dossier. Chaque ligne garde le
+chemin complet, avec le dossier atténué et le nom en gras, et ajoute son
+**type**, déduit du suffixe exact seulement :
+
+- `.design.json` donne Design ;
+- `.view.json` donne Contrat ;
+- `.html` donne Template ;
+- tout autre suffixe donne Autre.
+
+Aucun contenu n'est lu pour cela. Le détail d'un fichier présente son chemin, sa
+taille et sa date dans un en-tête, puis le contenu brut et la structure détectée,
+côte à côte sur écran large.
+
+Un fichier
 non UTF-8 ou trop gros peut figurer dans l'inventaire mais sa lecture est refusée.
 Un `mvc/views/` absent est un inventaire normal vide avec `source_present=False` ;
 un dossier vide donne `True`. Un dossier inaccessible produit un diagnostic.

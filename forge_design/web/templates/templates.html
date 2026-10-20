@@ -2,7 +2,7 @@
 {% block title %}Template Viewer — Forge Design{% endblock %}
 {% block content %}
 <h1>Template Viewer</h1>
-<p>Templates physiques de mvc/views/, en lecture seule. Les templates fournis exclusivement par les loaders d’opt-in ne sont pas inclus.</p>
+<p class="intro">Templates physiques de mvc/views/, en lecture seule. Les templates fournis exclusivement par les loaders d’opt-in ne sont pas inclus.</p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
 {% if result %}
@@ -11,17 +11,27 @@
 <ul>{% for issue in result.issues %}<li><code>{{ issue.code }}</code> : {{ issue.message }}{% if issue.path %} — {{ issue.path }}{% endif %}</li>{% endfor %}</ul>
 {% endif %}
 {% if result.templates %}
-<div class="table-scroll"><table>
-  <caption>Templates locaux</caption>
-  <thead><tr><th scope="col">Template</th><th scope="col">Taille</th><th scope="col">Modification</th><th scope="col">Action</th></tr></thead>
+<ul class="route-tally" aria-label="Fichiers de mvc/views">
+  <li><strong>{{ result.templates | length }}</strong> fichier{% if result.templates | length > 1 %}s{% endif %}</li>
+  <li data-kind="template"><strong>{{ template_counts.template }}</strong> template{% if template_counts.template > 1 %}s{% endif %}</li>
+  <li data-kind="contract"><strong>{{ template_counts.contract }}</strong> contrat{% if template_counts.contract > 1 %}s{% endif %} de vue</li>
+  <li data-kind="design"><strong>{{ template_counts.design }}</strong> design{% if template_counts.design > 1 %}s{% endif %}</li>
+  {% if template_counts.other %}<li><strong>{{ template_counts.other }}</strong> autre{% if template_counts.other > 1 %}s{% endif %}</li>{% endif %}
+</ul>
+<div class="table-scroll"><table class="template-table">
+  <caption>Templates locaux, par dossier</caption>
+  <thead><tr><th scope="col">Fichier</th><th scope="col">Type</th><th scope="col">Taille</th><th scope="col">Modification</th><th scope="col">Action</th></tr></thead>
+  {% for folder, entries in template_groups %}
   <tbody>
-  {% for template in result.templates %}
-  <tr data-template-path="{{ template.path }}" data-size="{{ template.size }}" data-modified-ns="{{ template.modified_ns }}">
-    <td>{{ template.path }}</td><td>{{ template.size }} octets</td><td>{{ modified_date(template.modified_ns) }}</td>
+  <tr class="template-group"><th scope="rowgroup" colspan="5">{{ folder or "mvc/views/ (racine)" }} <span>{{ entries | length }} fichier{% if entries | length > 1 %}s{% endif %}</span></th></tr>
+  {% for template in entries %}{% set kind = template_kind(template.path) %}{% set parts = split_template_path(template.path) %}
+  <tr data-template-path="{{ template.path }}" data-size="{{ template.size }}" data-modified-ns="{{ template.modified_ns }}" data-kind="{{ kind[0] }}">
+    <td><span class="template-dir">{{ parts[0] }}</span><span class="template-file">{{ parts[1] }}</span></td><td><span class="template-kind" data-kind="{{ kind[0] }}">{{ kind[1] }}</span></td><td>{{ template.size }} octets</td><td>{{ modified_date(template.modified_ns) }}</td>
     <td><a href="{{ template_url(template.path) }}" aria-label="Voir {{ template.path }}">Voir</a></td>
   </tr>
   {% endfor %}
   </tbody>
+  {% endfor %}
 </table></div>
 {% else %}<p>Aucun template disponible.</p>{% endif %}
 {% endif %}

@@ -1,5 +1,6 @@
 """Inventaire et lecture brute des templates, sans état ni rendu cible."""
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from urllib.parse import urlencode
 
@@ -15,7 +16,11 @@ from forge_design.forge.project_root import (
 from forge_design.forge.project_version import NotForgeProjectError
 from forge_design.forge.source import SourceReadError, source_parts
 from forge_design.forge.template_structure import analyze_template_structure
-from forge_design.forge.templates import TemplatesResult, read_template_source
+from forge_design.forge.templates import (
+    TemplateInfo,
+    TemplatesResult,
+    read_template_source,
+)
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.tools.template_navigation import resolve_template_references
 from forge_design.tools.template_tree import build_template_tree, flatten_template_tree
@@ -44,6 +49,46 @@ def modified_date(modified_ns: int) -> str:
         )
     except (ValueError, OverflowError, OSError):
         return "Date hors plage"
+
+
+# Type d'un fichier de mvc/views/ d'après son suffixe exact (FD-UX-006) :
+# présentation seulement, sans lecture ni validation du contenu.
+_KINDS = (
+    (".design.json", "design", "Design"),
+    (".view.json", "contract", "Contrat"),
+    (".html", "template", "Template"),
+)
+
+
+def template_kind(path: str) -> tuple[str, str]:
+    """(clé, libellé) : design, contract, template, ou other pour le reste."""
+    for suffix, key, label in _KINDS:
+        if path.endswith(suffix):
+            return key, label
+    return "other", "Autre"
+
+
+def split_template_path(path: str) -> tuple[str, str]:
+    """Dossier (avec « / » final, vide à la racine) et nom du fichier."""
+    folder, _, name = path.rpartition("/")
+    return (folder + "/" if folder else ""), name
+
+
+def group_templates(
+    templates: Iterable[TemplateInfo],
+) -> tuple[tuple[str, tuple[TemplateInfo, ...]], ...]:
+    """Groupes par dossier, dossiers triés, ordre d'inventaire conservé dedans."""
+    groups: dict[str, list[TemplateInfo]] = {}
+    for template in templates:
+        groups.setdefault(split_template_path(template.path)[0], []).append(template)
+    return tuple((folder, tuple(groups[folder])) for folder in sorted(groups))
+
+
+def count_template_kinds(templates: Iterable[TemplateInfo]) -> dict[str, int]:
+    counts = {"template": 0, "contract": 0, "design": 0, "other": 0}
+    for template in templates:
+        counts[template_kind(template.path)[0]] += 1
+    return counts
 
 
 def parse_template_path(request: Request) -> str:
@@ -77,6 +122,10 @@ def show_templates(
             "error": error,
             "template_url": template_url,
             "modified_date": modified_date,
+            "template_groups": group_templates(result.templates) if result else (),
+            "template_counts": count_template_kinds(result.templates) if result else {},
+            "template_kind": template_kind,
+            "split_template_path": split_template_path,
         },
         status=status,
     )

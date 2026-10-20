@@ -10,11 +10,18 @@ from test_templates import make_views
 from test_web_entity_graph import SvgDocument
 from test_web_recent_projects import call, project, running
 
-from forge_design.forge.templates import TemplatesResult
+from forge_design.forge.templates import TemplateInfo, TemplatesResult
 from forge_design.limits import MAX_SOURCE_BYTES
 from forge_design.recent_projects import RecentProjects
 from forge_design.tools.template_viewer import TemplateViewerTool
-from forge_design.web.template_viewer import modified_date, template_url
+from forge_design.web.template_viewer import (
+    count_template_kinds,
+    group_templates,
+    modified_date,
+    split_template_path,
+    template_kind,
+    template_url,
+)
 
 
 def test_list_detail_reload_and_no_write(
@@ -177,3 +184,29 @@ def test_project_becomes_invalid(tmp_path: Path, kind: str) -> None:
 
 def test_date_out_of_range() -> None:
     assert modified_date(10**40) == "Date hors plage"
+
+
+def test_grouping_and_kinds_for_the_list() -> None:
+    """Présentation de la liste (FD-UX-006) : type par suffixe exact, dossiers
+    triés (racine d'abord), ordre d'inventaire conservé dans chaque dossier."""
+    assert template_kind("contacts/list.html") == ("template", "Template")
+    assert template_kind("contacts/list.view.json") == ("contract", "Contrat")
+    assert template_kind("contacts/list.design.json") == ("design", "Design")
+    assert template_kind("contacts/list.view.JSON") == ("other", "Autre")
+    assert template_kind("README") == ("other", "Autre")
+    assert split_template_path("a/b/c.html") == ("a/b/", "c.html")
+    assert split_template_path("root.html") == ("", "root.html")
+    items = [
+        TemplateInfo(path, 1, 0)
+        for path in ("app/a.html", "app/a/b.html", "app/b.html", "root.html", "z")
+    ]
+    groups = group_templates(items)
+    assert [folder for folder, _ in groups] == ["", "app/", "app/a/"]
+    assert [t.path for t in groups[1][1]] == ["app/a.html", "app/b.html"]
+    assert sum(len(entries) for _, entries in groups) == len(items)
+    assert count_template_kinds(items) == {
+        "template": 4,
+        "contract": 0,
+        "design": 0,
+        "other": 1,
+    }

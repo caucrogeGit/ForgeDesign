@@ -5,14 +5,19 @@
 <p><a href="/templates">Retour à Template Viewer</a></p>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if source %}
-<h2>{{ source.path }}</h2>
-<p><a href="{{ template_tree_url(source.path) }}">Voir l’arbre</a></p>
-<dl data-size="{{ source.size }}" data-modified-ns="{{ source.modified_ns }}">
+<div class="template-header">
+<h2 class="template-path">{{ source.path }}</h2>
+<dl class="template-meta" data-size="{{ source.size }}" data-modified-ns="{{ source.modified_ns }}">
   <dt>Taille</dt><dd>{{ source.size }} octets</dd>
   <dt>Modification</dt><dd>{{ modified_date(source.modified_ns) }}</dd>
 </dl>
+<p class="template-actions"><a href="{{ template_tree_url(source.path) }}">Voir l’arbre</a></p>
+</div>
+<div class="template-detail">
+<section class="template-source" aria-label="Contenu brut">
 <p>Contenu brut en lecture seule, sans interprétation HTML ou Jinja.</p>
 <pre class="source-code"><code>{{ source.text }}</code></pre>
+</section>
 {% if structure %}
 <section aria-labelledby="structure-title">
 <h2 id="structure-title">Structure détectée</h2>
@@ -37,5 +42,6 @@
 {% endfor %}</pre>
 </section>
 {% endif %}
+</div>
 {% endif %}
 {% endblock %}
