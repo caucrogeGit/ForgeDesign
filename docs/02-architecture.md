@@ -181,6 +181,22 @@ Python, textes des scripts, cadre d'aperçu et pages réellement rendues. Le kit
 d'acceptance vérifie dans le navigateur le style calculé des aides et les
 deux-points sur des projets riches.
 
+#### Accueil, espace de travail (FD-UX-009)
+
+L'accueil (`/`) est un espace de travail épuré, sans nouvelle analyse : il
+affiche le même contexte qu'avant (projet courant, projets récents et leurs
+états, diagnostics de modules).
+
+- Avec un projet ouvert, l'en-tête porte son nom (`h1`), sa racine et sa
+  version Forge. Une grille de six liens mène aux outils, chacun avec une ligne
+  de description.
+- Sans projet, le `h1` reste « Forge Design ». Un formulaire « Ouvrir un
+  projet » poste directement vers `/inspector`, comme celui de la Vue
+  d'ensemble.
+- Les projets récents sont des lignes : initiale, nom, chemin, état et version,
+  puis les actions « Ouvrir » et « Retirer ». Le projet courant porte la
+  pastille « Ouvert ».
+
 ### Contrôle de l'en-tête Host (FD-WEB-003)
 
 L'écoute loopback ne suffit pas contre le DNS rebinding : une page étrangère dont

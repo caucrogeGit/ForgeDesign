@@ -263,7 +263,7 @@ def test_rendered_pages_follow_adr_002(tmp_path: Path) -> None:
 
 def test_help_text_style_is_black_italic() -> None:
     css = (PACKAGE / "web/static/shell.css").read_text(encoding="utf-8")
-    rule = re.search(r"\.help-text[^{]*\{([^}]*)\}", css)
+    rule = re.search(r"^\.help-text,[^{]*\{([^}]*)\}", css, re.M)
     assert rule is not None
     assert "color: var(--ink);" in rule.group(1)
     assert "font-style: italic;" in rule.group(1)

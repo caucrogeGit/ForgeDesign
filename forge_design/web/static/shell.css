@@ -465,6 +465,70 @@ main:has(> .editor-studio) > h2:not([id]) + p { margin: .1rem 0 0; color: var(--
 .real-preview-frame { display: block; width: 100%; height: 40rem; border: 1px solid var(--border-strong); background: white; }
 .real-preview-logs { max-height: 16rem; overflow: auto; white-space: pre-wrap; font-size: 0.85rem; }
 
+/* Accueil, espace de travail (FD-UX-009) : en-tête au nom du projet, grille des
+   outils, ouverture d'un projet et projets récents en lignes sobres. */
+.home { max-width: 64rem; }
+.home-hero { display: flex; align-items: center; gap: 1.25rem; padding: 1.25rem 0 1.75rem; }
+.home-mark { flex: none; display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: 14px; background: linear-gradient(135deg, var(--accent), #ea7a3f); color: #fff; font-size: 1.5rem; font-weight: 600; box-shadow: 0 10px 24px -14px rgba(194, 65, 12, .8); }
+.home-hero-text { min-width: 0; }
+.home-hero h1 { margin: 0; font-size: 2rem; letter-spacing: -.02em; line-height: 1.15; }
+.home-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .75rem; margin: .5rem 0 0; color: var(--muted); }
+.home-meta code { font-size: .78rem; overflow-wrap: anywhere; }
+.home-chip { padding: .1rem .6rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: .75rem; font-weight: 500; }
+.home-lead { max-width: 34rem; margin: .6rem 0 0; color: var(--ink-2); font-size: 1rem; line-height: 1.55; }
+.home-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.home-tools > li { display: flex; margin: 0; }
+.home-tool { flex: 1; }
+.home-tool { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .85rem; row-gap: .1rem; align-content: start; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); color: var(--ink); text-decoration: none; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.home-tool:hover { border-color: var(--border-strong); color: var(--ink); box-shadow: 0 12px 28px -20px rgba(21, 24, 28, .45); transform: translateY(-1px); }
+.home-tool-icon { grid-row: 1 / 3; display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius); background: var(--accent-soft); color: var(--accent-ink); }
+.home-tool-icon .icon { width: 1.1rem; height: 1.1rem; }
+.home-tool-label { font-size: .9rem; font-weight: 600; }
+.home-tool-text { color: var(--muted); font-size: .8rem; line-height: 1.45; }
+section.home-open { margin-top: 0; padding: 1.5rem; }
+.home-open form { margin-top: .25rem; }
+.home-open-row { display: flex; gap: .5rem; }
+.home-open-row input { flex: 1; min-height: 2.75rem; background: var(--surface); font-size: .9rem; }
+.home-open-row button { min-height: 2.75rem; padding: .4rem 1.4rem; }
+.home-open .help-text { margin: .6rem 0 0; font-size: .8rem; }
+section.home-recent { margin-top: 1.75rem; padding: 0; overflow: hidden; }
+.home-recent > h2 { display: flex; align-items: center; gap: .55rem; margin: 0; padding: .95rem 1.25rem; border-bottom: 1px solid var(--border); }
+.home-count { display: inline-grid; place-items: center; min-width: 1.45rem; height: 1.45rem; padding: 0 .4rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 600; }
+.home-recent > p { margin: .75rem 1.25rem; }
+.home-recent > p.home-empty { margin: 0; padding: 1.1rem 1.25rem; color: var(--muted); }
+.recent-list { margin: 0; padding: 0; list-style: none; }
+.recent-item { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: .5rem 1rem; padding: .8rem 1.25rem; }
+.recent-item + .recent-item { border-top: 1px solid var(--border); }
+.recent-item:hover { background: var(--surface-2); }
+.recent-mark { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius); background: var(--side-2); color: #fff; font-weight: 600; }
+.recent-item[data-current] .recent-mark { background: var(--accent); }
+.recent-item:not([data-recent-status="available"]) .recent-mark { background: var(--border); color: var(--muted); }
+.recent-body p, p.recent-state { margin: 0; }
+.recent-name { font-weight: 600; overflow-wrap: anywhere; }
+.recent-open { display: inline-block; margin-left: .5rem; padding: .05rem .5rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: .7rem; font-weight: 600; vertical-align: .1em; }
+.recent-path code { color: var(--muted); font-size: .75rem; overflow-wrap: anywhere; }
+.recent-state { color: var(--ink-2); font-size: .8rem; white-space: nowrap; }
+.recent-dot { display: inline-block; width: .5rem; height: .5rem; margin-right: .45rem; border-radius: 50%; background: var(--ok); vertical-align: .05em; }
+.recent-item[data-recent-status="missing"] .recent-dot, .recent-item[data-recent-status="invalid"] .recent-dot { background: var(--err); }
+.recent-item[data-recent-status="unavailable"] .recent-dot { background: var(--warn); }
+.recent-version { color: var(--muted); }
+.recent-actions { display: flex; justify-content: flex-end; gap: .35rem; min-width: 9.5rem; }
+.recent-actions form { margin: 0; }
+.recent-actions button { min-height: 2rem; padding: .3rem .8rem; font-size: .8rem; }
+.recent-actions .recent-open-button { border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.recent-actions .recent-open-button:hover { background: var(--accent-soft); }
+.recent-actions .recent-remove { border-color: transparent; background: transparent; color: var(--muted); }
+.recent-actions .recent-remove:hover { border-color: transparent; background: var(--err-soft); color: var(--err); }
+@media (max-width: 64rem) { .home-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 40rem) {
+  .home-tools { grid-template-columns: minmax(0, 1fr); }
+  .home-hero h1 { font-size: 1.6rem; }
+  .home-open-row { flex-direction: column; }
+  .recent-item { grid-template-columns: auto minmax(0, 1fr); }
+  .recent-state, .recent-actions { grid-column: 2; justify-content: flex-start; min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .home-tool { transition: none; } .home-tool:hover { transform: none; } }
+
 /* Textes d'aide (ADR-002, règle 12) : noir et italique, après le formulaire
    qu'ils commentent (règle 11). En fin de feuille et assez spécifiques pour
    l'emporter sur la couleur atténuée de chaque contexte. */

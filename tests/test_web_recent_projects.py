@@ -80,7 +80,7 @@ def test_restart_canonical_order_remove_and_isolation(tmp_path: Path) -> None:
         assert store.list()[0].path == str(first)
         assert call(app, "/inspector", method="POST", value=str(second))[0] == 200
         html = call(app)[1]
-        assert "· Ouvert" in html
+        assert '<span class="recent-open">Ouvert</span>' in html
         assert html.index(str(second), html.index("Projets récents")) < html.index(
             str(first), html.index("Projets récents")
         )
@@ -214,8 +214,9 @@ def test_bad_history_preserved_and_paths_escaped(tmp_path: Path) -> None:
                 self, tag: str, attrs: list[tuple[str, str | None]]
             ) -> None:
                 assert tag != "script"
-                if tag == "input":
-                    self.values.append(dict(attrs).get("value"))
+                values = dict(attrs)
+                if tag == "input" and values.get("name") == "recent":
+                    self.values.append(values.get("value"))
 
         inputs = Inputs()
         inputs.feed(html)
