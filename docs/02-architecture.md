@@ -180,26 +180,36 @@ Python, textes des scripts, cadre d'aperçu et pages réellement rendues. Le kit
 d'acceptance vérifie dans le navigateur le style calculé des aides et les
 deux-points sur des projets riches.
 
-#### Accueil en lanceur (FD-UX-009, FD-UX-010)
+#### Accueil en lanceur (FD-UX-009, FD-UX-010, FD-UX-013)
 
-L'accueil (`/`) est un lanceur : le menu de l'atelier et la barre du haut
-restent, le contenu (`launcher` dans le contexte, `main.launcher`) est centré.
+L'accueil (`/`) est un lanceur : le menu de l'atelier reste. Depuis FD-UX-013,
+le contenu (`launcher` dans le contexte, `main.launcher`) est aligné à gauche
+sur toute la largeur, comme les autres pages, en deux colonnes : les projets à
+gauche, les outils à droite. Les bascules suivent la place réelle (requêtes de
+conteneur) : sous 56 rem, les outils passent sous les projets ; sous 40 rem,
+chaque ligne de projet s'étage sur trois niveaux.
 C'est
 **le seul endroit où l'on ouvre un projet**, sans nouvelle analyse : il reçoit
 le même contexte qu'avant (projet courant, projets récents et leurs états,
 diagnostics de modules).
 
 - Le formulaire « Ouvrir un projet » vient toujours en premier (il poste vers
-  `/inspector`), puis les projets récents. Le `h1` « Forge Design » est
-  réservé aux lecteurs d'écran.
-- Les projets récents sont des cartes en forme de dossier, centrées : initiale
-  et une teinte sur six, stable par chemin (`project_hue`). Toute la carte
+  `/inspector`), puis les projets récents. Le `h1` « Accueil » est visible,
+  suivi d'une phrase d'introduction.
+- Les projets récents sont des lignes sur toute la largeur : un petit dossier
+  (initiale et une teinte sur six, stable par chemin, `project_hue`), le nom,
+  le chemin, la version Forge (pastille grise si elle est indéterminée,
+  `data-version="unknown"`) et « Ouvrir ». Toute la ligne
   ouvre le projet (POST `/project/open-recent`). Une croix nommée
   « Retirer … » le retire. Un projet introuvable ou non reconnu est grisé, sans
-  ouverture. La carte du projet courant, bordée d'orange, est un lien vers la
+  ouverture. La ligne du projet courant, bordée d'orange, est un lien vers la
   Vue d'ensemble (« Ouvert · Continuer ») : elle reprend le travail sans
   nouvelle inspection, et affiche la version de l'instantané pris à
   l'ouverture. « Fermer » reste dans la barre latérale, sous le nom du projet.
+- La colonne « Outils » présente les six outils de l'atelier (Vue d'ensemble,
+  Routes, Entités, Gabarits, Éditeur, Diagnostic) avec une ligne chacun. Avec
+  un projet ouvert, ce sont des liens. Sans projet, ils sont grisés
+  (`aria-disabled="true"`, sans lien) et une aide invite à ouvrir un projet.
 - `main.launcher` porte `data-current-project` : la racine du projet courant,
   ou une valeur vide. Les tests et le kit d'acceptance lisent l'état par ce
   marqueur.

@@ -225,6 +225,8 @@ def test_current_project_lifecycle(server: WSGIServer, project: Path) -> None:
     home = request(server, method="GET", target="/")[1]
     assert f'data-current-project="{project.resolve()}"' in home
     assert "Forge 1.0.0rc9" in home and 'data-current-project=""' not in home
+    tools = home.split('<aside class="launch-tools"', 1)[1].split("</aside>", 1)[0]
+    assert 'href="/routes"' in tools and "aria-disabled" not in tools
     # Actualiser et Fermer : dans la barre latérale, sous le nom du projet (FD-UX-012).
     shell = request(server, method="GET", target="/inspector")[1].split("<main>", 1)[0]
     actions = shell.split('class="app-project-actions">', 1)[1].split("</div>", 1)[0]

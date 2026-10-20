@@ -57,8 +57,11 @@ def test_local_binding_and_response(running_server: WSGIServer) -> None:
         assert html.startswith("<!doctype html>")
         assert '<html lang="fr">' in html
         assert "<title>Forge Design</title>" in html
-        assert '<h1 class="visually-hidden">Forge Design</h1>' in html
+        assert "<h1>Accueil</h1>" in html
         assert 'data-current-project=""' in html
+        # Outils de l'atelier : grisés tant qu'aucun projet n'est ouvert (FD-UX-013).
+        tools = html.split('<aside class="launch-tools"', 1)[1].split("</aside>", 1)[0]
+        assert tools.count('aria-disabled="true"') == 6 and "href=" not in tools
     finally:
         connection.close()
 
