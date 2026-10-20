@@ -183,8 +183,9 @@ deux-points sur des projets riches.
 
 #### Accueil en lanceur (FD-UX-009, FD-UX-010)
 
-L'accueil (`/`) est un lanceur plein écran : ni barre latérale ni barre du
-haut (`launcher` dans le contexte, `main.launcher`), tout est centré. C'est
+L'accueil (`/`) est un lanceur : le menu de l'atelier et la barre du haut
+restent, le contenu (`launcher` dans le contexte, `main.launcher`) est centré.
+C'est
 **le seul endroit où l'on ouvre un projet**, sans nouvelle analyse : il reçoit
 le même contexte qu'avant (projet courant, projets récents et leurs états,
 diagnostics de modules).
@@ -210,7 +211,7 @@ d'ouverture (origine, format, chemin vide ou trop long, racine absente,
 preview impossible à arrêter) rend l'accueil, avec l'erreur et le chemin
 saisi, au même code HTTP qu'avant. Un projet inspecté mais non reconnu reste
 affiché sur la Vue d'ensemble, avec ses constats et un lien vers l'accueil. Le
-menu de l'atelier (outils, modules) reste sur toutes les autres pages.
+menu de l'atelier (outils, modules) reste sur toutes les pages.
 
 ### Contrôle de l'en-tête Host (FD-WEB-003)
 

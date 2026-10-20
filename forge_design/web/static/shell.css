@@ -466,11 +466,11 @@ main:has(> .editor-studio) > h2:not([id]) + p { margin: .1rem 0 0; color: var(--
 .real-preview-frame { display: block; width: 100%; height: 40rem; border: 1px solid var(--border-strong); background: white; }
 .real-preview-logs { max-height: 16rem; overflow: auto; white-space: pre-wrap; font-size: 0.85rem; }
 
-/* Lanceur (accueil, FD-UX-010) : sans menu ni barre du haut, tout centré.
+/* Lanceur (accueil, FD-UX-010) : contenu centré à droite du menu.
    Projet ouvert en grande carte, champ d'ouverture, projets récents en
    dossiers. Dossier : initiale et une teinte sur six, stable par projet. */
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-main.launcher { max-width: none; min-height: 100vh; box-sizing: border-box; padding: 4.5rem 1.5rem 4rem; display: flex; flex-direction: column; align-items: center; }
+main.launcher { max-width: none; box-sizing: border-box; padding: 3.5rem 1.5rem 4rem; display: flex; flex-direction: column; align-items: center; }
 .folder { position: relative; display: block; flex: none; width: 7.25rem; height: 5.5rem; --tint: #c2410c; --tint-dark: #8a2d07; }
 .folder[data-hue="1"] { --tint: #1a4f8b; --tint-dark: #12385f; }
 .folder[data-hue="2"] { --tint: #146c3a; --tint-dark: #0d4a26; }
@@ -517,7 +517,6 @@ a.project-card:hover { color: var(--ink); box-shadow: 0 14px 30px -20px rgba(194
 .project-item[data-recent-status="missing"] .recent-dot, .project-item[data-recent-status="invalid"] .recent-dot { background: var(--err); }
 .project-item[data-recent-status="unavailable"] .recent-dot { background: var(--warn); }
 .recent-open { display: inline-block; padding: .05rem .55rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: .7rem; font-weight: 600; }
-.launch-footer { margin: 4.5rem 0 0; color: var(--muted); font-family: var(--font-mono); font-size: .75rem; }
 @media (max-width: 40rem) {
   main.launcher { padding-top: 2rem; }
   .launch-open-row { flex-direction: column; }

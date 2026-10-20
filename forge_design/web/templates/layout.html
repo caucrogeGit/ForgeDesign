@@ -16,8 +16,6 @@
 {%- endmacro %}
 {% set page_labels = {"home": "Accueil", "inspector": "Vue d’ensemble", "routes": "Routes", "entities": "Entités", "templates": "Gabarits", "editor": "Éditeur", "debug": "Diagnostic"} %}
 <body>
-  {#- Lanceur (accueil, FD-UX-010) : ni menu ni barre du haut, la page choisit le projet. #}
-  {% if not launcher %}
   <div class="app">
     <aside class="app-sidebar">
       <a class="app-brand" href="/"><span class="app-brand-mark" aria-hidden="true"></span><span class="app-brand-name">Forge Design</span>{% if app_version %}<span class="app-version">{{ app_version }}</span>{% endif %}</a>
@@ -63,13 +61,10 @@
         </div>
         {% endif %}
       </header>
-      {% endif %}
       <main{% if launcher %} class="launcher" data-current-project="{{ current_project.root if current_project else '' }}"{% endif %}>
 {% block content %}{% endblock %}
       </main>
-  {% if not launcher %}
     </div>
   </div>
-  {% endif %}
 </body>
 </html>
