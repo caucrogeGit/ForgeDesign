@@ -154,7 +154,8 @@ def test_production_version_is_the_authoritative_core_version() -> None:
     )
     assert [module.descriptor.id for module in result.modules] == ["ok"]
     assert result.diagnostics[0].message == (
-        "Le module « future » nécessite forge-design >=9999, version installée : 0.4.10."
+        "Le module « future » nécessite forge-design >=9999, "
+        "version installée : 0.4.10."
     )
 
 
