@@ -204,7 +204,7 @@ def test_inaccessible_project_is_a_controlled_diagnostic(tmp_path: Path) -> None
     assert 'data-health-status="indisponible"' in summary
     assert "Projet inaccessible\u00a0: " in summary
     # Le GET ne ferme pas le projet ; seule l'actualisation le fait.
-    assert f"Projet\u00a0: {root}" in html
+    assert f'title="{root}">Projet\u00a0: <span>{root.name}</span>' in html
 
 
 def test_secondary_section_failure_keeps_the_page(

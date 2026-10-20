@@ -20,8 +20,8 @@
       <a class="app-brand" href="/"><span class="app-brand-mark" aria-hidden="true"></span><span class="app-brand-name">Forge Design</span>{% if app_version %}<span class="app-version">{{ app_version }}</span>{% endif %}</a>
       <div class="current-project">
         {% if current_project %}
-        <p class="app-project-name">{{ current_project.root.name }}</p>
-        <p class="app-project-path" title="{{ current_project.root }}">Projet : {{ current_project.root }}</p>
+        {#- Le nom seul, pas le chemin ; le chemin complet reste au survol (FD-UX-019). #}
+        <p class="app-project-name" title="{{ current_project.root }}">Projet : <span>{{ current_project.root.name }}</span></p>
         {% if current_project.forge_version %}<p class="app-project-meta">Forge {{ current_project.forge_version }}</p>{% endif %}
         {#- Actions du projet ouvert, à côté de son nom : la barre du haut n'existe plus (FD-UX-012). #}
         <div class="app-project-actions">

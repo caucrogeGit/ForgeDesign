@@ -62,9 +62,9 @@ a:focus-visible, input:focus-visible, button:focus-visible, select:focus-visible
 .app-version { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; color: var(--side-muted); }
 .current-project { padding: .65rem .75rem; border-radius: var(--radius); background: var(--side-2); overflow-wrap: anywhere; }
 .current-project p { margin: 0; }
-.app-project-name { color: #fff; font-weight: 600; }
-.app-project-path, .app-project-meta { font-family: var(--font-mono); font-size: .7rem; color: var(--side-muted); }
-.app-project-path { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.app-project-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--side-muted); }
+.app-project-name span { color: #fff; font-weight: 600; }
+.app-project-meta { font-family: var(--font-mono); font-size: .7rem; color: var(--side-muted); }
 .app-project-empty { color: #fff; }
 .current-project a { color: var(--focus); }
 .app-project-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }

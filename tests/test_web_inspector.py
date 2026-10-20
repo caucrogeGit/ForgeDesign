@@ -336,7 +336,9 @@ def test_refresh_updates_diagnostic(server: WSGIServer, project: Path) -> None:
     assert "2.0.0" in html and "1.0.0rc9" not in html
     assert "mvc/views\u00a0: absent." not in html
     assert "mvc/models\u00a0: absent." in html
-    assert f"Projet\u00a0: {project.resolve()}" in html
+    # Barre latérale : le nom seul, le chemin au survol (FD-UX-019).
+    current = project.resolve()
+    assert f'title="{current}">Projet\u00a0: <span>{current.name}</span>' in html
     assert "no-store" in headers.get("Cache-Control", "")
     assert before == {
         p: (p.stat().st_mtime_ns, p.read_bytes() if p.is_file() else None)

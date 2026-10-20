@@ -106,7 +106,7 @@ Les liens fixes Accueil et Project Inspector utilisent un état actif explicite
 Le layout est un shell d'application, sans changer les routes ni les pages :
 
 - une **barre latérale** contient la marque et la version, le projet courant
-  (`Projet : <racine>` et la version Forge), ses actions « Actualiser » et
+  (`Projet : <nom>`, le chemin complet au survol, et la version Forge), ses actions « Actualiser » et
   « Fermer » (nom accessible « Fermer le projet »), et la navigation
   `Navigation principale`, regroupée en Projet (Vue d’ensemble), Explorer
   (Routes, Entités, Gabarits), Concevoir (Éditeur) et Diagnostiquer
