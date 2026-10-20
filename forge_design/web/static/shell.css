@@ -134,7 +134,7 @@ main th { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spaci
    écrit et marqué ; la couleur ne fait que le souligner. */
 /* Vue d'ensemble (FD-UX-020) : la page occupe tout le plan de travail ; menu et
    rubrique choisie sont centrés sur toute sa largeur. */
-main:has(> .health-nav) { max-width: none; }
+main:has(> .health-nav) { max-width: none; padding-top: 0; }
 .health-summary, .inspector-panels { max-width: 52rem; margin: 0 auto; }
 .health-summary > .health-section { margin: 0; padding: 1rem 1.1rem; background: var(--surface); }
 .health-section[data-status="attention"] { border-color: var(--warn-line); }
@@ -160,12 +160,13 @@ main:has(> .health-nav) { max-width: none; }
    une entrée par carte (icône, nom, marque d'état), infobulle au survol et au
    focus clavier. Sans la place pour les noms, il ne reste que les icônes : le
    nom reste lu par les lecteurs d'écran et repris par l'infobulle. */
-.health-nav { position: sticky; top: .5rem; z-index: 5; container: health-nav / inline-size; margin: 0 0 1rem; pointer-events: none; }
-/* Menu centré (FD-UX-017) : le cadre est sur la liste, à la largeur de son
-   contenu ; la bande pleine largeur reste le conteneur des bascules. */
-.health-nav ul { display: flex; flex-wrap: wrap; justify-content: center; gap: .15rem; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 0 auto; padding: .3rem; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); box-shadow: 0 6px 18px -14px rgba(21, 24, 28, .45); list-style: none; pointer-events: auto; }
+.health-nav { display: block; position: sticky; top: 0; z-index: 5; container: health-nav / inline-size; margin: 0 -1.75rem 1.5rem; }
+/* Menu en barre d'en-tête (FD-UX-021) : collé en haut du plan de travail, sur
+   toute sa largeur (la marge de main est compensée), coins droits, entrées
+   centrées ; la barre reste le conteneur des bascules. */
+.health-nav ul { display: flex; flex-wrap: wrap; justify-content: center; gap: .15rem; margin: 0; padding: .35rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface); box-shadow: 0 6px 18px -16px rgba(21, 24, 28, .45); list-style: none; }
 .health-nav li { position: relative; margin: 0; }
-.health-nav a { display: flex; align-items: center; gap: .4rem; padding: .4rem .55rem; border-radius: var(--radius); color: var(--ink); font-size: .8rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
+.health-nav a { display: flex; align-items: center; gap: .4rem; padding: .4rem .55rem; border-radius: 0; color: var(--ink); font-size: .8rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
 .health-nav a:hover { background: var(--surface-2); color: var(--ink); }
 .health-nav .icon { color: var(--muted); }
 .health-nav-mark { display: inline-grid; place-items: center; min-width: 1.15rem; height: 1.15rem; border-radius: 999px; font-size: .7rem; font-weight: 700; color: var(--muted); background: var(--surface-2); }

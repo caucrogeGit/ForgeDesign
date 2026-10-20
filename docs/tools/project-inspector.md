@@ -108,6 +108,8 @@ noms, seules les icônes restent visibles ; le nom reste lu par les lecteurs
 d'écran et repris par l'infobulle. Le sommaire ne mène qu'aux tuiles : les
 outils restent dans les tuiles et dans la barre latérale. Sans JavaScript.
 
+Depuis FD-UX-021, le menu est une barre d'en-tête collée en haut du plan de
+travail, sans espace ni coins arrondis, sur toute sa largeur, entrées centrées.
 Depuis FD-UX-020, la page occupe tout le plan de travail : le menu et la
 rubrique choisie sont centrés sur toute sa largeur, et rien d'autre ne
 s'affiche avant un choix (pas d'invite ; le message de réussite reste annoncé
