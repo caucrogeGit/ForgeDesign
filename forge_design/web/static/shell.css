@@ -340,6 +340,30 @@ li[data-method="DELETE"] .route-method { color: var(--err); background: var(--er
 .entity-graph-details { margin-top: 1rem; overflow-wrap: anywhere; }
 .entity-graph-details dd { margin-bottom: .75rem; }
 
+/* Debug Center (FD-UX-007) : une commande = en-tête (titre, commande,
+   confiance, bouton), avertissement visible avant le clic, description
+   repliable, état et sorties ; journal en section, niveau en pastille. */
+section[data-command] { margin-top: .9rem; }
+.command-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
+.command-head h2 { margin: 0; }
+.command-name { color: var(--muted); font-size: .8rem; }
+.command-head form { margin: 0 0 0 auto; }
+.message[data-diagnostic-warning] { margin: .75rem 0 .5rem; border-color: var(--warn-line); background: var(--warn-soft); color: var(--ink-2); font-size: .8rem; }
+.command-about { margin: .25rem 0 .5rem; font-size: .8rem; }
+.command-about > summary { width: fit-content; color: var(--muted); cursor: pointer; }
+.command-about p { margin: .4rem 0 0; color: var(--ink-2); }
+[data-diagnostic-status] > dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .15rem .9rem; margin: .5rem 0; font-size: .8rem; }
+[data-diagnostic-status] > dl dt, [data-diagnostic-status] > dl dd { margin: 0; }
+[data-diagnostic-status] h3 { margin-top: .75rem; }
+p[data-diagnostic-status="not-run"] { margin: .25rem 0 0; color: var(--muted); font-size: .8rem; }
+.debug-journal { margin-top: 1.5rem; }
+.debug-journal > h2 { margin-top: 0; }
+.debug-journal .route-filters + p { margin-top: .75rem; }
+.debug-journal td:first-child { white-space: nowrap; font-family: var(--font-mono); font-size: .75rem; }
+.level-pill { display: inline-block; padding: 0 .45rem; border-radius: 4px; font-family: var(--font-mono); font-size: .7rem; font-weight: 600; color: var(--ink-2); background: var(--surface-2); }
+.level-pill[data-level="ERROR"], .level-pill[data-level="CRITICAL"] { color: var(--err); background: var(--err-soft); }
+.level-pill[data-level="WARNING"] { color: var(--warn); background: var(--warn-soft); }
+.level-pill[data-level="INFO"] { color: var(--info); background: var(--info-soft); }
 /* Debug Center : étapes connues, sans interaction métier. */
 .debug-flow-scroll { overflow: auto; }
 .debug-flow-scroll:focus-visible { outline: 2px solid currentColor; }

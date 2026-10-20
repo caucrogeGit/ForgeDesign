@@ -4,6 +4,24 @@
 catégorie Forge, type, route et message. Sans projet, aucun Tool n’est exécuté.
 Chaque consultation appelle une fois `debug-center`, sans cache (`no-store`).
 
+## Organisation de la page (FD-UX-007)
+
+Les mêmes informations et les mêmes actions sont réorganisées :
+
+- sous le titre, des **compteurs** du journal : événements, erreurs et
+  avertissements affichés, anomalies de lecture ;
+- chaque **commande** Forge (`forge doctor`, `forge project:audit`,
+  `forge project:check`) est une carte :
+  - un en-tête donne le titre, la commande, son niveau de confiance
+    (Configuration, Lecture seule, Exécute le projet) et le bouton de
+    lancement ;
+  - l'**avertissement** reste toujours visible avant le clic ;
+  - la description et les limites (durée, taille des sorties) se déplient sous
+    « À propos de cette commande » ;
+  - l'état et les sorties suivent ;
+- le **journal** forme sa propre section (filtres, compte, tableau), avec le
+  niveau en pastille. Les anomalies de lecture suivent.
+
 ## Source et contrat
 
 Le seul fichier lu est `storage/logs/errors.dev.jsonl`, relatif à la racine Forge
