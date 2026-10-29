@@ -9,7 +9,12 @@ sa destination.
 
 Les corps HTML, CSS et JS ne sont jamais réécrits. Seuls les en-têtes
 d'encadrement changent : X-Frame-Options est retiré et frame-ancestors est
-remplacé par l'origine de l'éditeur. Le proxy ne démarre ni n'arrête jamais
+remplacé par l'origine de l'éditeur. Exception du mode analyse
+(FD-INSPECT-001) : quand le runner a été lancé avec --inspect, chaque réponse
+HTML reçoit, avant </body>, la balise du script d'inspection, servi par le
+proxy lui-même (même origine que la page, donc script-src 'self'). Tout chemin
+/__forge_design/ est traité ici et jamais relayé : la page ne lit pas les
+traces de l'enfant. Le proxy ne démarre ni n'arrête jamais
 le runner, ne lance aucun processus et n'écrit rien.
 """
 
@@ -25,6 +30,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from http.client import HTTPConnection, HTTPException
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from importlib.resources import files
 from pathlib import Path
 from socketserver import ThreadingMixIn
 from stat import S_ISDIR, S_ISREG
@@ -46,6 +52,8 @@ _MAX_DISCARDED_BODY = 1024 * 1024
 _CLIENT_TIMEOUT = 15.0
 _ALLOWED_METHODS = "GET, HEAD"
 _STATIC_PREFIX = "/static/"
+_INTERNAL_PREFIX = "/__forge_design"
+INSPECT_SCRIPT_PATH = "/__forge_design/inspect.js"
 _ORIGIN = re.compile(r"http://127\.0\.0\.1:([1-9][0-9]{0,4})")
 _HOP_BY_HOP = frozenset(
     {
@@ -142,6 +150,24 @@ def rewrite_location(location: str, runner_port: int) -> str:
     if parts.fragment:
         relative += "#" + parts.fragment
     return relative
+
+
+def inject_inspect_script(body: bytes, trace_id: str | None, origin: str) -> bytes:
+    """Balise du script d'inspection avant le dernier </body>, sinon à la fin.
+
+    data-trace : trace de cette réponse (chiffres seulement) ; data-origin :
+    seule origine à laquelle le script envoie ses messages (Forge Design).
+    """
+    validate_frame_ancestor_origin(origin)
+    trace = trace_id if trace_id is not None and trace_id.isdigit() else ""
+    tag = (
+        f'<script src="{INSPECT_SCRIPT_PATH}" data-trace="{trace}" '
+        f'data-origin="{origin}" defer></script>'
+    ).encode("ascii")
+    position = body.lower().rfind(b"</body")
+    if position < 0:
+        return body + tag
+    return body[:position] + tag + body[position:]
 
 
 @dataclass(frozen=True)
@@ -353,10 +379,28 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         ):
             self._plain(HTTPStatus.SERVICE_UNAVAILABLE, "Preview réelle indisponible.")
             return
-        if path == "/static" or path.startswith(_STATIC_PREFIX):
+        if path == _INTERNAL_PREFIX or path.startswith(_INTERNAL_PREFIX + "/"):
+            self._serve_internal(path, status.inspect)
+        elif path == "/static" or path.startswith(_STATIC_PREFIX):
             self._serve_static(status.project_root, path)
         else:
-            self._forward(status.port, target)
+            self._forward(status.port, target, status.inspect)
+
+    # ── /__forge_design/ (mode analyse) ──────────────────────────────────────
+
+    def _serve_internal(self, path: str, inspect: bool) -> None:
+        if not inspect or path != INSPECT_SCRIPT_PATH:
+            self._plain(HTTPStatus.NOT_FOUND, "Chemin réservé à Forge Design.")
+            return
+        body = files("forge_design.real_preview").joinpath("inspect.js").read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/javascript; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     # ── /static/ ─────────────────────────────────────────────────────────────
 
@@ -385,7 +429,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
 
     # ── Relais vers le runner ────────────────────────────────────────────────
 
-    def _forward(self, runner_port: int, target: str) -> None:
+    def _forward(self, runner_port: int, target: str, inspect: bool) -> None:
         config = self.proxy.config
         deadline = time.monotonic() + config.request_timeout
         connection = HTTPConnection(HOST, runner_port, timeout=config.request_timeout)
@@ -432,6 +476,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
                 response.getheaders(),
                 body,
                 runner_port,
+                inspect,
             )
         finally:
             connection.close()
@@ -443,6 +488,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         headers: list[tuple[str, str]],
         body: bytes,
         runner_port: int,
+        inspect: bool = False,
     ) -> None:
         connection_tokens = {
             token.strip().lower()
@@ -472,6 +518,14 @@ class _ProxyHandler(BaseHTTPRequestHandler):
             policies, self.proxy.frame_ancestor_origin
         ):
             kept.append(("Content-Security-Policy", policy))
+        content_type = next(
+            (value for name, value in headers if name.lower() == "content-type"), ""
+        )
+        if inspect and content_type.lower().startswith("text/html") and body:
+            trace = next(
+                (v for n, v in headers if n.lower() == "x-forge-design-trace"), None
+            )
+            body = inject_inspect_script(body, trace, self.proxy.frame_ancestor_origin)
         self.send_response_only(status, reason)
         for name, value in kept:
             self.send_header(name, value)

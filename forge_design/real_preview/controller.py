@@ -256,6 +256,7 @@ class RealPreviewController:
         self._cancel = threading.Event()
         self._state: RealPreviewState = "stopped"
         self._root: Path | None = None
+        self._inspect = False
         self._child: _Child | None = None
         self._pid: int | None = None
         self._port: int | None = None
@@ -275,6 +276,7 @@ class RealPreviewController:
             exit_code=self._exit_code,
             error=self._error,
             logs=self._logs.snapshot(),
+            inspect=self._inspect,
         )
 
     def _refresh_locked(self) -> None:
@@ -299,7 +301,7 @@ class RealPreviewController:
             return self._snapshot_locked()
 
     def _launch_plan(
-        self, project_root: str | PathLike[str]
+        self, project_root: str | PathLike[str], inspect: bool
     ) -> tuple[Path, list[str], int] | str:
         """Commande dérivée du seul projet ; message d'erreur sinon, sans lancement."""
         if not _POSIX:
@@ -332,10 +334,17 @@ class RealPreviewController:
             "--port",
             str(port),
         ]
+        if inspect:
+            command.append("--inspect")
         return root, command, port
 
-    def start(self, project_root: str | PathLike[str]) -> RealPreviewStatus:
-        """Lancer puis attendre running ou failed, au plus startup_timeout."""
+    def start(
+        self, project_root: str | PathLike[str], *, inspect: bool = False
+    ) -> RealPreviewStatus:
+        """Lancer puis attendre running ou failed, au plus startup_timeout.
+
+        inspect : sondes du mode analyse dans l'enfant (FD-INSPECT-001).
+        """
         if not self._operation.acquire(blocking=False):
             raise RealPreviewError("Une opération de preview réelle est en cours.")
         try:
@@ -351,11 +360,12 @@ class RealPreviewController:
             with self._lock:
                 self._state = "starting"
                 self._root = None
+                self._inspect = inspect
                 self._child = None
                 self._pid = self._port = self._exit_code = None
                 self._error = None
                 self._logs = self._new_logs()
-            plan = self._launch_plan(project_root)
+            plan = self._launch_plan(project_root, inspect)
             if isinstance(plan, str):
                 return self._fail(plan)
             root, command, port = plan

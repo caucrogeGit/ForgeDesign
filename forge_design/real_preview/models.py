@@ -65,3 +65,5 @@ class RealPreviewStatus:
     exit_code: int | None
     error: str | None
     logs: tuple[str, ...]
+    # Mode analyse (FD-INSPECT-001) : enfant lancé avec --inspect.
+    inspect: bool = False

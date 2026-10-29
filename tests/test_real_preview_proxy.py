@@ -30,6 +30,8 @@ from forge_design.real_preview import (
     create_real_preview_proxy,
 )
 from forge_design.real_preview.proxy import (
+    INSPECT_SCRIPT_PATH,
+    inject_inspect_script,
     rewrite_frame_ancestors,
     rewrite_location,
     validate_frame_ancestor_origin,
@@ -184,7 +186,7 @@ class FakeController(RealPreviewController):
         self.calls += 1
         return self.current
 
-    def start(self, project_root: Any) -> RealPreviewStatus:
+    def start(self, project_root: Any, *, inspect: bool = False) -> RealPreviewStatus:
         raise AssertionError("le proxy ne démarre jamais le runner")
 
     def stop(self) -> RealPreviewStatus:
@@ -765,6 +767,106 @@ def test_body_is_never_rewritten(
     assert body == b"\x1f\x8b" and header(headers, "Content-Encoding") == ["gzip"]
 
 
+# ── Mode analyse (FD-INSPECT-001) ────────────────────────────────────────────
+
+
+def inspecting(controller: FakeController, port: int, root: Path) -> None:
+    controller.current = RealPreviewStatus(
+        "running", root, 4242, port, None, None, (), inspect=True
+    )
+
+
+def test_inject_inspect_script() -> None:
+    tag = (
+        b'<script src="/__forge_design/inspect.js" data-trace="7" '
+        b'data-origin="http://127.0.0.1:8765" defer></script>'
+    )
+    page = b"<html><body><p>a</p></BODY></html>"
+    assert inject_inspect_script(page, "7", ORIGIN) == (
+        b"<html><body><p>a</p>" + tag + b"</BODY></html>"
+    )
+    assert inject_inspect_script(b"<p>fragment</p>", "7", ORIGIN) == (
+        b"<p>fragment</p>" + tag
+    )
+    # Seul le dernier </body> compte ; une trace non numérique est vidée.
+    assert inject_inspect_script(b"</body></body>", '1" onload="x', ORIGIN) == (
+        b"</body>" + tag.replace(b'"7"', b'""') + b"</body>"
+    )
+    with pytest.raises(ValueError):
+        inject_inspect_script(page, "7", "http://evil.example")
+
+
+def test_inspect_mode_injects_into_html_only(
+    controller: FakeController,
+    upstream: Upstream,
+    root: Path,
+    start_proxy: ProxyFactory,
+) -> None:
+    inspecting(controller, upstream.port, root)
+    page = b"<html><body><h1>x</h1></body></html>"
+    upstream.reply(
+        200,
+        [("Content-Type", "text/html; charset=utf-8"), ("X-Forge-Design-Trace", "12")],
+        page,
+    )
+    port = start_proxy(controller).server_port
+    _, headers, body = request(port)
+    assert body == inject_inspect_script(page, "12", ORIGIN)
+    assert header(headers, "Content-Length") == [str(len(body))]
+    upstream.reply(200, [("Content-Type", "application/json")], b'{"a": "</body>"}')
+    assert request(port)[2] == b'{"a": "</body>"}'
+    # Hors mode analyse, le corps reste intact (test_body_is_never_rewritten).
+    controller.running(upstream.port, root)
+    upstream.reply(200, [("Content-Type", "text/html")], page)
+    assert request(port)[2] == page
+
+
+def test_inspect_script_served_by_the_proxy(
+    controller: FakeController,
+    upstream: Upstream,
+    root: Path,
+    start_proxy: ProxyFactory,
+) -> None:
+    inspecting(controller, upstream.port, root)
+    port = start_proxy(controller).server_port
+    status, headers, body = request(port, target=INSPECT_SCRIPT_PATH)
+    assert status == 200
+    assert header(headers, "Content-Type") == ["text/javascript; charset=utf-8"]
+    assert header(headers, "Cache-Control") == ["no-store"]
+    assert body == Path(proxy_module.__file__).with_name("inspect.js").read_bytes()
+    assert upstream.requests == []
+
+
+@pytest.mark.parametrize("inspect", [False, True])
+@pytest.mark.parametrize(
+    "target",
+    [
+        "/__forge_design",
+        "/__forge_design/",
+        "/__forge_design/trace/1",
+        "/__forge_design/inspect.js/x",
+        "/__forge_design/../trace/1",
+    ],
+)
+def test_reserved_paths_never_reach_the_application(
+    controller: FakeController,
+    upstream: Upstream,
+    root: Path,
+    start_proxy: ProxyFactory,
+    inspect: bool,
+    target: str,
+) -> None:
+    if inspect:
+        inspecting(controller, upstream.port, root)
+    else:
+        controller.running(upstream.port, root)
+    port = start_proxy(controller).server_port
+    assert request(port, target=target)[0] == 404
+    if not inspect:
+        assert request(port, target=INSPECT_SCRIPT_PATH)[0] == 404
+    assert upstream.requests == []
+
+
 @pytest.mark.parametrize(
     ("location", "expected"),
     [
@@ -1072,7 +1174,12 @@ def test_proxy_module_imports() -> None:
             names.add(node.module.split(".")[0])
     assert names <= sys.stdlib_module_names | {"forge_design"}
     assert not names & {"subprocess", "runpy", "signal", "urllib.request"}
+    # Seule lecture hors /static/ confiné : le script d'inspection, ressource
+    # fixe du paquet (FD-INSPECT-001), jamais un chemin venu d'une requête.
+    packaged = 'files("forge_design.real_preview").joinpath("inspect.js").read_bytes()'
     source = Path(proxy_module.__file__).read_text()
+    assert source.count(packaged) == 1
+    source = source.replace(packaged, "")
     for forbidden in (
         ".start(",
         ".stop(",

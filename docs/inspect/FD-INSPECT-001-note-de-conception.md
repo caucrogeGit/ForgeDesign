@@ -221,4 +221,29 @@ qualification, pas de version publiée avant la fin de l'étape 3.
   templates HTML compilent avec les marqueurs, sans un seul repli, une fois
   déclarés ses filtres `enrichi` et `nu`.
 
-Le contrôleur ne passe pas encore `--inspect` : c'est l'étape 2.
+**Étape 2 faite** (marqueurs et Alt+clic) :
+
+- page **Analyse** (`/inspect`, groupe Explorer de la barre latérale) :
+  « Lancer l'analyse » démarre le runtime de la preview avec `--inspect`
+  (un runner ordinaire du même projet est arrêté puis relancé), l'application
+  s'affiche à gauche à partir de `/`, le panneau à droite ;
+- proxy : en mode analyse, balise `<script src="/__forge_design/inspect.js">`
+  avant `</body>` des réponses HTML (avec l'identifiant de trace et l'origine
+  de Forge Design), script servi par le proxy, tout autre chemin
+  `/__forge_design/` refusé en 404 et jamais relayé ;
+- `inspect.js` (dans la page de l'application) : Alt+clic, ou bouton
+  « Choisir un élément » qui arme un seul clic, cadre autour de l'élément,
+  chaîne des marqueurs envoyée à Forge Design par `postMessage` ;
+- `inspect-panel.js` (dans Forge Design) : n'accepte que les messages de
+  l'iframe du proxy, lit la trace par `GET /inspect/trace?id=…` (le serveur
+  la demande à l'enfant), affiche en texte l'élément choisi et son gabarit,
+  la page, la route, le handler (lien vers le source) et les gabarits rendus
+  (liens vers le visualiseur), avec les requêtes SQL ;
+- vérifié dans Chromium sur le squelette : panneau rempli au chargement,
+  Alt+clic sur le titre attribué à `home/index.html`, bloc `content`, clic
+  armé sur le pied de page attribué à `layouts/base.html`, navigation suivie,
+  aucune violation de CSP venant du mode analyse.
+
+Constat : une balise ouverte dans un gabarit et fermée par un bloc enfant
+appartient au gabarit qui l'ouvre (le `<footer>` du layout reste au layout,
+même quand son contenu vient d'un bloc). C'est le comportement attendu.

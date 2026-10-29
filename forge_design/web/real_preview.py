@@ -21,6 +21,7 @@ Deux entrées utilisateur, un seul runtime (FD-REALPREVIEW-008) :
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from http.client import HTTPConnection, HTTPException
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlencode
@@ -41,6 +42,7 @@ from forge_design.forge.routes import (
     RoutesSourceMissingError,
     RoutesSourceUnreadableError,
 )
+from forge_design.json_strict import loads_strict_json
 from forge_design.limits import MAX_SOURCE_PATH_LENGTH
 from forge_design.platform.tool_registry import ToolRegistry
 from forge_design.real_preview import (
@@ -76,7 +78,7 @@ REAL_PREVIEW_WARNING = (
     "La preview réelle exécute le projet Forge sélectionné et peut déclencher "
     "ses effets de bord habituels."
 )
-_STATE_LABELS: dict[str, str] = {
+STATE_LABELS: dict[str, str] = {
     "stopped": "arrêtée",
     "starting": "démarrage en cours",
     "running": "en cours d'exécution",
@@ -84,6 +86,9 @@ _STATE_LABELS: dict[str, str] = {
     "stopping": "arrêt en cours",
 }
 _PROXY_POLL_INTERVAL = 0.1
+_TRACE_TIMEOUT = 5.0
+_MAX_TRACE_BYTES = 4 * 1024 * 1024
+_MAX_TRACE_ID_DIGITS = 18
 _PROXY_JOIN_TIMEOUT = 5.0
 _REQUIRED_FIELDS = frozenset({"design"})
 _OPTIONAL_FIELDS = frozenset({"node", "preview"})
@@ -126,6 +131,7 @@ class RealPreviewRuntimeStatus:
     error: str | None
     logs: tuple[str, ...]
     proxy_origin: str | None
+    inspect: bool = False
 
 
 class RealPreviewRuntime:
@@ -162,8 +168,12 @@ class RealPreviewRuntime:
     def enabled(self) -> bool:
         return self._editor_origin is not None and not self._closed
 
-    def start(self, root: Path) -> RealPreviewRuntimeStatus:
-        """Démarrer le runner puis le proxy ; même projet actif : état inchangé."""
+    def start(self, root: Path, *, inspect: bool = False) -> RealPreviewRuntimeStatus:
+        """Démarrer le runner puis le proxy ; même projet actif : état inchangé.
+
+        inspect : mode analyse (FD-INSPECT-001). Un runner actif dans l'autre
+        mode est arrêté puis relancé.
+        """
         if self._editor_origin is None or self._closed:
             raise RealPreviewError("Preview réelle indisponible sur ce serveur.")
         if not self._operation.acquire(blocking=False):
@@ -174,12 +184,13 @@ class RealPreviewRuntime:
             if (
                 current.state == "running"
                 and current.project_root == root
+                and current.inspect == inspect
                 and self._proxy is not None
             ):
                 return self._snapshot()
             if not self._stop_locked():
                 return self._snapshot()
-            status = self._controller.start(root)
+            status = self._controller.start(root, inspect=inspect)
             if status.state != "running":
                 return self._snapshot()
             self._start_proxy_locked(self._editor_origin)
@@ -278,8 +289,40 @@ class RealPreviewRuntime:
             state, error = "failed", self._failure
         origin = self._proxy_origin if state == "running" else None
         return RealPreviewRuntimeStatus(
-            state, status.project_root, error, status.logs, origin
+            state, status.project_root, error, status.logs, origin, status.inspect
         )
+
+    def fetch_trace(self, trace_id: str) -> object | None:
+        """Trace du mode analyse, lue auprès de l'enfant sur la boucle locale.
+
+        None si aucun runner en mode analyse, trace inconnue ou réponse
+        invalide. Le port vient du contrôleur, jamais de la requête.
+        """
+        status = self._controller.status()
+        if (
+            status.state != "running"
+            or not status.inspect
+            or status.port is None
+            or not trace_id.isdigit()
+            or len(trace_id) > _MAX_TRACE_ID_DIGITS
+        ):
+            return None
+        connection = HTTPConnection("127.0.0.1", status.port, timeout=_TRACE_TIMEOUT)
+        try:
+            connection.putrequest(
+                "GET", f"/__forge_design/trace/{trace_id}", skip_host=True
+            )
+            connection.putheader("Host", f"127.0.0.1:{status.port}")
+            connection.endheaders()
+            response = connection.getresponse()
+            body = response.read(_MAX_TRACE_BYTES + 1)
+            if response.status != 200 or len(body) > _MAX_TRACE_BYTES:
+                return None
+            return loads_strict_json(body.decode("utf-8"))
+        except (OSError, HTTPException, UnicodeDecodeError, ValueError):
+            return None
+        finally:
+            connection.close()
 
 
 def real_preview_frame_url(proxy_origin: str, route_path: str) -> str:
@@ -387,7 +430,7 @@ class RealPreviewPanel:
         return RealPreviewWebState(
             enabled=self.runtime.enabled,
             state=state,
-            state_label=_STATE_LABELS[state],
+            state_label=STATE_LABELS[state],
             error=status.error if same else None,
             logs=status.logs if same and state == "failed" else (),
             route_available=selection.available,

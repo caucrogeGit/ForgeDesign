@@ -36,6 +36,7 @@ from forge_design.web.debug_detail import show_debug_detail
 from forge_design.web.editor import editor_action, show_editor
 from forge_design.web.editor_preview import show_editor_preview
 from forge_design.web.entities import show_entities
+from forge_design.web.inspect import inspect_action, inspect_trace, show_inspect
 from forge_design.web.inspector import (
     inspect_submission,
     refresh_project,
@@ -146,6 +147,13 @@ def _module_resource_script(request: Request) -> Response:
 
 def _entity_graph_script(request: Request) -> Response:
     script = files("forge_design.web").joinpath("static/entity-graph.js")
+    return Response(
+        body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
+    )
+
+
+def _inspect_panel_script(request: Request) -> Response:
+    script = files("forge_design.web").joinpath("static/inspect-panel.js")
     return Response(
         body=script.read_bytes(), content_type="text/javascript; charset=utf-8"
     )
@@ -267,6 +275,18 @@ def create_application(
     def route_preview_stop(request: Request) -> Response:
         return route_real_preview_action(request, context, panel, stop=True)
 
+    def analysis(request: Request) -> Response:
+        return show_inspect(request, context, runtime)
+
+    def analysis_start(request: Request) -> Response:
+        return inspect_action(request, context, runtime, stop=False)
+
+    def analysis_stop(request: Request) -> Response:
+        return inspect_action(request, context, runtime, stop=True)
+
+    def analysis_trace(request: Request) -> Response:
+        return inspect_trace(request, context, runtime)
+
     def entities(request: Request) -> Response:
         return show_entities(request, context, registry)
 
@@ -337,6 +357,7 @@ def create_application(
     add("GET", "/entity-graph.js", _entity_graph_script, public=True)
     add("GET", "/module-resource.js", _module_resource_script, public=True)
     add("GET", "/debug-flow.js", _debug_flow_script, public=True)
+    add("GET", "/inspect-panel.js", _inspect_panel_script, public=True)
     for module in GRAPHICS_MODULES:
         add("GET", f"/graphics/{module}.js", _graphics_module(module), public=True)
     for font in FONT_FILES:
@@ -378,6 +399,25 @@ def create_application(
         "POST",
         "/routes/real-preview/stop",
         route_preview_stop,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
+    # Mode analyse (FD-INSPECT-001) : même runtime, lancé avec les sondes.
+    add("GET", "/inspect", analysis, public=True, no_store=True)
+    add("GET", "/inspect/trace", analysis_trace, public=True, no_store=True)
+    add(
+        "POST",
+        "/inspect/start",
+        analysis_start,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
+    add(
+        "POST",
+        "/inspect/stop",
+        analysis_stop,
         public=True,
         csrf=False,
         no_store=True,

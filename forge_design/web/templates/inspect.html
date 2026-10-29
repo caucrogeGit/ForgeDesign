@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block title %}Analyse · Forge Design{% endblock %}
+{% block content %}
+<h1>Analyse</h1>
+<p>L'application du projet tourne ici, et vous y naviguez comme un utilisateur.</p>
+<p>Alt+clic sur un élément de la page montre d'où il vient.</p>
+{% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
+{% if error %}<div class="message error" role="alert"><p>{{ error }}</p></div>{% endif %}
+{% if current_project %}
+<section class="inspect-controls" aria-label="État de l'analyse">
+<p>État : <span class="real-preview-state" data-state="{{ state }}">{{ state_label }}</span></p>
+{% if run_error %}<div class="message error" role="alert"><p>{{ run_error }}</p>
+{% if logs %}<pre class="real-preview-logs">{{ logs | join("\n") }}</pre>{% endif %}
+</div>{% endif %}
+{% if can_start %}<form method="post" action="/inspect/start">
+  <button type="submit">{% if state == "failed" %}Relancer l'analyse{% else %}Lancer l'analyse{% endif %}</button>
+</form>
+<p class="real-preview-warning help-text" role="note">{{ warning }}</p>{% endif %}
+{% if can_stop %}<form method="post" action="/inspect/stop">
+  <button type="submit">Arrêter l'analyse</button>
+</form>{% endif %}
+</section>
+{% endif %}
+{% if frame_url %}
+<div class="inspect-workspace" data-inspect-workspace data-proxy-origin="{{ proxy_origin }}">
+  <div class="inspect-stage">
+    <iframe class="inspect-frame" src="{{ frame_url }}" title="Application analysée" sandbox="allow-scripts allow-same-origin allow-forms" referrerpolicy="no-referrer"></iframe>
+  </div>
+  <aside class="inspect-panel" aria-labelledby="inspect-panel-title">
+    <div class="inspect-panel-head">
+      <h2 id="inspect-panel-title">D'où vient cet élément</h2>
+      <button type="button" data-inspect-arm>Choisir un élément</button>
+    </div>
+    <div class="inspect-output" data-inspect-output aria-live="polite">
+      <p class="inspect-empty">Aucune page analysée pour l'instant.</p>
+    </div>
+  </aside>
+</div>
+<script type="module" src="/inspect-panel.js"></script>
+{% endif %}
+{% endblock %}

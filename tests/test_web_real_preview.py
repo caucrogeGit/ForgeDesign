@@ -82,13 +82,17 @@ class FakeController(RealPreviewController):
     def status(self) -> RealPreviewStatus:
         return self.current
 
-    def start(self, project_root: Any) -> RealPreviewStatus:
+    def start(self, project_root: Any, *, inspect: bool = False) -> RealPreviewStatus:
         root = Path(project_root)
-        self.events.append(("runner-start", root))
+        self.events.append(
+            ("runner-start", root, inspect) if inspect else ("runner-start", root)
+        )
         if self.on_start is not None:
             self.on_start()
         if self.start_state == "running":
-            self.current = _status("running", root, pid=4242, port=RUNNER_PORT)
+            self.current = _status(
+                "running", root, pid=4242, port=RUNNER_PORT, inspect=inspect
+            )
         else:
             self.current = _status(
                 "failed",

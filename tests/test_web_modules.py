@@ -22,6 +22,7 @@ HOSTILE = "</script><svg onload=alert(1)>"
 CORE_NAV = [
     "/",
     "/inspector",
+    "/inspect",
     "/routes",
     "/entities",
     "/templates",
