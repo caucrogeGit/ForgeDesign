@@ -31,6 +31,7 @@ from forge_design.real_preview import (
 )
 from forge_design.real_preview.proxy import (
     INSPECT_SCRIPT_PATH,
+    MAX_REAL_PREVIEW_REQUEST_BYTES,
     inject_inspect_script,
     rewrite_frame_ancestors,
     rewrite_location,
@@ -38,6 +39,7 @@ from forge_design.real_preview.proxy import (
 )
 
 ORIGIN = "http://127.0.0.1:8765"
+FORM = "application/x-www-form-urlencoded"
 Headers = list[tuple[str, str]]
 
 
@@ -200,6 +202,8 @@ class _Upstream(BaseHTTPRequestHandler):
     def _answer(self) -> None:
         server: Any = self.server
         server.requests.append((self.command, self.path, list(self.headers.items())))
+        length = int(self.headers.get("Content-Length") or 0)
+        server.bodies.append(self.rfile.read(length) if length else b"")
         if server.delay:
             time.sleep(server.delay)
         if server.raw is not None:
@@ -226,6 +230,7 @@ class Upstream:
         self.server: Any = ThreadingHTTPServer(("127.0.0.1", 0), _Upstream)
         self.server.daemon_threads = True
         self.server.requests = []
+        self.server.bodies = []
         self.server.reply = (200, [("Content-Type", "text/html")], b"<p>cible</p>")
         self.server.delay = 0.0
         self.server.raw = None
@@ -453,7 +458,8 @@ def test_other_methods_never_reach_runner(
     status, headers, _ = request(port, method, target, body=b"a=1")
     assert status == 405
     assert header(headers, "Allow") == ["GET, HEAD"]
-    assert upstream.requests == [] and controller.calls == 0
+    # POST consulte l'état : il n'est relayé qu'en mode analyse (FD-INSPECT-001).
+    assert upstream.requests == [] and controller.calls == (method == "POST")
 
 
 @pytest.mark.parametrize("state", ["stopped", "starting", "failed", "stopping"])
@@ -834,6 +840,61 @@ def test_inspect_script_served_by_the_proxy(
     assert header(headers, "Content-Type") == ["text/javascript; charset=utf-8"]
     assert header(headers, "Cache-Control") == ["no-store"]
     assert body == Path(proxy_module.__file__).with_name("inspect.js").read_bytes()
+    assert upstream.requests == []
+
+
+def test_inspect_mode_relays_post(
+    controller: FakeController,
+    upstream: Upstream,
+    root: Path,
+    start_proxy: ProxyFactory,
+) -> None:
+    inspecting(controller, upstream.port, root)
+    upstream.reply(303, [("Location", f"http://127.0.0.1:{upstream.port}/fini")])
+    port = start_proxy(controller).server_port
+    status, headers, _ = request(
+        port,
+        "POST",
+        "/login?next=/",
+        [("Content-Type", FORM), ("Cookie", "s=1"), ("Origin", "http://x")],
+        body=b"user=a&password=b",
+    )
+    assert (status, header(headers, "Location")) == (303, ["/fini"])
+    method, path, forwarded = upstream.requests[0]
+    assert (method, path, upstream.server.bodies) == (
+        "POST",
+        "/login?next=/",
+        [b"user=a&password=b"],
+    )
+    sent = {name.lower(): value for name, value in forwarded}
+    assert sent["content-type"] == FORM and sent["content-length"] == "17"
+    assert sent["cookie"] == "s=1" and sent["host"] == f"127.0.0.1:{upstream.port}"
+
+
+def test_inspect_mode_post_limits(
+    controller: FakeController,
+    upstream: Upstream,
+    root: Path,
+    start_proxy: ProxyFactory,
+) -> None:
+    inspecting(controller, upstream.port, root)
+    port = start_proxy(controller).server_port
+    host = f"Host: 127.0.0.1:{port}\r\n".encode()
+    chunked = raw_request(
+        port,
+        b"POST /x HTTP/1.1\r\n" + host + b"Transfer-Encoding: chunked\r\n\r\n0\r\n\r\n",
+    )
+    assert chunked.startswith(b"HTTP/1.0 411")
+    too_large = MAX_REAL_PREVIEW_REQUEST_BYTES + 1
+    huge = raw_request(
+        port,
+        b"POST /x HTTP/1.1\r\n"
+        + host
+        + f"Content-Length: {too_large}\r\n\r\n".encode(),
+    )
+    assert huge.startswith(b"HTTP/1.0 413")
+    assert request(port, "POST", "/static/app.css", body=b"a")[0] == 405
+    assert request(port, "POST", "/__forge_design/trace/1", body=b"a")[0] == 404
     assert upstream.requests == []
 
 

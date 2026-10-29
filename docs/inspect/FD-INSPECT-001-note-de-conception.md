@@ -244,6 +244,14 @@ qualification, pas de version publiée avant la fin de l'étape 3.
   armé sur le pied de page attribué à `layouts/base.html`, navigation suivie,
   aucune violation de CSP venant du mode analyse.
 
+**Étape 3 commencée** : le proxy relaie les POST en mode analyse seulement
+(corps de 32 Mio au plus, `Content-Length` obligatoire, 411 sinon), avec
+`Content-Type` ; `/static/` reste en GET et `/__forge_design/` n'est jamais
+relayé. Hors mode analyse, POST reste refusé en 405. La copie jetable de la
+base n'est pas encore faite : SéquenCiel charge `env/dev` avec
+`override=True`, une variable passée à l'enfant ne suffit donc pas à changer
+de base.
+
 Constat : une balise ouverte dans un gabarit et fermée par un bloc enfant
 appartient au gabarit qui l'ouvre (le `<footer>` du layout reste au layout,
 même quand son contenu vient d'un bloc). C'est le comportement attendu.

@@ -1,7 +1,9 @@
 """Proxy local de la preview réelle (FD-REALPREVIEW-003).
 
 Listener dédié sur 127.0.0.1:<port proxy>, origine distincte de Forge Design
-et du runner. Seuls GET et HEAD passent. /static/ est servi depuis
+et du runner. Seuls GET et HEAD passent, plus POST en mode analyse (corps
+borné, Content-Length obligatoire), décision du porteur pour FD-INSPECT-001
+avec une copie jetable de la base. /static/ est servi depuis
 <projet>/static par lecture confinée ; tout autre chemin est relayé, sans
 suivre de redirection, vers http://127.0.0.1:<port du runner> uniquement. Le
 port vient exclusivement de controller.status() : aucune requête ne choisit
@@ -45,6 +47,7 @@ HOST = "127.0.0.1"
 MAX_REAL_PREVIEW_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_REAL_PREVIEW_STATIC_BYTES = 8 * 1024 * 1024
 MAX_REAL_PREVIEW_QUERY_LENGTH = 8192
+MAX_REAL_PREVIEW_REQUEST_BYTES = 32 * 1024 * 1024
 _MAX_CONFIG_BYTES = 64 * 1024 * 1024
 _MAX_SECONDS = 3600.0
 _CHUNK = 64 * 1024
@@ -314,6 +317,9 @@ class _ProxyHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         self._dispatch()
 
+    def do_POST(self) -> None:
+        self._dispatch(post=True)
+
     def do_HEAD(self) -> None:
         self._dispatch()
 
@@ -351,7 +357,27 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         self._plain(HTTPStatus.BAD_REQUEST, "Hôte de requête non autorisé.")
         return False
 
-    def _dispatch(self) -> None:
+    def _read_body(self) -> bytes | None:
+        """Corps d'un POST du mode analyse ; None après une réponse d'erreur."""
+        length = self.headers.get("Content-Length", "").strip()
+        if self.headers.get("Transfer-Encoding") is not None or not length.isdigit():
+            self.close_connection = True
+            self._plain(HTTPStatus.LENGTH_REQUIRED, "Longueur de corps requise.")
+            return None
+        if int(length) > MAX_REAL_PREVIEW_REQUEST_BYTES:
+            self.close_connection = True
+            self._plain(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Corps trop volumineux.")
+            return None
+        try:
+            body = self.rfile.read(int(length))
+        except OSError:
+            body = b""
+        if len(body) != int(length):
+            self.close_connection = True
+            return None
+        return body
+
+    def _dispatch(self, post: bool = False) -> None:
         if not self._host_allowed():
             return
         target = self.path
@@ -365,13 +391,23 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         ):
             self._plain(HTTPStatus.BAD_REQUEST, "Cible de requête refusée.")
             return
-        if self.headers.get("Transfer-Encoding") is not None or self.headers.get(
-            "Content-Length", "0"
-        ) not in ("", "0"):
-            self._discard_body()
-            self._plain(HTTPStatus.BAD_REQUEST, "Corps de requête refusé.")
-            return
-        status = self.proxy.controller.status()
+        body: bytes | None = None
+        if post:
+            status = self.proxy.controller.status()
+            if not status.inspect:
+                self._refuse_method()
+                return
+            body = self._read_body()
+            if body is None:
+                return
+        else:
+            if self.headers.get("Transfer-Encoding") is not None or self.headers.get(
+                "Content-Length", "0"
+            ) not in ("", "0"):
+                self._discard_body()
+                self._plain(HTTPStatus.BAD_REQUEST, "Corps de requête refusé.")
+                return
+            status = self.proxy.controller.status()
         if (
             status.state != "running"
             or status.port is None
@@ -382,9 +418,16 @@ class _ProxyHandler(BaseHTTPRequestHandler):
         if path == _INTERNAL_PREFIX or path.startswith(_INTERNAL_PREFIX + "/"):
             self._serve_internal(path, status.inspect)
         elif path == "/static" or path.startswith(_STATIC_PREFIX):
-            self._serve_static(status.project_root, path)
+            if post:
+                self._plain(
+                    HTTPStatus.METHOD_NOT_ALLOWED,
+                    "Méthode non autorisée.",
+                    [("Allow", _ALLOWED_METHODS)],
+                )
+            else:
+                self._serve_static(status.project_root, path)
         else:
-            self._forward(status.port, target, status.inspect)
+            self._forward(status.port, target, status.inspect, body)
 
     # ── /__forge_design/ (mode analyse) ──────────────────────────────────────
 
@@ -429,7 +472,9 @@ class _ProxyHandler(BaseHTTPRequestHandler):
 
     # ── Relais vers le runner ────────────────────────────────────────────────
 
-    def _forward(self, runner_port: int, target: str, inspect: bool) -> None:
+    def _forward(
+        self, runner_port: int, target: str, inspect: bool, body: bytes | None = None
+    ) -> None:
         config = self.proxy.config
         deadline = time.monotonic() + config.request_timeout
         connection = HTTPConnection(HOST, runner_port, timeout=config.request_timeout)
@@ -442,7 +487,12 @@ class _ProxyHandler(BaseHTTPRequestHandler):
                 for name in _FORWARDED_REQUEST_HEADERS:
                     for value in self.headers.get_all(name) or ():
                         connection.putheader(name, value)
-                connection.endheaders()
+                if body is not None:
+                    content_type = self.headers.get("Content-Type")
+                    if content_type is not None:
+                        connection.putheader("Content-Type", content_type)
+                    connection.putheader("Content-Length", str(len(body)))
+                connection.endheaders(body)
                 response = connection.getresponse()
                 body = b""
                 if self.command != "HEAD":
