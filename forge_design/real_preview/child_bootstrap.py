@@ -8,7 +8,8 @@ avec cwd = racine canonique du projet. Bibliothèque standard seulement : ce
 fichier n'importe jamais forge_design, qui n'est pas installé chez le projet.
 
 Ordre normatif : arguments, garde d'audit socket.bind, compatibilité Forge,
-import app (config.py, env/dev, bootstrap.py), create_wsgi_app, garde Host,
+import app (config.py, env/dev, bootstrap.py), create_wsgi_app, sondes du
+mode analyse avec --inspect (child_inspect.py, FD-INSPECT-001), garde Host,
 bind 127.0.0.1:<port>, serve_forever. L'hôte est une constante et le port un
 argument : aucune configuration du projet ne peut les modifier.
 
@@ -20,6 +21,7 @@ portée. Ce n'est pas une sandbox.
 import errno
 import importlib
 import importlib.metadata
+import importlib.util
 import ipaddress
 import os
 import socket
@@ -57,6 +59,24 @@ def parse_port(arguments: Sequence[str]) -> int | None:
         return None
     port = int(text)
     return port if MIN_PORT <= port <= MAX_PORT else None
+
+
+def parse_arguments(arguments: Sequence[str]) -> tuple[int, bool] | None:
+    """--port <port>, suivi ou non de --inspect (mode analyse, FD-INSPECT-001)."""
+    inspect = len(arguments) == 3 and arguments[2] == "--inspect"
+    port = parse_port(arguments[:2] if inspect else arguments)
+    return None if port is None else (port, inspect)
+
+
+def _load_inspect() -> Any:
+    """child_inspect.py voisin, chargé par chemin (-I : dossier hors sys.path)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "child_inspect.py")
+    spec = importlib.util.spec_from_file_location("_forge_design_inspect", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def bind_allowed(family: object, address: object) -> bool:
@@ -152,10 +172,11 @@ def _load_wsgi_factory() -> Callable[..., Any] | None:
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
-    port = parse_port(sys.argv[1:] if arguments is None else arguments)
-    if port is None:
-        _error("usage : child_bootstrap.py --port <1024-65535>")
+    parsed = parse_arguments(sys.argv[1:] if arguments is None else arguments)
+    if parsed is None:
+        _error("usage : child_bootstrap.py --port <1024-65535> [--inspect]")
         return EXIT_USAGE
+    port, inspect = parsed
     # Avant tout code Forge ou projet.
     sys.addaudithook(audit_hook)
     factory = _load_wsgi_factory()
@@ -178,6 +199,13 @@ def main(arguments: Sequence[str] | None = None) -> int:
         traceback.print_exc()
         _error("create_wsgi_app a échoué.")
         return EXIT_INCOMPATIBLE
+    if inspect:
+        try:
+            wsgi_app = _load_inspect().install(wsgi_app)
+        except Exception:
+            traceback.print_exc()
+            _error("sondes du mode analyse impossibles à poser.")
+            return EXIT_INCOMPATIBLE
     try:
         server = make_server(
             HOST, port, host_guard(wsgi_app, port), server_class=PreviewServer
