@@ -30,6 +30,8 @@ from test_web_real_preview import (
     serving,
 )
 
+from forge_design.real_preview.analysis_database import AnalysisDatabase
+from forge_design.web import inspect as web_inspect
 from forge_design.web import server as web
 from forge_design.web.inspect import trace_links
 
@@ -47,6 +49,42 @@ def stop(
     server: web.ForgeDesignServer, *fields: tuple[str, str], **options: Any
 ) -> Reply:
     return http(server, "POST", "/inspect/stop", list(fields), **options)
+
+
+def copy(
+    server: web.ForgeDesignServer, *fields: tuple[str, str], **options: Any
+) -> Reply:
+    return http(server, "POST", "/inspect/copy", list(fields), **options)
+
+
+class FakeDatabase:
+    """Base d'analyse double : état renvoyé par la vérification, copies comptées."""
+
+    def __init__(self) -> None:
+        self.status = "none"
+        self.copies: list[Path] = []
+        self.events: list[tuple[Any, ...]] = []
+
+    def check(self, root: Path) -> AnalysisDatabase:
+        return AnalysisDatabase(self.status, "a_analyse", source="reelle")  # type: ignore[arg-type]
+
+    def copy(self, root: Path) -> AnalysisDatabase:
+        self.copies.append(root)
+        self.events.append(("database-copy", root))
+        if self.status in ("none", "missing"):
+            return self.check(root)
+        self.status = "ready"
+        return AnalysisDatabase(
+            "ready", "a_analyse", source="reelle", tables=3, rows=1234, seconds=0.5
+        )
+
+
+@pytest.fixture(autouse=True)
+def database(monkeypatch: pytest.MonkeyPatch) -> FakeDatabase:
+    fake = FakeDatabase()
+    monkeypatch.setattr(web_inspect, "check_analysis_database", fake.check)
+    monkeypatch.setattr(web_inspect, "copy_analysis_database", fake.copy)
+    return fake
 
 
 # ── Page et actions, runtime double ──────────────────────────────────────────
@@ -158,6 +196,91 @@ def test_start_refusals(
     open_project(server, project_root)
     assert start(server, *fields, **options)[0] == expected
     assert stop(server, *fields, **options)[0] == expected
+    assert harness.starts == []
+
+
+def test_start_on_the_analysis_copy(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    project_root: Path,
+    database: FakeDatabase,
+) -> None:
+    open_project(server, project_root)
+    database.status = "ready"
+    assert start(server)[0] == 303
+    assert harness.starts == [("runner-start", project_root, True, "a_analyse")]
+    assert database.copies == []
+    body = http(server, "GET", "/inspect")[1]
+    assert "la base <code>a_analyse</code>" in body
+
+
+def test_first_start_copies_an_empty_target(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    project_root: Path,
+    database: FakeDatabase,
+) -> None:
+    open_project(server, project_root)
+    database.status = "empty"
+    assert start(server)[0] == 303
+    assert database.copies == [project_root]
+    assert harness.starts == [("runner-start", project_root, True, "a_analyse")]
+
+
+def test_missing_target_never_starts(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    project_root: Path,
+    database: FakeDatabase,
+) -> None:
+    open_project(server, project_root)
+    database.status = "missing"
+    status, body, _ = start(server)
+    assert status == 409 and "La base d&#39;analyse a_analyse n&#39;existe pas" in body
+    assert "CREATE DATABASE `a_analyse`;" in body
+    assert harness.starts == [] and database.copies == []
+
+
+def test_copy_restarts_a_running_analysis(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    project_root: Path,
+    database: FakeDatabase,
+) -> None:
+    open_project(server, project_root)
+    database.status = "ready"
+    database.events = harness.events
+    start(server)
+    status, body, _ = copy(server)
+    assert status == 200
+    # Espaces insécables : typographie du rendu des pages.
+    assert "Base a_analyse recopiée depuis reelle\xa0: 3 tables" in body
+    assert "1\u202f234 lignes en 0,5\xa0s." in body
+    # Copie faite application arrêtée ; le second runner-stop, sans effet,
+    # vient de runtime.start.
+    names = harness.names()
+    assert names[names.index("proxy-create") + 1 :] == [
+        "proxy-shutdown",
+        "proxy-close",
+        "runner-stop",
+        "database-copy",
+        "runner-stop",
+        "runner-start",
+        "proxy-create",
+    ]
+    assert database.copies == [project_root]
+
+
+def test_copy_without_database(
+    harness: Harness,
+    server: web.ForgeDesignServer,
+    project_root: Path,
+    database: FakeDatabase,
+) -> None:
+    open_project(server, project_root)
+    status, body, _ = copy(server)
+    assert status == 409 and "rien à recopier" in body
+    assert copy(server, ("x", "1"))[0] == 400
     assert harness.starts == []
 
 

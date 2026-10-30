@@ -132,6 +132,7 @@ class RealPreviewRuntimeStatus:
     logs: tuple[str, ...]
     proxy_origin: str | None
     inspect: bool = False
+    database: str | None = None
 
 
 class RealPreviewRuntime:
@@ -168,11 +169,13 @@ class RealPreviewRuntime:
     def enabled(self) -> bool:
         return self._editor_origin is not None and not self._closed
 
-    def start(self, root: Path, *, inspect: bool = False) -> RealPreviewRuntimeStatus:
+    def start(
+        self, root: Path, *, inspect: bool = False, database: str | None = None
+    ) -> RealPreviewRuntimeStatus:
         """Démarrer le runner puis le proxy ; même projet actif : état inchangé.
 
-        inspect : mode analyse (FD-INSPECT-001). Un runner actif dans l'autre
-        mode est arrêté puis relancé.
+        inspect : mode analyse (FD-INSPECT-001), database : sa base d'analyse.
+        Un runner actif dans un autre mode est arrêté puis relancé.
         """
         if self._editor_origin is None or self._closed:
             raise RealPreviewError("Preview réelle indisponible sur ce serveur.")
@@ -185,12 +188,13 @@ class RealPreviewRuntime:
                 current.state == "running"
                 and current.project_root == root
                 and current.inspect == inspect
+                and current.database == database
                 and self._proxy is not None
             ):
                 return self._snapshot()
             if not self._stop_locked():
                 return self._snapshot()
-            status = self._controller.start(root, inspect=inspect)
+            status = self._controller.start(root, inspect=inspect, database=database)
             if status.state != "running":
                 return self._snapshot()
             self._start_proxy_locked(self._editor_origin)
@@ -289,7 +293,13 @@ class RealPreviewRuntime:
             state, error = "failed", self._failure
         origin = self._proxy_origin if state == "running" else None
         return RealPreviewRuntimeStatus(
-            state, status.project_root, error, status.logs, origin, status.inspect
+            state,
+            status.project_root,
+            error,
+            status.logs,
+            origin,
+            status.inspect,
+            status.database,
         )
 
     def fetch_trace(self, trace_id: str) -> object | None:

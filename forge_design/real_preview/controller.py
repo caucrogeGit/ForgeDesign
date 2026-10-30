@@ -257,6 +257,7 @@ class RealPreviewController:
         self._state: RealPreviewState = "stopped"
         self._root: Path | None = None
         self._inspect = False
+        self._database: str | None = None
         self._child: _Child | None = None
         self._pid: int | None = None
         self._port: int | None = None
@@ -277,6 +278,7 @@ class RealPreviewController:
             error=self._error,
             logs=self._logs.snapshot(),
             inspect=self._inspect,
+            database=self._database,
         )
 
     def _refresh_locked(self) -> None:
@@ -301,7 +303,7 @@ class RealPreviewController:
             return self._snapshot_locked()
 
     def _launch_plan(
-        self, project_root: str | PathLike[str], inspect: bool
+        self, project_root: str | PathLike[str], inspect: bool, database: str | None
     ) -> tuple[Path, list[str], int] | str:
         """Commande dérivée du seul projet ; message d'erreur sinon, sans lancement."""
         if not _POSIX:
@@ -336,15 +338,24 @@ class RealPreviewController:
         ]
         if inspect:
             command.append("--inspect")
+            if database is not None:
+                command.extend(["--db", database])
         return root, command, port
 
     def start(
-        self, project_root: str | PathLike[str], *, inspect: bool = False
+        self,
+        project_root: str | PathLike[str],
+        *,
+        inspect: bool = False,
+        database: str | None = None,
     ) -> RealPreviewStatus:
         """Lancer puis attendre running ou failed, au plus startup_timeout.
 
         inspect : sondes du mode analyse dans l'enfant (FD-INSPECT-001).
+        database : base d'analyse imposée à l'enfant (--db), avec inspect seulement.
         """
+        if database is not None and not inspect:
+            raise RealPreviewError("Base d'analyse sans mode analyse.")
         if not self._operation.acquire(blocking=False):
             raise RealPreviewError("Une opération de preview réelle est en cours.")
         try:
@@ -361,11 +372,12 @@ class RealPreviewController:
                 self._state = "starting"
                 self._root = None
                 self._inspect = inspect
+                self._database = database
                 self._child = None
                 self._pid = self._port = self._exit_code = None
                 self._error = None
                 self._logs = self._new_logs()
-            plan = self._launch_plan(project_root, inspect)
+            plan = self._launch_plan(project_root, inspect, database)
             if isinstance(plan, str):
                 return self._fail(plan)
             root, command, port = plan

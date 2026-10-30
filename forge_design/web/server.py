@@ -279,10 +279,13 @@ def create_application(
         return show_inspect(request, context, runtime)
 
     def analysis_start(request: Request) -> Response:
-        return inspect_action(request, context, runtime, stop=False)
+        return inspect_action(request, context, runtime, action="start")
 
     def analysis_stop(request: Request) -> Response:
-        return inspect_action(request, context, runtime, stop=True)
+        return inspect_action(request, context, runtime, action="stop")
+
+    def analysis_copy(request: Request) -> Response:
+        return inspect_action(request, context, runtime, action="copy")
 
     def analysis_trace(request: Request) -> Response:
         return inspect_trace(request, context, runtime)
@@ -418,6 +421,14 @@ def create_application(
         "POST",
         "/inspect/stop",
         analysis_stop,
+        public=True,
+        csrf=False,
+        no_store=True,
+    )
+    add(
+        "POST",
+        "/inspect/copy",
+        analysis_copy,
         public=True,
         csrf=False,
         no_store=True,

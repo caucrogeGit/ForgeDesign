@@ -65,5 +65,7 @@ class RealPreviewStatus:
     exit_code: int | None
     error: str | None
     logs: tuple[str, ...]
-    # Mode analyse (FD-INSPECT-001) : enfant lancé avec --inspect.
+    # Mode analyse (FD-INSPECT-001) : enfant lancé avec --inspect, et --db
+    # <database> quand l'application écrit dans la copie d'analyse.
     inspect: bool = False
+    database: str | None = None

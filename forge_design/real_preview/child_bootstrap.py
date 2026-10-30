@@ -8,8 +8,10 @@ avec cwd = racine canonique du projet. Bibliothèque standard seulement : ce
 fichier n'importe jamais forge_design, qui n'est pas installé chez le projet.
 
 Ordre normatif : arguments, garde d'audit socket.bind, compatibilité Forge,
-import app (config.py, env/dev, bootstrap.py), create_wsgi_app, sondes du
-mode analyse avec --inspect (child_inspect.py, FD-INSPECT-001), garde Host,
+DB_NAME forcé sur la copie d'analyse avec --db (child_database.py), import
+app (config.py, env/dev, bootstrap.py), garde du pilote avec --db,
+create_wsgi_app, sondes du mode analyse avec --inspect (child_inspect.py,
+FD-INSPECT-001), garde Host,
 bind 127.0.0.1:<port>, serve_forever. L'hôte est une constante et le port un
 argument : aucune configuration du projet ne peut les modifier.
 
@@ -61,22 +63,42 @@ def parse_port(arguments: Sequence[str]) -> int | None:
     return port if MIN_PORT <= port <= MAX_PORT else None
 
 
-def parse_arguments(arguments: Sequence[str]) -> tuple[int, bool] | None:
-    """--port <port>, suivi ou non de --inspect (mode analyse, FD-INSPECT-001)."""
-    inspect = len(arguments) == 3 and arguments[2] == "--inspect"
-    port = parse_port(arguments[:2] if inspect else arguments)
-    return None if port is None else (port, inspect)
+def parse_arguments(
+    arguments: Sequence[str],
+) -> tuple[int, bool, str | None] | None:
+    """--port <port>, puis --inspect (mode analyse, FD-INSPECT-001), puis --db <nom>.
+
+    --db n'est admis qu'après --inspect ; le nom est validé par
+    child_database.valid_target, après chargement.
+    """
+    port = parse_port(arguments[:2])
+    rest = list(arguments[2:])
+    if port is None:
+        return None
+    if rest in ([], ["--inspect"]):
+        return port, bool(rest), None
+    if len(rest) == 3 and rest[:2] == ["--inspect", "--db"]:
+        return port, True, rest[2]
+    return None
 
 
-def _load_inspect() -> Any:
-    """child_inspect.py voisin, chargé par chemin (-I : dossier hors sys.path)."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "child_inspect.py")
-    spec = importlib.util.spec_from_file_location("_forge_design_inspect", path)
+def _load_sibling(filename: str, name: str) -> Any:
+    """Module voisin, chargé par chemin (-I : dossier hors sys.path)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise ImportError(path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _load_inspect() -> Any:
+    return _load_sibling("child_inspect.py", "_forge_design_inspect")
+
+
+def _load_database() -> Any:
+    return _load_sibling("child_database.py", "_forge_design_database")
 
 
 def bind_allowed(family: object, address: object) -> bool:
@@ -174,14 +196,23 @@ def _load_wsgi_factory() -> Callable[..., Any] | None:
 def main(arguments: Sequence[str] | None = None) -> int:
     parsed = parse_arguments(sys.argv[1:] if arguments is None else arguments)
     if parsed is None:
-        _error("usage : child_bootstrap.py --port <1024-65535> [--inspect]")
+        _error(
+            "usage : child_bootstrap.py --port <1024-65535> [--inspect [--db <nom>]]"
+        )
         return EXIT_USAGE
-    port, inspect = parsed
+    port, inspect, database_name = parsed
     # Avant tout code Forge ou projet.
     sys.addaudithook(audit_hook)
     factory = _load_wsgi_factory()
     if factory is None:
         return EXIT_INCOMPATIBLE
+    database: Any = None
+    if database_name is not None:
+        database = _load_database()
+        if not database.valid_target(database_name):
+            _error(f"base d'analyse invalide : {database_name!r}.")
+            return EXIT_USAGE
+        database.redirect(database_name)
     sys.path.insert(0, os.getcwd())
     try:
         project = importlib.import_module("app")
@@ -189,6 +220,13 @@ def main(arguments: Sequence[str] | None = None) -> int:
         traceback.print_exc()
         _error("import du projet impossible.")
         return EXIT_IMPORT
+    if database is not None:
+        try:
+            database.guard_driver(database_name)
+        except Exception:
+            traceback.print_exc()
+            _error("base d'analyse impossible à imposer.")
+            return EXIT_INCOMPATIBLE
     application = getattr(project, "application", None)
     if not callable(getattr(application, "dispatch", None)):
         _error("app.application.dispatch introuvable.")

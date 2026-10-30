@@ -5,7 +5,9 @@
 <p>L'application du projet tourne ici, et vous y naviguez comme un utilisateur.</p>
 <p>Alt+clic sur un élément de la page montre d'où il vient.</p>
 {% if not current_project %}<p>Aucun projet ouvert.</p>{% endif %}
-{% if error %}<div class="message error" role="alert"><p>{{ error }}</p></div>{% endif %}
+{% if error %}<div class="message error" role="alert"><p>{{ error }}</p>
+{% if error_sql %}<pre>{{ error_sql }}</pre>{% endif %}</div>{% endif %}
+{% if notice %}<p class="message" role="status">{{ notice }}</p>{% endif %}
 {% if current_project %}
 <section class="inspect-controls" aria-label="État de l'analyse">
 <p>État : <span class="real-preview-state" data-state="{{ state }}">{{ state_label }}</span></p>
@@ -18,6 +20,10 @@
 <p class="real-preview-warning help-text" role="note">{{ warning }}</p>{% endif %}
 {% if can_stop %}<form method="post" action="/inspect/stop">
   <button type="submit">Arrêter l'analyse</button>
+</form>{% endif %}
+{% if database %}<p>L'application écrit dans la base <code>{{ database }}</code>, une copie jetable : la base du projet n'est jamais touchée.</p>{% endif %}
+{% if can_copy %}<form method="post" action="/inspect/copy">
+  <button type="submit">Recopier la base</button>
 </form>{% endif %}
 </section>
 {% endif %}

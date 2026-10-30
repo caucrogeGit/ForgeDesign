@@ -244,13 +244,41 @@ qualification, pas de version publiée avant la fin de l'étape 3.
   armé sur le pied de page attribué à `layouts/base.html`, navigation suivie,
   aucune violation de CSP venant du mode analyse.
 
-**Étape 3 commencée** : le proxy relaie les POST en mode analyse seulement
-(corps de 32 Mio au plus, `Content-Length` obligatoire, 411 sinon), avec
-`Content-Type` ; `/static/` reste en GET et `/__forge_design/` n'est jamais
-relayé. Hors mode analyse, POST reste refusé en 405. La copie jetable de la
-base n'est pas encore faite : SéquenCiel charge `env/dev` avec
-`override=True`, une variable passée à l'enfant ne suffit donc pas à changer
-de base.
+**Étape 3 en cours** : connexion faite, essai sur 5 pages à mener par le
+porteur.
+
+- le proxy relaie les POST en mode analyse seulement (corps de 32 Mio au
+  plus, `Content-Length` obligatoire, 411 sinon), avec `Content-Type` ;
+  `/static/` reste en GET et `/__forge_design/` n'est jamais relayé. Hors
+  mode analyse, POST reste refusé en 405 ;
+- **base d'analyse** : `<dossier du projet>_analyse`, sur le même serveur,
+  créée une fois par un administrateur du serveur (le compte
+  d'administration du projet n'a pas le droit de créer une base). Pour
+  SéquenCiel : `sequenciel_analyse`, mêmes droits que les autres bases pour
+  les deux comptes ;
+- `child_database.py`, lancé avec l'interpréteur du projet (les
+  identifiants ne quittent pas ce processus) : vérification (`--check`) ou
+  copie, en supprimant les tables de la cible puis `CREATE TABLE … LIKE` et
+  `INSERT … SELECT` table par table (colonnes générées exclues), puis les
+  vues. La cible doit finir par `_analyse` et différer de `DB_NAME` ;
+- l'enfant reçoit `--db <base>` avec `--inspect` : `DB_NAME` est posé
+  avant `import app` et de nouveau après chaque `load_dotenv` (SéquenCiel
+  charge `env/dev` avec `override=True`), puis `mariadb.connect` et
+  `mariadb.ConnectionPool` refusent toute autre base ;
+- page Analyse : un projet qui a un `DB_NAME` ne démarre que sur sa copie,
+  recopiée automatiquement si elle est vide ; base absente : refus, avec le
+  SQL à faire lancer par l'administrateur ; bouton « Recopier la base »
+  (analyse arrêtée, copie, analyse relancée). Un projet sans `DB_NAME`
+  démarre comme avant ;
+- essai réel sur SéquenCiel (30 octobre) : copie de 117 tables et 41 885
+  lignes en 2,5 à 3 s, contenu identique à la source ; `/login` et un POST
+  de connexion (mot de passe faux) passés par le proxy, avec route, handler
+  et les 7 requêtes SQL dans la trace ; sessions et tentatives de connexion
+  écrites dans la copie seulement ; empreinte (`CHECKSUM TABLE`) des 117
+  tables de la base réelle identique avant et après.
+
+Reste pour l'étape 3 : l'essai sur 5 pages choisies par le porteur, avec
+son propre compte (§8).
 
 Constat : une balise ouverte dans un gabarit et fermée par un bloc enfant
 appartient au gabarit qui l'ouvre (le `<footer>` du layout reste au layout,

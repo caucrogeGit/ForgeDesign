@@ -5,13 +5,17 @@ l'application tourne avec les sondes de child_inspect.py et le proxy injecte
 le script d'inspection dans ses pages. Aucune sélection de route : la page
 part de / et l'on navigue partout.
 
+Base d'analyse (étape 3) : un projet qui a une base (DB_NAME) ne démarre
+qu'avec sa copie jetable, recopiée au premier lancement puis à la demande.
+
 La page reçoit, par postMessage depuis l'origine du proxy, un identifiant de
 trace ; elle demande la trace à GET /inspect/trace, que le serveur lit
 auprès de l'enfant. La trace vient du code du projet : elle n'est affichée
 qu'en texte, et les seuls liens sont des URL de Forge Design construites ici.
 """
 
-from typing import Any, cast
+from pathlib import Path
+from typing import Any, Literal, cast
 from urllib.parse import urlencode
 
 from core.http.request import Request
@@ -19,6 +23,12 @@ from core.http.response import Response
 
 from forge_design.current_project import CurrentProjectContext
 from forge_design.real_preview import RealPreviewError
+from forge_design.real_preview.analysis_database import (
+    AnalysisDatabase,
+    check_analysis_database,
+    copy_analysis_database,
+    creation_sql,
+)
 from forge_design.web.editor import (
     EditorHttpError,
     check_editor_post,
@@ -93,6 +103,8 @@ def render_inspect(
     runtime: RealPreviewRuntime,
     *,
     error: str | None = None,
+    error_sql: str | None = None,
+    notice: str | None = None,
     status: int = 200,
 ) -> Response:
     """Page du mode analyse ; frame-src élargi au seul proxy actif."""
@@ -117,8 +129,12 @@ def render_inspect(
             and context.root is not None
             and state in ("stopped", "failed"),
             "can_stop": state in ("running", "starting"),
+            "can_copy": runtime.enabled and context.root is not None,
+            "database": current.database if active else None,
             "warning": REAL_PREVIEW_WARNING,
             "error": error,
+            "error_sql": error_sql,
+            "notice": notice,
         },
         status=status,
     )
@@ -138,30 +154,94 @@ def show_inspect(
     return render_inspect(context, runtime)
 
 
+class _DatabaseError(EditorHttpError):
+    def __init__(self, message: str, sql: str | None = None) -> None:
+        super().__init__(409, message)
+        self.sql = sql
+
+
+def _database_error(database: AnalysisDatabase) -> _DatabaseError:
+    if database.status == "missing":
+        return _DatabaseError(
+            f"La base d'analyse {database.target} n'existe pas sur le serveur. "
+            "Le compte d'administration du projet ne peut pas la créer : "
+            "un administrateur du serveur doit lancer ceci.",
+            creation_sql(database),
+        )
+    if database.status == "none":
+        return _DatabaseError("Le projet n'a pas de base (DB_NAME) : rien à recopier.")
+    return _DatabaseError(f"Base d'analyse : {database.error or database.status}.")
+
+
+def _analysis_database(root: Path) -> str | None:
+    """Nom de la copie à imposer à l'enfant ; None si le projet n'a pas de base."""
+    database = check_analysis_database(root)
+    if database.status == "none":
+        return None
+    if database.status == "empty":
+        database = copy_analysis_database(root)
+    if database.status != "ready":
+        raise _database_error(database)
+    return database.target
+
+
+def _start(root: Path, runtime: RealPreviewRuntime, database: str | None) -> None:
+    try:
+        runtime.start(root, inspect=True, database=database)
+    except RealPreviewError as error:
+        raise EditorHttpError(409, str(error)) from None
+
+
+def _copy(root: Path, runtime: RealPreviewRuntime) -> str:
+    """Arrêter l'analyse en cours, recopier, relancer ; message de réussite."""
+    current = runtime.status()
+    running = (
+        current.inspect
+        and current.project_root == root
+        and current.state in ("running", "starting")
+    )
+    if running and not runtime.stop():
+        raise EditorHttpError(500, "Analyse impossible à arrêter.")
+    database = copy_analysis_database(root)
+    if database.status != "ready":
+        raise _database_error(database)
+    if running:
+        _start(root, runtime, database.target)
+    rows = f"{database.rows or 0:,}".replace(",", "\u202f")
+    seconds = ""
+    if database.seconds is not None:
+        seconds = f" en {database.seconds:.1f}".replace(".", ",") + "\u00a0s"
+    return (
+        f"Base {database.target} recopiée depuis {database.source} : "
+        f"{database.tables} tables, {rows} lignes{seconds}."
+    )
+
+
 def inspect_action(
     request: Request,
     context: CurrentProjectContext,
     runtime: RealPreviewRuntime,
     *,
-    stop: bool,
+    action: Literal["start", "stop", "copy"],
 ) -> Response:
-    """POST Start/Stop, sans aucun champ."""
+    """POST Start/Stop/Recopier, sans aucun champ."""
     try:
         check_editor_post(request, context)
         if editor_form_fields(request):
             raise EditorHttpError(400, "Champs de formulaire inattendus.")
-        if stop:
+        if action == "stop":
             if not runtime.stop():
                 raise EditorHttpError(500, "Analyse impossible à arrêter.")
         else:
             assert context.root is not None
-            try:
-                runtime.start(context.root, inspect=True)
-            except RealPreviewError as error:
-                raise EditorHttpError(409, str(error)) from None
+            if action == "copy":
+                notice = _copy(context.root, runtime)
+                return render_inspect(context, runtime, notice=notice)
+            _start(context.root, runtime, _analysis_database(context.root))
     except EditorHttpError as error:
+        sql = error.sql if isinstance(error, _DatabaseError) else None
         return render_inspect(
-            context, runtime, error=error.message, status=error.status
+            context, runtime, error=error.message, error_sql=sql, status=error.status
         )
     return Response(303, b"", headers={"Location": INSPECT_PAGE})
 

@@ -35,10 +35,13 @@ def test_inspect_uses_only_the_standard_library() -> None:
 
 
 def test_parse_arguments() -> None:
-    assert child_bootstrap.parse_arguments(["--port", "8080"]) == (8080, False)
-    assert child_bootstrap.parse_arguments(["--port", "8080", "--inspect"]) == (
+    parse = child_bootstrap.parse_arguments
+    assert parse(["--port", "8080"]) == (8080, False, None)
+    assert parse(["--port", "8080", "--inspect"]) == (8080, True, None)
+    assert parse(["--port", "8080", "--inspect", "--db", "x_analyse"]) == (
         8080,
         True,
+        "x_analyse",
     )
 
 
@@ -50,6 +53,10 @@ def test_parse_arguments() -> None:
         ["--port", "8080", "--inspect", "--inspect"],
         ["--port", "80", "--inspect"],
         ["--inspect"],
+        ["--port", "8080", "--db", "x_analyse"],
+        ["--port", "8080", "--db", "x_analyse", "--inspect"],
+        ["--port", "8080", "--inspect", "--db"],
+        ["--port", "8080", "--inspect", "--db", "x_analyse", "--inspect"],
     ],
 )
 def test_parse_arguments_refuses(arguments: list[str]) -> None:
@@ -424,3 +431,48 @@ def test_without_inspect_nothing_changes(serve: Callable[..., int]) -> None:
     assert response.status == 200 and response.getheader(ci.TRACE_HEADER) is None
     assert "fd:" not in body
     assert _get(port, "/__forge_design/trace/1")[0].status == 404
+
+
+def test_db_option_wins_over_env_dev(tmp_path: Path) -> None:
+    """env/dev pose DB_NAME avec override=True : la copie d'analyse l'emporte."""
+    root = make_project(tmp_path / "projet", env_dev="DB_NAME=reelle\n")
+    seen = tmp_path / "db_name.txt"
+    with (root / "app.py").open("a", encoding="utf-8") as app:
+        app.write(
+            "\nimport os as _os\n"
+            f"open({str(seen)!r}, 'w').write(_os.environ.get('DB_NAME', ''))\n"
+        )
+    command = [str(root / ".venv/bin/python"), "-I", "-B", "-u", str(BOOTSTRAP)]
+    env = {"PATH": "/usr/bin:/bin", "APP_ENV": "dev"}
+    port = str(_free_port())
+    invalid = subprocess.run(
+        [*command, "--port", port, "--inspect", "--db", "reelle"],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert invalid.returncode == child_bootstrap.EXIT_USAGE
+    assert "base d'analyse invalide" in invalid.stderr and not seen.exists()
+    child = subprocess.Popen(
+        [*command, "--port", port, "--inspect", "--db", "projet_analyse"],
+        cwd=root,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        assert child.stdout is not None
+        for line in child.stdout:
+            if "écoute sur" in line:
+                break
+        else:
+            pytest.fail(f"enfant arrêté : {child.wait()}")
+        assert seen.read_text() == "projet_analyse"
+        assert _get(int(port), "/")[0].status == 200
+    finally:
+        child.terminate()
+        child.wait(timeout=10)

@@ -183,6 +183,30 @@ def test_start_command_and_running(harness: Harness, project: Path) -> None:
     assert harness.signals == []
 
 
+def test_start_command_in_analysis_mode(harness: Harness, project: Path) -> None:
+    status = RealPreviewController().start(
+        project, inspect=True, database="projet_analyse"
+    )
+    assert (status.state, status.inspect, status.database) == (
+        "running",
+        True,
+        "projet_analyse",
+    )
+    assert harness.spawned[0][0][-5:] == [
+        "--port",
+        "40001",
+        "--inspect",
+        "--db",
+        "projet_analyse",
+    ]
+
+
+def test_database_requires_analysis_mode(harness: Harness, project: Path) -> None:
+    with pytest.raises(RealPreviewError):
+        RealPreviewController().start(project, database="projet_analyse")
+    assert harness.spawned == []
+
+
 def test_spawn_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls: list[tuple[list[str], dict[str, Any]]] = []
 
